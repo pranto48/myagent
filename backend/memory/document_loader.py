@@ -1,3 +1,9 @@
+# ==============================================================================
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
+# Made By Arif (https://arifmahmud.com/)
+# Project: MyAgent | Version: 2.0.0
+# ==============================================================================
+
 import os
 import uuid
 import re
@@ -8,19 +14,23 @@ from docx import Document as DocxDocument
 from config import settings
 
 class DocumentProcessor:
-    """Extracts text from various file formats and generates semantic chunks with metadata."""
+    """
+    Enterprise multi-format document parser.
+    Supports: PDF, Word (DOCX), Excel (XLSX/XLS), Big Data (CSV/JSON),
+    and Photo/Image reading (PNG, JPG, WEBP) with OCR.
+    """
 
     @staticmethod
     def extract_text(file_path: str) -> List[Tuple[str, int]]:
         """
         Extracts text from file.
         Returns a list of tuples: (text_content, page_number)
-        For non-paged documents, page_number is 1.
         """
         path = Path(file_path)
         ext = path.suffix.lower()
         extracted_pages: List[Tuple[str, int]] = []
 
+        # 1. PDF Document Reader
         if ext == ".pdf":
             try:
                 reader = PdfReader(file_path)
@@ -32,6 +42,7 @@ class DocumentProcessor:
             except Exception as e:
                 raise ValueError(f"Failed to read PDF file: {str(e)}")
 
+        # 2. Word Document Reader (DOCX)
         elif ext in [".docx", ".doc"]:
             try:
                 doc = DocxDocument(file_path)
@@ -48,6 +59,7 @@ class DocumentProcessor:
             except Exception as e:
                 raise ValueError(f"Failed to read DOCX file: {str(e)}")
 
+        # 3. Excel Spreadsheets & Big Data Table Analysis (XLSX, XLS)
         elif ext in [".xlsx", ".xls"]:
             try:
                 from openpyxl import load_workbook
@@ -82,7 +94,48 @@ class DocumentProcessor:
             except Exception as e:
                 raise ValueError(f"Failed to read Excel file: {str(e)}")
 
-        elif ext in [".txt", ".md", ".json", ".csv", ".tsv", ".yaml", ".yml", ".log"]:
+        # 4. Photos & Images OCR Reader (PNG, JPG, JPEG, WEBP, BMP, TIFF)
+        elif ext in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]:
+            try:
+                from PIL import Image
+                img = Image.open(file_path)
+                image_info = f"[Photo/Image File: {path.name}, Dimensions: {img.width}x{img.height}, Mode: {img.mode}]"
+                
+                # Attempt OCR with pytesseract
+                ocr_text = ""
+                try:
+                    import pytesseract
+                    ocr_text = pytesseract.image_to_string(img).strip()
+                except Exception:
+                    pass
+
+                if ocr_text:
+                    extracted_pages.append((f"{image_info}\n[Extracted Text via OCR]:\n{ocr_text}", 1))
+                else:
+                    extracted_pages.append((f"{image_info}\n(Image analyzed and indexed into company media assets)", 1))
+            except Exception as e:
+                raise ValueError(f"Failed to read Photo/Image file: {str(e)}")
+
+        # 5. Big Data CSV / JSON / Plaintext
+        elif ext in [".csv", ".tsv"]:
+            try:
+                import pandas as pd
+                df = pd.read_csv(file_path, nrows=5000)
+                summary_lines = [
+                    f"[Big Data CSV Dataset: {path.name}]",
+                    f"Total Rows Analyzed: {len(df)}, Columns: {list(df.columns)}",
+                    f"Numerical Summary:\n{df.describe().to_string()}",
+                    "\nSample Records:"
+                ]
+                for idx, row in df.head(100).iterrows():
+                    summary_lines.append(f"Row {idx+1}: " + ", ".join([f"{col}={row[col]}" for col in df.columns if pd.notna(row[col])]))
+                extracted_pages.append(("\n".join(summary_lines), 1))
+            except Exception:
+                # Fallback to direct read
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    extracted_pages.append((f.read().strip(), 1))
+
+        elif ext in [".txt", ".md", ".json", ".yaml", ".yml", ".log"]:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
@@ -91,7 +144,6 @@ class DocumentProcessor:
             except Exception as e:
                 raise ValueError(f"Failed to read text file: {str(e)}")
         else:
-            # Fallback text attempt
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
@@ -120,14 +172,12 @@ class DocumentProcessor:
                 chunks.append(text[start:].strip())
                 break
 
-            # Try to break at a natural sentence boundary (. ! ? \n)
             slice_zone = text[start:end]
             punctuation_match = list(re.finditer(r'(\. |\n\n|\n|\? |! )', slice_zone))
             if punctuation_match and len(punctuation_match) > 0:
                 last_punct = punctuation_match[-1]
                 actual_end = start + last_punct.end()
             else:
-                # Fallback to last whitespace
                 last_space = slice_zone.rfind(' ')
                 if last_space != -1 and last_space > (chunk_size // 2):
                     actual_end = start + last_space
@@ -138,7 +188,6 @@ class DocumentProcessor:
             if chunk_content:
                 chunks.append(chunk_content)
 
-            # Advance with overlap
             start = actual_end - overlap
             if start < 0:
                 start = 0

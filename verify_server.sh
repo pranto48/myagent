@@ -1,5 +1,6 @@
 #!/bin/bash
 # ==============================================================================
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
 # MyAgent - Server 192.168.9.9 Diagnostic and Health Verification Script
 # ==============================================================================
 

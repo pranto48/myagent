@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" fill="none">
+  <!-- Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) -->
+  <defs>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <!-- Icon Emblem -->
+  <rect x="6" y="10" width="40" height="40" rx="10" fill="#1e293b" stroke="url(#logoGrad)" stroke-width="2"/>
+  <circle cx="26" cy="30" r="9" fill="url(#logoGrad)"/>
+  <circle cx="26" cy="30" r="4" fill="#ffffff"/>
+  <circle cx="16" cy="20" r="2.5" fill="#38bdf8"/>
+  <line x1="18" y1="22" x2="21" y2="25" stroke="#38bdf8" stroke-width="1.5"/>
+  <circle cx="36" cy="20" r="2.5" fill="#a855f7"/>
+  <line x1="34" y1="22" x2="31" y2="25" stroke="#a855f7" stroke-width="1.5"/>
+  
+  <!-- Text -->
+  <text x="56" y="32" font-family="'Outfit', 'Inter', sans-serif" font-weight="800" font-size="20" fill="#ffffff" letter-spacing="-0.5">MyAgent</text>
+  <text x="56" y="45" font-family="'Inter', sans-serif" font-weight="600" font-size="9" fill="#06b6d4" letter-spacing="1.5">ENTERPRISE AI PLATFORM</text>
+</svg>

@@ -1,35 +1,68 @@
-// Main Application Logic, Chat Streaming & UI Interactions
+/* ==============================================================================
+ * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
+ * Made By Arif (https://arifmahmud.com/)
+ * Project: MyAgent | Version: 2.0.0
+ * ============================================================================== */
+
+// Main Application Logic, Mobile Drawer, Chat Streaming & UI Interactions
 
 let currentSessionId = null;
 let conversationHistory = [];
 let isGenerating = false;
 let useMemory = true;
 
-// Tab Switching
+// Mobile Sidebar Drawer Toggle
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('main-sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('mobile-open');
+  }
+}
+
+// Tab Switching across all 5 views
 function switchTab(tabName) {
-  const chatView = document.getElementById('view-chat');
-  const knowledgeView = document.getElementById('view-knowledge');
-  const navChatBtn = document.getElementById('nav-chat-btn');
-  const navKnowledgeBtn = document.getElementById('nav-knowledge-btn');
+  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models'];
+  tabs.forEach(t => {
+    const view = document.getElementById(`view-${t}`);
+    const btn = document.getElementById(`nav-${t}-btn`);
+    if (view) view.classList.remove('active');
+    if (btn) btn.classList.remove('active');
+  });
+
+  const activeView = document.getElementById(`view-${tabName}`);
+  const activeBtn = document.getElementById(`nav-${tabName}-btn`);
+  if (activeView) activeView.classList.add('active');
+  if (activeBtn) activeBtn.classList.add('active');
+
   const topbarTitle = document.getElementById('topbar-title-text');
   const topbarDesc = document.getElementById('topbar-desc-text');
 
+  // Close mobile sidebar after tab switch
+  const sidebar = document.getElementById('main-sidebar');
+  if (sidebar && sidebar.classList.contains('mobile-open')) {
+    sidebar.classList.remove('mobile-open');
+  }
+
   if (tabName === 'chat') {
-    chatView.classList.add('active');
-    knowledgeView.classList.remove('active');
-    navChatBtn.classList.add('active');
-    navKnowledgeBtn.classList.remove('active');
     topbarTitle.innerText = 'কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট';
     topbarDesc.innerText = 'ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই';
-  } else {
-    chatView.classList.remove('active');
-    knowledgeView.classList.add('active');
-    navChatBtn.classList.remove('active');
-    navKnowledgeBtn.classList.add('active');
-    topbarTitle.innerText = 'কোম্পানি নলেজবেস ও মেমোরি ম্যানেজার';
-    topbarDesc.innerText = 'কোম্পানির ফাইল ইনডেক্সিং এবং ভেক্টর সার্চ অডিট';
-    loadDocumentList();
-    loadMemoryStats();
+  } else if (tabName === 'dashboard') {
+    topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
+    topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
+    if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+  } else if (tabName === 'users') {
+    topbarTitle.innerText = 'কোম্পানি ইউজার ও এক্সেস কন্ট্রোল';
+    topbarDesc.innerText = 'অভ্যন্তরীণ কর্মকর্তা ও কর্মচারীদের রোল ম্যানেজমেন্ট';
+    if (typeof loadUsersList === 'function') loadUsersList();
+  } else if (tabName === 'knowledge') {
+    topbarTitle.innerText = 'কোম্পানি ডেটা লাইব্রেরি ও মেমোরি ইনজেস্ট';
+    topbarDesc.innerText = 'PDF, Word, Excel, CSV ও ফটো/ছবি OCR প্রসেসিং';
+    if (typeof loadDocumentList === 'function') loadDocumentList();
+    if (typeof loadMemoryStats === 'function') loadMemoryStats();
+  } else if (tabName === 'models') {
+    topbarTitle.innerText = 'এআই মডেল হাব ও রিয়েলটাইম পিং টেস্ট';
+    topbarDesc.innerText = 'বাহ্যিক এলএলএম সার্ভারের সংযোগ ও রেসপন্স টাইম (ms)';
+    if (typeof loadModelsOverview === 'function') loadModelsOverview();
   }
 }
 
@@ -45,21 +78,48 @@ function toggleMemoryUsage() {
 
   if (useMemory) {
     icon.innerText = '🧠';
-    label.innerText = 'কোম্পানি মেমোরি: সক্রিয়';
+    label.innerText = 'মেমোরি: সক্রিয়';
     btn.style.borderColor = 'rgba(6, 182, 212, 0.4)';
     btn.style.color = 'var(--cyan-glow)';
   } else {
     icon.innerText = '⚡';
-    label.innerText = 'মেমোরি: নিষ্ক্রিয় (সরাসরি এলএলএম)';
+    label.innerText = 'মেমোরি: নিষ্ক্রিয়';
     btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
     btn.style.color = 'var(--text-muted)';
   }
 }
 
+// Export Chat Conversation as Markdown
+function exportChatConversation() {
+  if (!conversationHistory || conversationHistory.length === 0) {
+    showToast('এক্সপোর্ট করার মতো কোনো মেসেজ নেই।', 'info');
+    return;
+  }
+
+  let mdContent = `# MyAgent Chat Export\n`;
+  mdContent += `Date: ${new Date().toLocaleString()}\n`;
+  mdContent += `Copyright: IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/)\n\n`;
+  mdContent += `---\n\n`;
+
+  conversationHistory.forEach(m => {
+    const sender = m.role === 'user' ? 'User' : 'MyAgent';
+    mdContent += `### ${sender}\n${m.content}\n\n`;
+  });
+
+  const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `myagent_chat_${Date.now()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!', 'success');
+}
+
 // Textarea Auto-resize
 function autoResizeTextarea(textarea) {
   textarea.style.height = 'auto';
-  textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+  textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
 }
 
 function handleTextareaKey(e) {
@@ -76,9 +136,7 @@ function usePrompt(text) {
   sendMessage();
 }
 
-// ==============================================================================
 // Persistent Chat Sessions Management
-// ==============================================================================
 async function loadChatSessions() {
   const listEl = document.getElementById('sessions-list');
   if (!listEl) return;
@@ -88,7 +146,7 @@ async function loadChatSessions() {
     if (res.ok) {
       const sessions = await res.json();
       if (!sessions || sessions.length === 0) {
-        listEl.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;">কোনো পূর্ববর্তী চ্যাট নেই।</div>';
+        listEl.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">কোনো পূর্ববর্তী চ্যাট নেই।</div>';
         return;
       }
 
@@ -139,7 +197,6 @@ async function switchSession(sessionId) {
   if (currentSessionId === sessionId) return;
   currentSessionId = sessionId;
   
-  // Highlight active session item
   document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
   const activeEl = document.getElementById(`session-item-${sessionId}`);
   if (activeEl) activeEl.classList.add('active');
@@ -207,16 +264,14 @@ function onModelSelectChange(newModel) {
     body: JSON.stringify({ llm_model: newModel })
   }).then(res => {
     if (res.ok) {
-      showToast(`সক্রিয় মডেল পরিবর্তন করা হয়েছে: ${newModel}`, 'success');
+      showToast(`সক্রিয় মডেল: ${newModel}`, 'success');
       const sideModel = document.getElementById('sidebar-model-name');
       if (sideModel) sideModel.innerText = newModel;
     }
   });
 }
 
-// ==============================================================================
 // Send Message & Stream SSE Response
-// ==============================================================================
 async function sendMessage() {
   if (isGenerating) return;
 
@@ -224,22 +279,18 @@ async function sendMessage() {
   const prompt = input.value.trim();
   if (!prompt) return;
 
-  // Ensure session exists
   if (!currentSessionId) {
     await createNewChatSession();
   }
 
-  // Hide empty state hero
   const hero = document.getElementById('empty-hero');
   if (hero) hero.style.display = 'none';
 
-  // 1. Render User Message
   renderMessage('user', prompt);
   conversationHistory.push({ role: 'user', content: prompt });
   input.value = '';
   input.style.height = 'auto';
 
-  // 2. Prepare Assistant Message Placeholder
   const assistantBubble = renderMessage('assistant', '', true);
   isGenerating = true;
   document.getElementById('btn-send-message').disabled = true;
@@ -259,9 +310,7 @@ async function sendMessage() {
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -282,7 +331,6 @@ async function sendMessage() {
 
           try {
             const data = JSON.parse(jsonStr);
-
             if (data.type === 'sources') {
               citations = data.sources || [];
             } else if (data.type === 'token') {
@@ -299,15 +347,12 @@ async function sendMessage() {
       }
     }
 
-    // Finalize bubble with markdown & citations
     updateAssistantMessage(assistantBubble, assistantContent, false, citations);
     conversationHistory.push({ role: 'assistant', content: assistantContent });
-    
-    // Refresh sessions list to update title
     loadChatSessions();
 
   } catch (err) {
-    assistantContent += `\n\n❌ **নেটওয়ার্ক বা সার্ভার সমস্যা:** ${err.message}. নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিস এবং আপনার এলএলএম সার্ভার চালু আছে।`;
+    assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}. নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিস চালু আছে।`;
     updateAssistantMessage(assistantBubble, assistantContent, false);
   } finally {
     isGenerating = false;
@@ -315,14 +360,13 @@ async function sendMessage() {
   }
 }
 
-// Render Message in DOM
 function renderMessage(role, text, isStreaming = false) {
   const feed = document.getElementById('chat-feed');
   const messageEl = document.createElement('div');
   messageEl.className = `chat-message ${role}-message`;
 
   const avatar = role === 'user' ? '👤' : '🤖';
-  const senderTitle = role === 'user' ? 'আপনি' : 'কোম্পানি এআই এজেন্ট';
+  const senderTitle = role === 'user' ? 'আপনি' : 'MyAgent AI';
 
   messageEl.innerHTML = `
     <div class="chat-avatar">${avatar}</div>
@@ -341,7 +385,6 @@ function renderMessage(role, text, isStreaming = false) {
   return messageEl;
 }
 
-// Update Streaming Message
 function updateAssistantMessage(messageEl, content, isStreaming, citations = []) {
   const textContainer = messageEl.querySelector('.message-text');
   const cursor = messageEl.querySelector('.streaming-cursor');
@@ -376,7 +419,6 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
   feed.scrollTop = feed.scrollHeight;
 }
 
-// Lightweight Markdown Renderer
 function renderMarkdown(md) {
   if (!md) return '';
 
@@ -385,27 +427,17 @@ function renderMarkdown(md) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Code blocks
   html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
   });
 
-  // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Headers
   html = html.replace(/^### (.*$)/gim, '<h4>$1</h4>');
   html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
   html = html.replace(/^# (.*$)/gim, '<h2>$1</h2>');
-
-  // Bold & Italic
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  // Blockquotes
   html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>');
-
-  // Unordered list items
   html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
 

@@ -116,5 +116,22 @@ chmod +x deploy.sh
 | `POST` | `/api/documents/upload` | PDF/DOCX/XLSX/CSV ফাইল আপলোড ও মেমোরি ইনজেস্ট |
 | `GET` | `/api/documents/{doc_id}/chunks` | ডকুমেন্টের সংরক্ষিত ভেক্টর চাঙ্কস প্রিভিউ |
 | `POST` | `/api/memory/search` | সরাসরি ভেক্টর মেমোরি সেমান্টিক সার্চ |
+| `GET` | `/api/dashboard/stats` | রিয়েলটাইম কেপিআই মেট্রিক্স ও সিস্টেম স্ট্যাটাস |
+| `GET` | `/api/users` | ইউজার ও রোল ম্যানেজমেন্ট তালিকা |
+| `POST` | `/api/users` | নতুন ইউজার তৈরি |
+| `DELETE` | `/api/users/{id}` | ইউজার মুছে ফেলা |
+| `GET` | `/api/models/list` | এলএলএম মডেল হাব ও কনফিগারেশন |
+| `POST` | `/api/models/ping` | লাইভ সার্ভার রেসপন্স ল্যাটেন্সি টেস্ট (ms) |
 | `GET` | `/api/settings` | কনফিগারেশন প্রদর্শন |
 | `POST` | `/api/settings/test-connection` | এলএলএম সার্ভার সংযোগ পরীক্ষা |
+
+---
+
+## 📜 কপিরাইট ও লাইসেন্স (Copyright & License)
+
+```
+Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
+```
+
+All Rights Reserved. Developed by **Arif Mahmud** ([arifmahmud.com](https://arifmahmud.com/)) for **IT support BD** ([itsupport.com.bd](https://itsupport.com.bd)).
+

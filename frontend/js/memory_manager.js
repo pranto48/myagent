@@ -1,4 +1,13 @@
-// Company Knowledge Base and Vector Memory Manager
+/* ==============================================================================
+ * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
+ * Made By Arif (https://arifmahmud.com/)
+ * Project: MyAgent | Version: 2.0.0
+ * ============================================================================== */
+
+// Company Knowledge Base, Big Data & Vector Memory Manager
+
+let activeFilter = 'all';
+let allLoadedDocs = [];
 
 function handleDragOver(e) {
   e.preventDefault();
@@ -26,14 +35,14 @@ function handleFileSelected(e) {
   }
 }
 
-// Upload and Index Files into Memory (PDF, Word, Excel, CSV, TXT)
+// Upload and Index Files into Memory (PDF, Word, Excel, CSV, Photos PNG/JPG, TXT)
 async function uploadFiles(files) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
     formData.append('files', files[i]);
   }
 
-  showToast(`${files.length}টি ফাইল প্রসেসিং এবং ভেক্টর মেমোরিতে যুক্ত করা হচ্ছে...`, 'info');
+  showToast(`${files.length}টি ফাইল / ফটো মেমোরিতে যুক্ত ও বিশ্লেষণ করা হচ্ছে...`, 'info');
 
   try {
     const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
@@ -51,6 +60,7 @@ async function uploadFiles(files) {
       showToast('ফাইল সফলভাবে মেমোরিতে ইনজেস্ট করা হয়েছে!', 'success');
       loadDocumentList();
       loadMemoryStats();
+      if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     } else {
       showToast(`ইনজেস্ট ত্রুটি: ${data.detail || data.message || 'ব্যর্থ'}`, 'error');
     }
@@ -61,7 +71,72 @@ async function uploadFiles(files) {
   }
 }
 
-// Fetch and Render Documents in Inventory
+// Set Filter for Document Inventory
+function setDocFilter(type) {
+  activeFilter = type;
+  document.querySelectorAll('.filter-tab-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById(`filter-btn-${type}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  renderFilteredDocs();
+}
+
+function renderFilteredDocs() {
+  const listEl = document.getElementById('doc-inventory-list');
+  if (!listEl) return;
+
+  let filtered = allLoadedDocs;
+  if (activeFilter !== 'all') {
+    filtered = allLoadedDocs.filter(d => {
+      const ext = (d.filename.split('.').pop() || '').toLowerCase();
+      if (activeFilter === 'pdf') return ext === 'pdf';
+      if (activeFilter === 'excel') return ['xlsx', 'xls', 'csv'].includes(ext);
+      if (activeFilter === 'word') return ['docx', 'doc'].includes(ext);
+      if (activeFilter === 'photo') return ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext);
+      if (activeFilter === 'text') return ['txt', 'md', 'json', 'log'].includes(ext);
+      return true;
+    });
+  }
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">এই ক্যাটাগরিতে কোনো ফাইল নেই।</div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(doc => {
+    const ext = (doc.filename.split('.').pop() || '').toLowerCase();
+    let icon = '📄';
+    if (['xlsx', 'xls', 'csv'].includes(ext)) icon = '📊';
+    else if (['docx', 'doc'].includes(ext)) icon = '📝';
+    else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) icon = '🖼️';
+
+    return `
+      <div class="doc-item" id="doc-${doc.doc_id}">
+        <div class="doc-info">
+          <div class="doc-icon">${icon}</div>
+          <div>
+            <div class="doc-title">${escapeHtml(doc.filename)}</div>
+            <div class="doc-meta">
+              ${formatBytes(doc.size_bytes)} • ${doc.chunks_count}টি ভেক্টর চাঙ্ক • ${doc.created_at}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap: 8px;">
+          <button class="btn-inspect-chunks" onclick="inspectChunks('${doc.doc_id}', '${escapeHtml(doc.filename)}')">
+            চাঙ্কস দেখুন
+          </button>
+          <span class="doc-badge">মেমোরিতে ইনডেক্সড</span>
+          <button class="delete-doc-btn" title="মুছে ফেলুন" onclick="deleteDocument('${doc.doc_id}')">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Fetch and Render Documents
 async function loadDocumentList() {
   const listEl = document.getElementById('doc-inventory-list');
   if (!listEl) return;
@@ -71,43 +146,8 @@ async function loadDocumentList() {
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
     if (res.ok) {
-      const docs = await res.json();
-      if (!docs || docs.length === 0) {
-        listEl.innerHTML = `
-          <div style="text-align: center; color: var(--text-muted); padding: 24px;">
-            কোনো ডকুমেন্ট আপলোড করা হয়নি। বামপাশ থেকে কোম্পানির ফাইল ড্রপ করুন।
-          </div>`;
-        return;
-      }
-
-      listEl.innerHTML = docs.map(doc => `
-        <div class="doc-item" id="doc-${doc.doc_id}">
-          <div class="doc-info">
-            <div class="doc-icon">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div>
-              <div class="doc-title">${escapeHtml(doc.filename)}</div>
-              <div class="doc-meta">
-                ${formatBytes(doc.size_bytes)} • ${doc.chunks_count}টি ভেক্টর চাঙ্ক • ${doc.created_at}
-              </div>
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap: 8px;">
-            <button class="btn-inspect-chunks" onclick="inspectChunks('${doc.doc_id}', '${escapeHtml(doc.filename)}')">
-              চাঙ্কস দেখুন
-            </button>
-            <span class="doc-badge">মেমোরিতে যুক্ত</span>
-            <button class="delete-doc-btn" title="মুছে ফেলুন" onclick="deleteDocument('${doc.doc_id}')">
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      `).join('');
+      allLoadedDocs = await res.json();
+      renderFilteredDocs();
     }
   } catch (err) {
     listEl.innerHTML = `<div style="color:var(--rose-red); padding:10px;">তালিকা লোড ব্যর্থ: ${err.message}</div>`;
@@ -142,7 +182,7 @@ async function inspectChunks(docId, filename) {
         <div class="chunk-card">
           <div class="chunk-card-meta">
             <span>ID: ${escapeHtml(c.chunk_id)}</span>
-            <span>পৃষ্ঠা: ${c.metadata ? (c.metadata.page || 1) : 1}</span>
+            <span>পৃষ্ঠা / সেকশন: ${c.metadata ? (c.metadata.page || 1) : 1}</span>
           </div>
           <div class="chunk-card-body">${escapeHtml(c.content)}</div>
         </div>
@@ -172,6 +212,7 @@ async function deleteDocument(docId) {
       showToast('ডকুমেন্টটি মেমোরি থেকে মুছে ফেলা হয়েছে।', 'info');
       loadDocumentList();
       loadMemoryStats();
+      if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     } else {
       showToast('ডকুমেন্ট ডিলিট করতে ব্যর্থ হয়েছে।', 'error');
     }
@@ -196,7 +237,7 @@ async function executeMemorySearch() {
     const res = await fetch('/api/memory/search', {
       method: 'POST',
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: query, top_k: 3 })
+      body: JSON.stringify({ query: query, top_k: 4 })
     });
 
     if (res.ok) {
@@ -244,6 +285,7 @@ async function saveDirectNote() {
       document.getElementById('note-content').value = '';
       loadDocumentList();
       loadMemoryStats();
+      if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     }
   } catch (err) {
     showToast(`ত্রুটি: ${err.message}`, 'error');

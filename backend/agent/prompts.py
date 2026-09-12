@@ -1,3 +1,4 @@
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
 """
 System Prompts and Context Templates for Company Data AI Agent.
 """
