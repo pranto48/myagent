@@ -1,0 +1,53 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myagent-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - WEB_PORT=${WEB_PORT:-3000}
+      - BACKEND_PORT=${BACKEND_PORT:-8000}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://192.168.9.10:11434/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-not-needed}
+      - LLM_MODEL=${LLM_MODEL:-llama3.3}
+      - AGENT_NAME=${AGENT_NAME:-Company Data Intelligence Agent}
+      - AGENT_TEMPERATURE=${AGENT_TEMPERATURE:-0.3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - CHUNKING_SIZE=${CHUNKING_SIZE:-800}
+      - CHUNKING_OVERLAP=${CHUNKING_OVERLAP:-150}
+      - TOP_K_RESULTS=${TOP_K_RESULTS:-4}
+      - DATA_DIR=/app/data
+      - DOCUMENTS_DIR=/app/data/documents
+      - CHROMA_DIR=/app/data/chroma_db
+    volumes:
+      - ./data/documents:/app/data/documents
+      - ./data/chroma_db:/app/data/chroma_db
+      - ./data/uploads:/app/data/uploads
+    networks:
+      - myagent-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: myagent-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - myagent-network
+
+networks:
+  myagent-network:
+    driver: bridge

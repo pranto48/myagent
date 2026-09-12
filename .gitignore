@@ -1,0 +1,26 @@
+# Environments
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+
+# Data & Persistence
+data/chroma_db/
+data/documents/*
+!data/documents/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+
+# System & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
