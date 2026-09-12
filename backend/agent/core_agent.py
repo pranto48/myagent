@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import os
 import json
 import logging
@@ -10,6 +10,9 @@ from memory.vector_store import VectorMemoryStore
 from agent.prompts import SYSTEM_PROMPT_TEMPLATE, RAG_CONTEXT_WRAPPER
 from agent.tools import AgentTools
 from models.schemas import ChatMessage, SourceCitation
+from security.firewall import PromptFirewall
+from security.dlp import DLPEngine
+from security.audit import SecurityAuditStore
 
 logger = logging.getLogger("myagent.agent")
 
@@ -70,9 +73,9 @@ class CompanyAIAgent:
                 "active_model": settings.LLM_MODEL
             }
 
-    def _prepare_rag_context(self, prompt: str) -> tuple[str, List[SourceCitation]]:
-        """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list."""
-        hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS)
+    def _prepare_rag_context(self, prompt: str, user_role: str = "admin") -> tuple[str, List[SourceCitation]]:
+        """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list with DLS."""
+        hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS, user_role=user_role)
         sources: List[SourceCitation] = []
 
         if not hits:
@@ -110,12 +113,45 @@ class CompanyAIAgent:
         history: List[ChatMessage],
         use_memory: bool = True,
         temperature: Optional[float] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        username: str = "admin",
+        user_role: str = "admin"
     ) -> AsyncGenerator[str, None]:
         """
         Executes agent reasoning with dynamic tool calling (local tools & MCP)
-        and streams response as SSE formatted strings.
+        enforcing Prompt Injection Firewall, DLP PII sanitization, and DLS.
         """
+        audit_store = SecurityAuditStore()
+
+        # 1. Prompt Firewall Check
+        firewall_check = PromptFirewall.inspect_prompt(prompt)
+        if firewall_check["blocked"]:
+            await audit_store.log_event(
+                action="PROMPT_INJECTION_BLOCKED",
+                username=username,
+                user_role=user_role,
+                resource="chat",
+                severity="CRITICAL",
+                details={"threat_types": firewall_check["threat_types"], "reason": firewall_check["reason"]}
+            )
+            blocked_msg = "🛡️ [সিকিউরিটি সিস্টেম অ্যালার্ট]: আপনার ইনপুটে সম্ভাব্য প্রম্পট ইনজেকশন বা অননুমোদিত নির্দেশিকা সনাক্ত হওয়ায় ফায়ারওয়াল দ্বারা অনুরোধটি ব্লক করা হয়েছে।"
+            yield f"data: {json.dumps({'type': 'token', 'token': blocked_msg})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
+        # 2. Inbound DLP Sanitization
+        dlp_res = DLPEngine.inspect_text(prompt)
+        if dlp_res["redacted_count"] > 0:
+            await audit_store.log_event(
+                action="DLP_TRIGGERED",
+                username=username,
+                user_role=user_role,
+                resource="chat_prompt",
+                severity="WARNING",
+                details={"redacted_count": dlp_res["redacted_count"], "types": [f["type"] for f in dlp_res["findings"]]}
+            )
+            prompt = dlp_res["sanitized_text"]
+
         target_model = model or settings.LLM_MODEL
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE
 
@@ -123,9 +159,9 @@ class CompanyAIAgent:
         user_content = prompt
 
         if use_memory:
-            user_content, sources = self._prepare_rag_context(prompt)
+            user_content, sources = self._prepare_rag_context(prompt, user_role=user_role)
 
-        # 1. Send sources metadata first
+        # 3. Send sources metadata first
         sources_payload = [s.model_dump() for s in sources]
         yield f"data: {json.dumps({'type': 'sources', 'sources': sources_payload})}\n\n"
 

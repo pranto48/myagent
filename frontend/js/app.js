@@ -1,15 +1,27 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 2.1.0
+ * Project: MyAgent | Version: 2.2.0
  * ============================================================================== */
 
 // Main Application Logic, Mobile Drawer, Chat Streaming & UI Interactions
 
 let currentSessionId = null;
 let conversationHistory = [];
-let isGenerating = false;
 let useMemory = true;
+let isStreaming = false;
+
+// Initialize on DOM Ready
+document.addEventListener('DOMContentLoaded', () => {
+  initApp();
+});
+
+async function initApp() {
+  checkAuthStatus();
+  await loadServerStatus();
+  await loadSessionHistory();
+  if (typeof initDashboard === 'function') initDashboard();
+}
 
 // Mobile Sidebar Drawer Toggle
 function toggleMobileSidebar() {
@@ -19,9 +31,9 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all 6 views
+// Tab Switching across all 7 views
 function switchTab(tabName) {
-  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp'];
+  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -68,6 +80,10 @@ function switchTab(tabName) {
     topbarTitle.innerText = 'টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব';
     topbarDesc.innerText = 'ওপেন-সোর্স টুলস স্যুট ও ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা';
     if (typeof loadMcpDashboard === 'function') loadMcpDashboard();
+  } else if (tabName === 'security') {
+    topbarTitle.innerText = 'এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স';
+    topbarDesc.innerText = 'AES-256 এনক্রিপশন, PII/DLP রিডাকশন, ফায়ারওয়াল ও অডিট ট্রেইল';
+    if (typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
   }
 }
 

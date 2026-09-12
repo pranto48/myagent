@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 # MyAgent - Deployment Script for Server 192.168.9.9 (Port: 3399)
 # ==============================================================================
 

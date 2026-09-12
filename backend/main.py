@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 2.1.0
+# Project: MyAgent | Version: 2.2.0
 # ==============================================================================
 
 import logging
@@ -13,6 +13,7 @@ from memory.vector_store import VectorMemoryStore
 from memory.chat_session_store import ChatSessionStore
 from memory.user_store import UserStore
 from mcp.store import MCPStore
+from security.audit import SecurityAuditStore
 from routers import (
     chat_router,
     documents_router,
@@ -23,7 +24,8 @@ from routers import (
     users_router,
     dashboard_router,
     models_mgmt_router,
-    mcp_router
+    mcp_router,
+    security_router
 )
 from models.schemas import SystemStatusResponse
 
@@ -36,7 +38,7 @@ logger = logging.getLogger("myagent.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle initialization for vector store, persistent databases, and MCP registry."""
-    logger.info(f"Starting {settings.AGENT_NAME} v2.1.0 on port {settings.WEB_PORT}...")
+    logger.info(f"Starting {settings.AGENT_NAME} v2.2.0 on port {settings.WEB_PORT}...")
 
     # Warm up ChromaDB and FTS5
     try:
@@ -46,7 +48,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Vector store warmup error: {e}")
 
-    # Warm up SQLite chat, user, and MCP databases
+    # Warm up SQLite chat, user, MCP, and security audit databases
     try:
         db = await ChatSessionStore.get_db()
         await db.close()
@@ -54,7 +56,8 @@ async def lifespan(app: FastAPI):
         await u_db.close()
         m_db = await MCPStore.get_db()
         await m_db.close()
-        logger.info(f"Persistent databases initialized at {settings.SESSION_DB_PATH}")
+        await SecurityAuditStore().init_db()
+        logger.info(f"Persistent databases and security audit trail initialized at {settings.SESSION_DB_PATH}")
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
 
@@ -63,8 +66,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",
-    description="Enterprise AI Agent with Hybrid Vector Memory, MCP Hub, and Universal Branding",
-    version="2.1.0",
+    description="Enterprise AI Agent with Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
+    version="2.2.0",
     lifespan=lifespan
 )
 
@@ -83,6 +86,7 @@ app.include_router(users_router)
 app.include_router(dashboard_router)
 app.include_router(models_mgmt_router)
 app.include_router(mcp_router)
+app.include_router(security_router)
 app.include_router(sessions_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
@@ -93,13 +97,13 @@ app.include_router(settings_router)
 async def get_version():
     """Returns official project version and branding information."""
     return {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "company": "IT support BD",
         "company_url": "https://itsupport.com.bd",
         "author": "Arif",
         "author_url": "https://arifmahmud.com/",
         "web_port": settings.WEB_PORT,
-        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0"
+        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0"
     }
 
 @app.get("/api/health")
@@ -107,7 +111,7 @@ async def health_check():
     """Health check endpoint for Docker container monitoring."""
     return {
         "status": "healthy",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "service": "myagent-backend",
         "web_port": settings.WEB_PORT
     }

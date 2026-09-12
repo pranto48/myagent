@@ -1,10 +1,11 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
 from agent.core_agent import CompanyAIAgent
 from memory.chat_session_store import ChatSessionStore
+from routers.auth import get_optional_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["Chat & Agent"])
 
@@ -17,12 +18,18 @@ def get_agent() -> CompanyAIAgent:
     return _agent_instance
 
 @router.post("/stream")
-async def stream_chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(get_agent)):
+async def stream_chat_endpoint(
+    request: ChatRequest,
+    agent: CompanyAIAgent = Depends(get_agent),
+    current_user: dict = Depends(get_optional_current_user)
+):
     """
     Streams the AI Agent response in real-time using Server-Sent Events (SSE)
-    and saves the conversation turns into persistent SQLite session storage.
+    enforcing prompt firewall, DLP sanitization, and Document-Level Security (DLS).
     """
     session_id = request.session_id
+    username = current_user.get("sub", "guest")
+    user_role = current_user.get("role", "viewer")
 
     # Record user message in persistent session store
     if session_id:
@@ -37,7 +44,9 @@ async def stream_chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Dep
                 history=request.history,
                 use_memory=request.use_memory,
                 temperature=request.temperature,
-                model=request.model
+                model=request.model,
+                username=username,
+                user_role=user_role
             )
 
             async for chunk in generator:

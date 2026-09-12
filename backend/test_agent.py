@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 """
 Automated Verification and Test Suite for MyAgent.
 Tests: Config, Document Chunking, Excel Parsing, SQLite Multi-Session Store, JWT Auth.

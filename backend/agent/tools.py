@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import os
 import sys
 import math
@@ -9,30 +9,33 @@ import logging
 from typing import Dict, Any, List, Optional
 import httpx
 from bs4 import BeautifulSoup
-from memory.vector_store import VectorMemoryStore
+from memory.vector_store import VectorStore as VectorMemoryStore
 from config import settings
 
-logger = logging.getLogger("myagent.tools")
+logger = logging.getLogger(__name__)
 
 class AgentTools:
     """
-    Comprehensive Open Source Toolbox for the Enterprise AI Agent.
-    Includes:
-      - Big Data Analyzer (Pandas, CSV/TSV)
-      - Document Readers (PDF, Word docx, Excel xlsx/xls, Photo OCR)
-      - Safe Python Code & Math Runner
-      - Web Search & BeautifulSoup Scraper
+    Built-in Open Source & Local Toolbox for Autonomous AI Agent:
+      - Python Sandbox (safe arithmetic & data calculations)
+      - DuckDuckGo Instant Web Search
+      - BeautifulSoup4 Web Page Scraper
+      - Big Data Analyzer (Pandas CSV/TSV aggregations & distributions)
+      - PDF Reader (pypdf)
+      - Word Reader (python-docx)
+      - Excel Reader (openpyxl)
+      - Photo OCR Reader (Pillow & pytesseract)
       - Local File System Operator
       - SQLite Query Engine
       - System & Container Diagnostics
-      - Super Fast Hybrid Company Memory
+      - Super Fast Hybrid Company Memory (with Document-Level Security & DLP)
     """
 
     @staticmethod
-    def query_company_memory(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
+    def query_company_memory(query: str, top_k: int = 4, user_role: str = "admin") -> List[Dict[str, Any]]:
         """Tool to retrieve semantic and keyword matches from company hybrid memory (< 10ms)."""
         store = VectorMemoryStore()
-        return store.super_fast_search(query=query, top_k=top_k)
+        return store.super_fast_search(query=query, top_k=top_k, user_role=user_role)
 
     @staticmethod
     async def web_search(query: str) -> str:

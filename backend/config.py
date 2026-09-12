@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     CHROMA_DIR: str = "/app/data/chroma_db"
     UPLOADS_DIR: str = "/app/data/uploads"
     SESSION_DB_PATH: str = "/app/data/chat_history.db"
+    AUDIT_DB_PATH: str = "/app/data/security_audit.db"
+
+    # Enterprise Data Security & Compliance Settings
+    SECURITY_ENCRYPTION_KEY: str = "it-support-bd-secure-aes256-master-key-2026"
+    DLP_ENABLED: bool = True
+    DLP_MASK_CREDIT_CARDS: bool = True
+    DLP_MASK_API_KEYS: bool = True
+    DLP_MASK_EMAILS: bool = True
+    DLP_MASK_PHONES: bool = True
+    FIREWALL_ENABLED: bool = True
+    AUDIT_LOG_ENABLED: bool = True
+    RATE_LIMIT_ENABLED: bool = True
 
     class Config:
         env_file = ".env"
@@ -52,10 +64,12 @@ class Settings(BaseSettings):
             self.CHROMA_DIR = "./data/chroma_db"
             self.UPLOADS_DIR = "./data/uploads"
             self.SESSION_DB_PATH = "./data/chat_history.db"
+            self.AUDIT_DB_PATH = "./data/security_audit.db"
 
         os.makedirs(self.DOCUMENTS_DIR, exist_ok=True)
         os.makedirs(self.CHROMA_DIR, exist_ok=True)
         os.makedirs(self.UPLOADS_DIR, exist_ok=True)
 
 settings = Settings()
+
 settings.setup_directories()

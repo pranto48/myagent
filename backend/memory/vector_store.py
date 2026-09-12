@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import os
 import time
 import json
@@ -10,8 +10,10 @@ from chromadb.config import Settings as ChromaSettings
 from chromadb.utils import embedding_functions
 from typing import List, Dict, Any, Optional, Tuple
 from config import settings
+from security.dlp import DLPEngine
 
 logger = logging.getLogger("myagent.vector_store")
+
 
 class LRUCache:
     """Thread-safe lightweight in-memory LRU cache for ultra-fast query retrieval."""
@@ -129,7 +131,8 @@ class VectorMemoryStore:
                 "filename": c["filename"],
                 "page": int(c.get("page", 1)),
                 "chunk_index": int(c.get("chunk_index", 1)),
-                "category": c.get("category", "general")
+                "category": c.get("category", "general"),
+                "security_level": c.get("security_level", "INTERNAL")
             }
             for c in chunks
         ]
@@ -168,16 +171,18 @@ class VectorMemoryStore:
         logger.info(f"Successfully indexed {len(chunks)} chunks in hybrid memory.")
         return len(chunks)
 
-    def super_fast_search(self, query: str, top_k: Optional[int] = None, category: Optional[str] = None) -> List[Dict[str, Any]]:
+    def super_fast_search(self, query: str, top_k: Optional[int] = None, category: Optional[str] = None, user_role: str = "admin") -> List[Dict[str, Any]]:
         """
-        Ultra-Fast Hybrid Retrieval:
+        Ultra-Fast Hybrid Retrieval with Document-Level Security (DLS):
         1. Checks in-memory LRU cache (< 2ms).
         2. Queries SQLite FTS5 for exact keyword & phrase matches (< 5ms).
         3. Queries ChromaDB HNSW for deep semantic context (< 15ms).
-        4. Fuses scores using Reciprocal Rank Fusion (RRF) for optimal accuracy.
+        4. Fuses scores using Reciprocal Rank Fusion (RRF).
+        5. Enforces Role-Based Document Level Security (DLS) based on user_role.
+        6. Applies dynamic DLP sanitization to prevent sensitive data leakage.
         """
         k = top_k or settings.TOP_K_RESULTS
-        cache_key = f"{query.strip().lower()}::top_{k}::cat_{category or 'all'}"
+        cache_key = f"{query.strip().lower()}::top_{k}::cat_{category or 'all'}::role_{user_role}"
 
         cached = self.cache.get(cache_key)
         if cached is not None:
@@ -195,7 +200,7 @@ class VectorMemoryStore:
                 where=where_clause,
                 include=["documents", "metadatas", "distances"]
             )
-            if results and "documents" in results and results["documents"]:
+            if results and results.get("documents") and results["documents"][0]:
                 docs = results["documents"][0]
                 metas = results["metadatas"][0] if "metadatas" in results else [{}] * len(docs)
                 dists = results["distances"][0] if "distances" in results else [0.0] * len(docs)
@@ -265,15 +270,57 @@ class VectorMemoryStore:
 
         # Sort by fused score
         sorted_ids = sorted(combined_scores.keys(), key=lambda x: combined_scores[x], reverse=True)
-        final_hits = [item_map[cid] for cid in sorted_ids[:k]]
+        raw_hits = [item_map[cid] for cid in sorted_ids[:k * 2]]
+
+        # Document-Level Security (DLS) Access Control
+        allowed_levels = {"PUBLIC"}
+        if user_role in ["analyst", "admin"]:
+            allowed_levels.update(["INTERNAL", "CONFIDENTIAL"])
+        if user_role == "admin":
+            allowed_levels.add("RESTRICTED_ADMIN")
+
+        authorized_hits = []
+        for item in raw_hits:
+            item_sec = item.get("metadata", {}).get("security_level", "INTERNAL")
+            if item_sec in allowed_levels:
+                # Dynamic DLP on egress
+                sanitized_content = DLPEngine.sanitize(item["content"])
+                item_copy = dict(item)
+                item_copy["content"] = sanitized_content
+                authorized_hits.append(item_copy)
+                if len(authorized_hits) >= k:
+                    break
 
         # Store in LRU cache
-        self.cache.set(cache_key, final_hits)
-        return final_hits
+        self.cache.set(cache_key, authorized_hits)
+        return authorized_hits
 
-    def search_memory(self, query: str, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    def search_memory(self, query: str, top_k: Optional[int] = None, user_role: str = "admin") -> List[Dict[str, Any]]:
         """Backwards-compatible wrapper calling super_fast_search."""
-        return self.super_fast_search(query=query, top_k=top_k)
+        return self.super_fast_search(query=query, top_k=top_k, user_role=user_role)
+
+    def reclassify_document(self, doc_id: str, new_security_level: str) -> bool:
+        """Updates security classification metadata for all chunks belonging to a document."""
+        try:
+            chunks = self.collection.get(where={"doc_id": doc_id})
+            if not chunks or not chunks.get("ids") or len(chunks["ids"]) == 0:
+                return False
+            
+            cids = chunks["ids"]
+            metas = chunks["metadatas"]
+            new_metas = []
+            for m in metas:
+                updated = dict(m)
+                updated["security_level"] = new_security_level
+                new_metas.append(updated)
+
+            self.collection.update(ids=cids, metadatas=new_metas)
+            self.cache.clear()
+            logger.info(f"Reclassified {len(cids)} chunks for doc {doc_id} to {new_security_level}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reclassify document {doc_id}: {e}")
+            return False
 
     # --------------------------------------------------------------------------
     # ADMIN CRUD METHODS: VIEW, EDIT, DELETE
