@@ -1,5 +1,6 @@
 // Main Application Logic, Chat Streaming & UI Interactions
 
+let currentSessionId = null;
 let conversationHistory = [];
 let isGenerating = false;
 let useMemory = true;
@@ -75,29 +76,158 @@ function usePrompt(text) {
   sendMessage();
 }
 
-function clearConversation() {
-  conversationHistory = [];
-  const feed = document.getElementById('chat-feed');
-  feed.innerHTML = '';
-  
-  // Re-append Hero
-  const hero = document.getElementById('empty-hero');
-  if (hero) {
-    hero.style.display = 'flex';
-    feed.appendChild(hero);
-  } else {
-    location.reload();
+// ==============================================================================
+// Persistent Chat Sessions Management
+// ==============================================================================
+async function loadChatSessions() {
+  const listEl = document.getElementById('sessions-list');
+  if (!listEl) return;
+
+  try {
+    const res = await fetch('/api/sessions', { headers: getAuthHeaders() });
+    if (res.ok) {
+      const sessions = await res.json();
+      if (!sessions || sessions.length === 0) {
+        listEl.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;">কোনো পূর্ববর্তী চ্যাট নেই।</div>';
+        return;
+      }
+
+      listEl.innerHTML = sessions.map(s => `
+        <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="switchSession('${s.id}')" id="session-item-${s.id}">
+          <span class="session-title-text" title="${escapeHtml(s.title)}">💬 ${escapeHtml(s.title)}</span>
+          <div class="session-actions">
+            <button class="session-del-btn" title="ডিলিট করুন" onclick="deleteChatSession('${s.id}', event)">&times;</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('Error loading chat sessions:', err);
   }
-  showToast('নতুন চ্যাট সেশন শুরু হয়েছে।', 'info');
 }
 
+async function createNewChatSession() {
+  try {
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title: 'নতুন চ্যাট' })
+    });
+    if (res.ok) {
+      const newSession = await res.json();
+      currentSessionId = newSession.id;
+      conversationHistory = [];
+      
+      const feed = document.getElementById('chat-feed');
+      feed.innerHTML = '';
+      
+      const hero = document.getElementById('empty-hero');
+      if (hero) {
+        hero.style.display = 'flex';
+        feed.appendChild(hero);
+      }
+      
+      loadChatSessions();
+      showToast('নতুন চ্যাট সেশন শুরু হয়েছে।', 'info');
+    }
+  } catch (err) {
+    showToast(`সেশন তৈরিতে সমস্যা: ${err.message}`, 'error');
+  }
+}
+
+async function switchSession(sessionId) {
+  if (currentSessionId === sessionId) return;
+  currentSessionId = sessionId;
+  
+  // Highlight active session item
+  document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+  const activeEl = document.getElementById(`session-item-${sessionId}`);
+  if (activeEl) activeEl.classList.add('active');
+
+  const feed = document.getElementById('chat-feed');
+  feed.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">মেসেজ লোড হচ্ছে...</div>';
+
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      feed.innerHTML = '';
+      conversationHistory = [];
+
+      if (!data.messages || data.messages.length === 0) {
+        const hero = document.getElementById('empty-hero');
+        if (hero) {
+          hero.style.display = 'flex';
+          feed.appendChild(hero);
+        }
+        return;
+      }
+
+      for (const m of data.messages) {
+        conversationHistory.push({ role: m.role, content: m.content });
+        const bubble = renderMessage(m.role, m.content, false);
+        if (m.role === 'assistant' && m.sources && m.sources.length > 0) {
+          updateAssistantMessage(bubble, m.content, false, m.sources);
+        }
+      }
+    }
+  } catch (err) {
+    feed.innerHTML = `<div style="color:var(--rose-red); padding:20px;">লোড ব্যর্থ: ${err.message}</div>`;
+  }
+}
+
+async function deleteChatSession(sessionId, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('আপনি কি এই চ্যাট সেশনটি মুছে ফেলতে চান?')) return;
+
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      showToast('চ্যাট সেশন মুছে ফেলা হয়েছে।', 'info');
+      if (currentSessionId === sessionId) {
+        currentSessionId = null;
+        createNewChatSession();
+      } else {
+        loadChatSessions();
+      }
+    }
+  } catch (err) {
+    showToast(`ডিলিট ব্যর্থ: ${err.message}`, 'error');
+  }
+}
+
+// Model Switcher from Topbar
+function onModelSelectChange(newModel) {
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ llm_model: newModel })
+  }).then(res => {
+    if (res.ok) {
+      showToast(`সক্রিয় মডেল পরিবর্তন করা হয়েছে: ${newModel}`, 'success');
+      const sideModel = document.getElementById('sidebar-model-name');
+      if (sideModel) sideModel.innerText = newModel;
+    }
+  });
+}
+
+// ==============================================================================
 // Send Message & Stream SSE Response
+// ==============================================================================
 async function sendMessage() {
   if (isGenerating) return;
 
   const input = document.getElementById('chat-input');
   const prompt = input.value.trim();
   if (!prompt) return;
+
+  // Ensure session exists
+  if (!currentSessionId) {
+    await createNewChatSession();
+  }
 
   // Hide empty state hero
   const hero = document.getElementById('empty-hero');
@@ -118,10 +248,11 @@ async function sendMessage() {
   let citations = [];
 
   try {
-    const response = await fetch(`${API_BASE}/chat/stream`, {
+    const response = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
+        session_id: currentSessionId,
         prompt: prompt,
         history: conversationHistory.slice(-8),
         use_memory: useMemory
@@ -160,8 +291,6 @@ async function sendMessage() {
             } else if (data.type === 'error') {
               assistantContent += `\n\n⚠️ **ত্রুটি:** ${data.error}`;
               updateAssistantMessage(assistantBubble, assistantContent, false);
-            } else if (data.type === 'done') {
-              // Finalizing response
             }
           } catch (parseErr) {
             console.warn('SSE Parse error:', parseErr);
@@ -173,6 +302,9 @@ async function sendMessage() {
     // Finalize bubble with markdown & citations
     updateAssistantMessage(assistantBubble, assistantContent, false, citations);
     conversationHistory.push({ role: 'assistant', content: assistantContent });
+    
+    // Refresh sessions list to update title
+    loadChatSessions();
 
   } catch (err) {
     assistantContent += `\n\n❌ **নেটওয়ার্ক বা সার্ভার সমস্যা:** ${err.message}. নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিস এবং আপনার এলএলএম সার্ভার চালু আছে।`;
@@ -249,7 +381,6 @@ function renderMarkdown(md) {
   if (!md) return '';
 
   let html = md
-    // Escape standard characters
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -278,7 +409,6 @@ function renderMarkdown(md) {
   html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
 
-  // Line breaks to paragraphs
   const paragraphs = html.split(/\n\n+/);
   return paragraphs.map(p => {
     if (p.startsWith('<pre>') || p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<h4>') || p.startsWith('<ul>') || p.startsWith('<blockquote>')) {
@@ -287,3 +417,7 @@ function renderMarkdown(md) {
     return `<p>${p.replace(/\n/g, '<br>')}</p>`;
   }).join('');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadChatSessions();
+});

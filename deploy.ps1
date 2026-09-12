@@ -1,9 +1,9 @@
 # ==============================================================================
-# MyAgent - PowerShell Deployment Script
+# MyAgent - PowerShell Deployment Script (Port: 3399)
 # ==============================================================================
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "🚀 Starting MyAgent Installation & Deployment" -ForegroundColor Cyan
+Write-Host "🚀 Starting MyAgent Installation & Deployment (Port: 3399)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # Check Docker
@@ -32,7 +32,9 @@ docker compose up -d --build
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "🎉 MyAgent Successfully Deployed!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host "🌐 Web Interface:      http://localhost:3000 (or http://192.168.9.9:3000)" -ForegroundColor Cyan
+Write-Host "🌐 Web Interface:      http://localhost:3399 (or http://192.168.9.9:3399)" -ForegroundColor Cyan
+Write-Host "🔑 Admin Username:     admin" -ForegroundColor Yellow
+Write-Host "🔒 Admin Password:     Aa987654" -ForegroundColor Yellow
 Write-Host "🔌 Backend API:        http://localhost:8000/api" -ForegroundColor Cyan
 Write-Host "📖 Swagger API Docs:   http://localhost:8000/docs" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Green

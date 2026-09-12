@@ -48,6 +48,40 @@ class DocumentProcessor:
             except Exception as e:
                 raise ValueError(f"Failed to read DOCX file: {str(e)}")
 
+        elif ext in [".xlsx", ".xls"]:
+            try:
+                from openpyxl import load_workbook
+                wb = load_workbook(file_path, data_only=True, read_only=True)
+                sheets_text = []
+                for sheet_name in wb.sheetnames:
+                    ws = wb[sheet_name]
+                    rows_data = []
+                    headers = []
+                    for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+                        clean_row = [str(cell).strip() if cell is not None else "" for cell in row]
+                        if not any(clean_row):
+                            continue
+                        if not headers:
+                            headers = clean_row
+                            rows_data.append(f"[Worksheet: {sheet_name}] Headers: " + " | ".join(headers))
+                        else:
+                            row_pairs = []
+                            for i in range(min(len(headers), len(clean_row))):
+                                if clean_row[i]:
+                                    h_name = headers[i] if i < len(headers) and headers[i] else f"Col_{i+1}"
+                                    row_pairs.append(f"{h_name}: {clean_row[i]}")
+                            if row_pairs:
+                                rows_data.append(f"[Sheet: {sheet_name}, Row {row_idx + 1}]: " + ", ".join(row_pairs))
+                            else:
+                                rows_data.append(f"[Sheet: {sheet_name}, Row {row_idx + 1}]: " + " | ".join(clean_row))
+                    if rows_data:
+                        sheets_text.append("\n".join(rows_data))
+                wb.close()
+                if sheets_text:
+                    extracted_pages.append(("\n\n".join(sheets_text), 1))
+            except Exception as e:
+                raise ValueError(f"Failed to read Excel file: {str(e)}")
+
         elif ext in [".txt", ".md", ".json", ".csv", ".tsv", ".yaml", ".yml", ".log"]:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:

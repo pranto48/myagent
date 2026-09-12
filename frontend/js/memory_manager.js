@@ -26,7 +26,7 @@ function handleFileSelected(e) {
   }
 }
 
-// Upload and Index Files into Memory
+// Upload and Index Files into Memory (PDF, Word, Excel, CSV, TXT)
 async function uploadFiles(files) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
@@ -36,8 +36,13 @@ async function uploadFiles(files) {
   showToast(`${files.length}টি ফাইল প্রসেসিং এবং ভেক্টর মেমোরিতে যুক্ত করা হচ্ছে...`, 'info');
 
   try {
-    const res = await fetch(`${API_BASE}/documents/upload`, {
+    const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/documents/upload', {
       method: 'POST',
+      headers: headers,
       body: formData
     });
 
@@ -62,7 +67,9 @@ async function loadDocumentList() {
   if (!listEl) return;
 
   try {
-    const res = await fetch(`${API_BASE}/documents`);
+    const res = await fetch('/api/documents', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
     if (res.ok) {
       const docs = await res.json();
       if (!docs || docs.length === 0) {
@@ -89,6 +96,9 @@ async function loadDocumentList() {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap: 8px;">
+            <button class="btn-inspect-chunks" onclick="inspectChunks('${doc.doc_id}', '${escapeHtml(doc.filename)}')">
+              চাঙ্কস দেখুন
+            </button>
             <span class="doc-badge">মেমোরিতে যুক্ত</span>
             <button class="delete-doc-btn" title="মুছে ফেলুন" onclick="deleteDocument('${doc.doc_id}')">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -104,6 +114,49 @@ async function loadDocumentList() {
   }
 }
 
+// Inspect Document Chunks in Vector Store Modal
+async function inspectChunks(docId, filename) {
+  const modal = document.getElementById('chunks-modal');
+  const title = document.getElementById('chunks-modal-title');
+  const meta = document.getElementById('chunks-modal-meta');
+  const list = document.getElementById('chunks-viewer-list');
+
+  title.innerText = `চাঙ্কস প্রিভিউ: ${filename}`;
+  meta.innerText = 'ChromaDB থেকে ভেক্টর চাঙ্কস লোড হচ্ছে...';
+  list.innerHTML = '';
+  modal.classList.add('open');
+
+  try {
+    const res = await fetch(`/api/documents/${docId}/chunks`, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (res.ok) {
+      const data = await res.json();
+      meta.innerText = `মোট ভেক্টর চাঙ্কস: ${data.total_chunks || 0}টি`;
+      if (!data.chunks || data.chunks.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted); padding:20px;">কোনো চাঙ্ক পাওয়া যায়নি।</div>';
+        return;
+      }
+
+      list.innerHTML = data.chunks.map(c => `
+        <div class="chunk-card">
+          <div class="chunk-card-meta">
+            <span>ID: ${escapeHtml(c.chunk_id)}</span>
+            <span>পৃষ্ঠা: ${c.metadata ? (c.metadata.page || 1) : 1}</span>
+          </div>
+          <div class="chunk-card-body">${escapeHtml(c.content)}</div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    meta.innerText = `ত্রুটি: ${err.message}`;
+  }
+}
+
+function closeChunksModal() {
+  document.getElementById('chunks-modal').classList.remove('open');
+}
+
 // Delete Document from Vector Store and Disk
 async function deleteDocument(docId) {
   if (!confirm('আপনি কি নিশ্চিত যে এই ডকুমেন্টটি মেমোরি থেকে সম্পূর্ণ মুছে ফেলতে চান?')) {
@@ -111,7 +164,10 @@ async function deleteDocument(docId) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/documents/${docId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/documents/${docId}`, {
+      method: 'DELETE',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
     if (res.ok) {
       showToast('ডকুমেন্টটি মেমোরি থেকে মুছে ফেলা হয়েছে।', 'info');
       loadDocumentList();
@@ -137,9 +193,9 @@ async function executeMemorySearch() {
   resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">মেমোরিতে সেমান্টিক সার্চ চলছে...</div>';
 
   try {
-    const res = await fetch(`${API_BASE}/memory/search`, {
+    const res = await fetch('/api/memory/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: query, top_k: 3 })
     });
 
@@ -176,9 +232,9 @@ async function saveDirectNote() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/memory/note`, {
+    const res = await fetch('/api/memory/note', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, content, tags: ['corporate_note', 'policy'] })
     });
 
@@ -197,7 +253,9 @@ async function saveDirectNote() {
 // Load Vector Memory Stats
 async function loadMemoryStats() {
   try {
-    const res = await fetch(`${API_BASE}/memory/stats`);
+    const res = await fetch('/api/memory/stats', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
     if (res.ok) {
       const stats = await res.json();
       const chunksPill = document.getElementById('sidebar-chunks-count');

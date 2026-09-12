@@ -1,11 +1,12 @@
+import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
 from agent.core_agent import CompanyAIAgent
+from memory.chat_session_store import ChatSessionStore
 
 router = APIRouter(prefix="/api/chat", tags=["Chat & Agent"])
 
-# Global agent singleton
 _agent_instance = None
 
 def get_agent() -> CompanyAIAgent:
@@ -17,33 +18,74 @@ def get_agent() -> CompanyAIAgent:
 @router.post("/stream")
 async def stream_chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(get_agent)):
     """
-    Streams the AI Agent response in real-time using Server-Sent Events (SSE).
+    Streams the AI Agent response in real-time using Server-Sent Events (SSE)
+    and saves the conversation turns into persistent SQLite session storage.
     """
-    try:
-        generator = agent.stream_chat(
-            prompt=request.prompt,
-            history=request.history,
-            use_memory=request.use_memory,
-            temperature=request.temperature,
-            model=request.model
-        )
-        return StreamingResponse(
-            generator,
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    session_id = request.session_id
+
+    # Record user message in persistent session store
+    if session_id:
+        await ChatSessionStore.add_message(session_id=session_id, role="user", content=request.prompt)
+
+    async def event_generator():
+        assistant_full_reply = ""
+        citations = []
+        try:
+            generator = agent.stream_chat(
+                prompt=request.prompt,
+                history=request.history,
+                use_memory=request.use_memory,
+                temperature=request.temperature,
+                model=request.model
+            )
+
+            async for chunk in generator:
+                yield chunk
+                # Extract tokens and sources for persistent logging
+                if chunk.startswith("data: "):
+                    payload_str = chunk[6:].strip()
+                    if payload_str:
+                        try:
+                            data = json.loads(payload_str)
+                            if data.get("type") == "token":
+                                assistant_full_reply += data.get("token", "")
+                            elif data.get("type") == "sources":
+                                citations = data.get("sources", [])
+                        except Exception:
+                            pass
+
+            # Save assistant response to session store
+            if session_id and assistant_full_reply:
+                await ChatSessionStore.add_message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=assistant_full_reply,
+                    sources=citations
+                )
+
+        except Exception as e:
+            err_json = json.dumps({"type": "error", "error": str(e)})
+            yield f"data: {err_json}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @router.post("", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(get_agent)):
     """
-    Non-streaming standard chat endpoint.
+    Non-streaming standard chat endpoint with persistent session logging.
     """
+    session_id = request.session_id
+    if session_id:
+        await ChatSessionStore.add_message(session_id=session_id, role="user", content=request.prompt)
+
     try:
         res = await agent.generate_response(
             prompt=request.prompt,
@@ -52,6 +94,15 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
             temperature=request.temperature,
             model=request.model
         )
+
+        if session_id:
+            await ChatSessionStore.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=res["reply"],
+                sources=res["sources"]
+            )
+
         return ChatResponse(
             reply=res["reply"],
             sources=res["sources"],

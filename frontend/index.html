@@ -4,10 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MyAgent - কোম্পানি এআই এজেন্ট ও নলেজ মেমোরি প্ল্যাটফর্ম</title>
-  <meta name="description" content="ডকারাইজড কোম্পানি এআই এজেন্ট এবং পারসিসটেন্ট ভেক্টর মেমোরি ওয়ার্কস্পেস (সার্ভার ১৯২.১৬৮.৯.৯)">
+  <meta name="description" content="ডকারাইজড কোম্পানি এআই এজেন্ট এবং পারসিসটেন্ট ভেক্টর মেমোরি ওয়ার্কস্পেস (সার্ভার ১৯২.১৬৮.৯.৯:৩৩৯৯)">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+  <!-- Admin Login Overlay Screen -->
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+      <div class="brand-icon" style="margin: 0 auto 12px; width: 48px; height: 48px;">
+        <svg viewBox="0 0 24 24" style="width: 28px; height: 28px;">
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5"/>
+        </svg>
+      </div>
+      <h2>MyAgent অ্যাডমিন লগইন</h2>
+      <p>কোম্পানির সংবেদনশীল ডেটা ও এআই এজেন্ট ব্যবহারে প্রমাণীকরণ আবশ্যক</p>
+
+      <form onsubmit="performLogin(event)" style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="form-group" style="text-align: left;">
+          <label>অ্যাডমিন ইউজারনেম (Username)</label>
+          <input type="text" id="login-username" class="text-input" placeholder="admin" autocomplete="username" required>
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label>পাসওয়ার্ড (Password)</label>
+          <input type="password" id="login-password" class="text-input" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+
+        <div id="login-error-msg" class="login-err-box" style="display:none;"></div>
+
+        <button type="submit" class="btn-primary" id="btn-do-login" style="width: 100%; justify-content: center; padding: 11px; margin-top: 6px;">
+          লগইন করুন
+        </button>
+      </form>
+      <div style="margin-top: 16px; font-size: 0.72rem; color: var(--text-muted);">
+        সার্ভার: <code>192.168.9.9:3399</code> • সুরক্ষিত অভ্যন্তরীণ নেটওয়ার্ক
+      </div>
+    </div>
+  </div>
+
   <div class="app-layout">
     
     <!-- Left Navigation Sidebar -->
@@ -30,7 +64,7 @@
           <div class="status-dot" id="system-status-dot"></div>
           <span id="agent-online-status">অনলাইন</span>
         </div>
-        <span class="server-ip">192.168.9.9</span>
+        <span class="server-ip">192.168.9.9:3399</span>
       </div>
 
       <!-- Navigation Menu -->
@@ -58,24 +92,31 @@
         </button>
       </nav>
 
-      <!-- Stats Summary in Sidebar -->
-      <div class="sidebar-stats">
-        <div class="stat-box">
-          <div class="stat-box-title">সংযুক্ত এলএলএম মডেল</div>
-          <div class="stat-box-val">
-            <span id="sidebar-model-name">llama3.3</span>
-            <span class="stat-pill">সক্রিয়</span>
-          </div>
+      <!-- Chat History Sessions List -->
+      <div class="sessions-panel">
+        <div class="sessions-header">
+          <span>চ্যাট হিস্টোরি</span>
+          <button class="icon-btn-sm" title="নতুন চ্যাট" onclick="createNewChatSession()">+</button>
         </div>
-
-        <div class="stat-box">
-          <div class="stat-box-title">ভেক্টর মেমোরি চাঙ্কস</div>
-          <div class="stat-box-val">
-            <span id="sidebar-chunks-count">০</span>
-            <span class="stat-pill">ChromaDB</span>
-          </div>
+        <div class="sessions-list" id="sessions-list">
+          <div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;">সেশন লোড হচ্ছে...</div>
         </div>
       </div>
+
+      <!-- Logged-in Admin User & Logout -->
+      <div class="user-footer-card">
+        <div class="user-avatar-sm">👤</div>
+        <div class="user-meta">
+          <span class="user-name" id="logged-in-user-name">admin</span>
+          <span class="user-role">অ্যাডমিন</span>
+        </div>
+        <button class="logout-btn" title="লগআউট" onclick="logout()">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
+
     </aside>
 
     <!-- Main Workspace -->
@@ -87,16 +128,25 @@
           <h2 id="topbar-title-text">কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট</h2>
           <p id="topbar-desc-text">ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই</p>
         </div>
+
         <div class="topbar-actions">
-          <button class="btn-secondary" id="btn-clear-chat" onclick="clearConversation()">
+          <!-- Model Switcher Dropdown -->
+          <div class="model-picker-wrap">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">মডেল:</span>
+            <select id="topbar-model-select" class="model-select" onchange="onModelSelectChange(this.value)">
+              <option value="llama3.3">llama3.3</option>
+            </select>
+          </div>
+
+          <button class="btn-secondary" id="btn-clear-chat" onclick="createNewChatSession()">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span>নতুন চ্যাট</span>
           </button>
           <button class="btn-primary" id="btn-quick-upload" onclick="switchTab('knowledge')">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <span>ডকুমেন্ট ইনজেস্ট</span>
           </button>
@@ -117,19 +167,19 @@
                 </svg>
               </div>
               <h3>কোম্পানি এআই এজেন্ট প্রস্তুত</h3>
-              <p>আপনার আপলোড করা অভ্যন্তরীণ কোম্পানির ডকুমেন্ট, পলিসি, হিসাব এবং তথ্যের ভিত্তিতে নির্ভুল উত্তর প্রদান করবে। নিচে থেকে নমুনা প্রশ্ন নির্বাচন করুন বা সরাসরি লিখুন।</p>
+              <p>আপনার আপলোড করা অভ্যন্তরীণ কোম্পানির ডকুমেন্ট, পলিসি, এক্সেল হিসাব এবং তথ্যের ভিত্তিতে নির্ভুল উত্তর প্রদান করবে। নিচে থেকে নমুনা প্রশ্ন নির্বাচন করুন বা সরাসরি লিখুন।</p>
               
               <div class="prompt-suggestions">
                 <div class="suggestion-card" onclick="usePrompt('আমাদের কোম্পানির অভ্যন্তরীণ নীতিমালা এবং ছুটির নিয়মগুলো কি?')">
                   📌 কোম্পানির নীতিমালা ও ছুটির নিয়মাবলী
                 </div>
-                <div class="suggestion-card" onclick="usePrompt('আপলোড করা ফাইলের মূল তথ্যসমূহ সংক্ষেপে উপস্থাপন করো')">
+                <div class="suggestion-card" onclick="usePrompt('আপলোড করা এক্সেল ফাইলের হিসাব ও বিক্রয় ডেটা বিশ্লেষণ করো')">
+                  📊 এক্সেল স্প্রেডশিট ও বিক্রয় বিশ্লেষণ
+                </div>
+                <div class="suggestion-card" onclick="usePrompt('আপলোড করা ডকুমেন্টের মূল পয়েন্টগুলো সংক্ষেপে উপস্থাপন করো')">
                   📄 আপলোড করা ফাইলের সারসংক্ষেপ
                 </div>
-                <div class="suggestion-card" onclick="usePrompt('সর্বশেষ ফাইন্যান্সিয়াল বা বিক্রয় রিপোর্টের মূল পয়েন্টগুলো বিশ্লেষণ করো')">
-                  📊 আর্থিক বা ব্যবসায়িক ডেটা বিশ্লেষণ
-                </div>
-                <div class="suggestion-card" onclick="usePrompt('কোন কোন ডকুমেন্ট বর্তমানে তোমার মেমোরিতে যুক্ত আছে?')">
+                <div class="suggestion-card" onclick="usePrompt('বর্তমানে তোমার মেমোরিতে কোন কোন ফাইল সংরক্ষিত আছে?')">
                   🧠 এজেন্টের বর্তমান মেমোরি অডিট
                 </div>
               </div>
@@ -188,7 +238,7 @@
                   </svg>
                   কোম্পানি ডেটা ও ডকুমেন্ট আপলোড
                 </h3>
-                <p>PDF, DOCX, TXT, CSV, MD ফাইল আপলোড করে এজেন্টের স্থায়ী মেমোরিতে সংরক্ষণ করুন।</p>
+                <p>PDF, Word (.docx), Excel (.xlsx), CSV, TXT, MD ফাইল আপলোড করে স্থায়ী মেমোরিতে সংরক্ষণ করুন।</p>
               </div>
 
               <div 
@@ -206,9 +256,9 @@
                 </div>
                 <div class="dropzone-text">
                   <h4>ফাইল এখানে ড্রপ করুন অথবা ব্রাউজ করুন</h4>
-                  <p>সমর্থিত ফরম্যাট: PDF, Word (DOCX), Excel/CSV, Text, Markdown (সর্বোচ্চ ১০০ মেগাবাইট)</p>
+                  <p>সমর্থিত: PDF, Word, Excel (.xlsx), CSV, Text, Markdown (সর্বোচ্চ ১০০ মেগাবাইট)</p>
                 </div>
-                <input type="file" id="file-input-hidden" multiple style="display:none;" onchange="handleFileSelected(event)" accept=".pdf,.docx,.doc,.txt,.csv,.md,.json">
+                <input type="file" id="file-input-hidden" multiple style="display:none;" onchange="handleFileSelected(event)" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv,.md,.json">
               </div>
 
               <!-- Manual Memory Note Ingestion -->
@@ -240,7 +290,7 @@
                   </svg>
                   সংরক্ষিত কোম্পানি ডকুমেন্ট ভান্ডার
                 </h3>
-                <p>বর্তমানে ইনডেক্স করা সমস্ত ডকুমেন্ট এবং সেগুলোর মেমোরি চাঙ্কস।</p>
+                <p>ইনডেক্স করা সমস্ত ডকুমেন্ট এবং সেগুলোর ভেক্টর চাঙ্কস প্রিভিউ।</p>
               </div>
 
               <!-- Document List -->
@@ -262,13 +312,11 @@
               </div>
 
               <div class="memory-search-bar">
-                <input type="text" id="memory-search-input" class="text-input" placeholder="সার্চ কোয়েরি লিখুন (যেমন: ছুটির ভাতা)">
+                <input type="text" id="memory-search-input" class="text-input" placeholder="সার্চ কোয়েরি লিখুন (যেমন: ছুটির নিয়ম বা সেলস)">
                 <button class="btn-secondary" onclick="executeMemorySearch()">সার্চ</button>
               </div>
 
-              <div class="search-results-list" id="memory-search-results">
-                <!-- Search Hits will appear here -->
-              </div>
+              <div class="search-results-list" id="memory-search-results"></div>
 
             </div>
           </div>
@@ -277,6 +325,19 @@
       </section>
 
     </main>
+
+    <!-- Document Chunk Inspector Modal -->
+    <div class="modal-backdrop" id="chunks-modal">
+      <div class="modal-window" style="max-width: 720px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+          <h3 id="chunks-modal-title">ডকুমেন্ট চাঙ্কস ইন্সপেক্টর</h3>
+          <button class="close-modal-btn" onclick="closeChunksModal()">&times;</button>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted);" id="chunks-modal-meta">লোড হচ্ছে...</div>
+        <div class="chunks-viewer-list" id="chunks-viewer-list" style="overflow-y: auto; flex: 1; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+        </div>
+      </div>
+    </div>
 
     <!-- Settings Modal -->
     <div class="modal-backdrop" id="settings-modal">
@@ -323,12 +384,13 @@
       </div>
     </div>
 
-    <!-- Toast Notification Container -->
+    <!-- Toast Notification Shelf -->
     <div class="toast-container" id="toast-shelf"></div>
 
   </div>
 
   <!-- Scripts -->
+  <script src="js/auth.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/memory_manager.js"></script>
   <script src="js/app.js"></script>

@@ -8,8 +8,11 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - WEB_PORT=${WEB_PORT:-3000}
+      - WEB_PORT=${WEB_PORT:-3399}
       - BACKEND_PORT=${BACKEND_PORT:-8000}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Aa987654}
+      - JWT_SECRET=${JWT_SECRET:-company-secret-jwt-token-key-3399-2026}
       - LLM_BASE_URL=${LLM_BASE_URL:-http://192.168.9.10:11434/v1}
       - LLM_API_KEY=${LLM_API_KEY:-not-needed}
       - LLM_MODEL=${LLM_MODEL:-llama3.3}
@@ -23,9 +26,7 @@ services:
       - DOCUMENTS_DIR=/app/data/documents
       - CHROMA_DIR=/app/data/chroma_db
     volumes:
-      - ./data/documents:/app/data/documents
-      - ./data/chroma_db:/app/data/chroma_db
-      - ./data/uploads:/app/data/uploads
+      - ./data:/app/data
     networks:
       - myagent-network
     healthcheck:
@@ -42,7 +43,7 @@ services:
     container_name: myagent-web
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-3000}:80"
+      - "${WEB_PORT:-3399}:80"
     depends_on:
       - backend
     networks:

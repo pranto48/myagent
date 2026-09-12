@@ -1,8 +1,5 @@
 // Settings and Remote LLM Connectivity Management
 
-const API_BASE = '/api';
-
-// Toast Notification Helper
 function showToast(message, type = 'info') {
   const shelf = document.getElementById('toast-shelf');
   if (!shelf) return;
@@ -26,7 +23,6 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 
-// Modal Toggle
 function openSettingsModal() {
   document.getElementById('settings-modal').classList.add('open');
   loadSettings();
@@ -35,27 +31,44 @@ function openSettingsModal() {
 function closeSettingsModal() {
   document.getElementById('settings-modal').classList.remove('open');
   const badge = document.getElementById('test-connection-badge');
-  badge.className = 'test-res-badge';
-  badge.style.display = 'none';
+  if (badge) {
+    badge.className = 'test-res-badge';
+    badge.style.display = 'none';
+  }
 }
 
 // Load current configuration
 async function loadSettings() {
   try {
-    const res = await fetch(`${API_BASE}/settings`);
+    const res = await fetch('/api/settings', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
     if (res.ok) {
       const data = await res.json();
       document.getElementById('setting-llm-url').value = data.llm_base_url || '';
       document.getElementById('setting-llm-model').value = data.llm_model || '';
       document.getElementById('setting-agent-temp').value = data.agent_temperature || 0.3;
       
-      // Update sidebar
       const modelLabel = document.getElementById('sidebar-model-name');
       if (modelLabel) modelLabel.innerText = data.llm_model || 'Unknown';
+
+      // Sync topbar model dropdown
+      updateModelDropdown([data.llm_model], data.llm_model);
     }
   } catch (err) {
-    console.error('Error loading settings:', err);
+    console.warn('Error loading settings:', err);
   }
+}
+
+// Update Model Select Dropdown in Topbar
+function updateModelDropdown(models, activeModel) {
+  const select = document.getElementById('topbar-model-select');
+  if (!select) return;
+
+  const uniqueModels = Array.from(new Set([activeModel, ...(models || [])])).filter(Boolean);
+  select.innerHTML = uniqueModels.map(m => `
+    <option value="${m}" ${m === activeModel ? 'selected' : ''}>${m}</option>
+  `).join('');
 }
 
 // Test connectivity to external LLM Server
@@ -67,7 +80,10 @@ async function testConnection() {
   badge.style.display = 'none';
 
   try {
-    const res = await fetch(`${API_BASE}/settings/test-connection`, { method: 'POST' });
+    const res = await fetch('/api/settings/test-connection', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
     const data = await res.json();
 
     badge.style.display = 'block';
@@ -75,6 +91,10 @@ async function testConnection() {
       badge.className = 'test-res-badge success';
       badge.innerHTML = `✅ ${data.message}<br><small>উপলব্ধ মডেল: ${data.models_available.slice(0, 5).join(', ') || 'কাস্টম মডেল সক্রিয়'}</small>`;
       showToast('এলএলএম সার্ভারের সাথে সফলভাবে সংযুক্ত হয়েছে!', 'success');
+      
+      if (data.models_available && data.models_available.length > 0) {
+        updateModelDropdown(data.models_available, data.active_model);
+      }
     } else {
       badge.className = 'test-res-badge error';
       badge.innerText = `❌ ${data.message}`;
@@ -103,9 +123,9 @@ async function saveSettings() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/settings`, {
+    const res = await fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         llm_base_url: url,
         llm_model: model,
@@ -117,6 +137,7 @@ async function saveSettings() {
     if (res.ok) {
       showToast('সেটিংস সফলভাবে সংরক্ষিত হয়েছে!', 'success');
       document.getElementById('sidebar-model-name').innerText = model;
+      updateModelDropdown([model], model);
       closeSettingsModal();
     } else {
       showToast('সেটিংস সেভ করতে ব্যর্থ হয়েছে।', 'error');
@@ -126,7 +147,6 @@ async function saveSettings() {
   }
 }
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
 });

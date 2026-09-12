@@ -4,7 +4,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from memory.vector_store import VectorMemoryStore
-from routers import chat_router, documents_router, memory_router, settings_router
+from memory.chat_session_store import ChatSessionStore
+from routers import (
+    chat_router,
+    documents_router,
+    memory_router,
+    settings_router,
+    auth_router,
+    sessions_router
+)
 from models.schemas import SystemStatusResponse
 
 # Setup logging
@@ -16,22 +24,32 @@ logger = logging.getLogger("myagent.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle events for warming up the agent memory store."""
-    logger.info(f"Starting {settings.AGENT_NAME}...")
-    # Initialize ChromaDB and pre-load embedding model
+    """Lifecycle events for warming up the agent memory store and database."""
+    logger.info(f"Starting {settings.AGENT_NAME} on port {settings.WEB_PORT}...")
+    
+    # 1. Warm up ChromaDB vector store
     try:
         store = VectorMemoryStore()
         stats = store.get_stats()
         logger.info(f"Vector memory active. Total indexed chunks: {stats.get('total_chunks', 0)}")
     except Exception as e:
         logger.error(f"Vector store warmup error: {e}")
+
+    # 2. Warm up SQLite persistent session database
+    try:
+        db = await ChatSessionStore.get_db()
+        await db.close()
+        logger.info(f"Chat session SQLite database ready at {settings.SESSION_DB_PATH}")
+    except Exception as e:
+        logger.error(f"SQLite DB initialization error: {e}")
+
     yield
     logger.info("Shutting down MyAgent services...")
 
 app = FastAPI(
     title="MyAgent - Company AI Agent Platform",
     description="Enterprise AI Agent with Persistent Vector Memory and External LLM Connectivity",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -45,6 +63,8 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth_router)
+app.include_router(sessions_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(memory_router)
@@ -53,7 +73,11 @@ app.include_router(settings_router)
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for Docker container monitoring."""
-    return {"status": "healthy", "service": "myagent-backend"}
+    return {
+        "status": "healthy",
+        "service": "myagent-backend",
+        "web_port": settings.WEB_PORT
+    }
 
 @app.get("/api/status", response_model=SystemStatusResponse)
 async def system_status():

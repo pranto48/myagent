@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/documents", tags=["Company Documents"])
 async def upload_documents(files: List[UploadFile] = File(...)):
     """
     Uploads and indexes one or multiple company documents into vector memory.
+    Supports PDF, DOCX, XLSX, CSV, TXT, JSON, MD.
     """
     store = VectorMemoryStore()
     processed_files = []
@@ -80,7 +81,6 @@ async def list_documents():
     results = []
     seen_ids = set()
 
-    # Scan directory
     for file_path in docs_dir.glob("*_*"):
         if file_path.is_file() and not file_path.name.startswith("."):
             parts = file_path.name.split("_", 1)
@@ -94,7 +94,6 @@ async def list_documents():
                 size = file_path.stat().st_size
                 mtime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(file_path.stat().st_mtime))
 
-                # Query chunk count from collection
                 try:
                     query_result = store.collection.get(where={"doc_id": doc_id})
                     chunks_count = len(query_result["ids"]) if query_result and "ids" in query_result else 0
@@ -110,6 +109,29 @@ async def list_documents():
                 ))
 
     return results
+
+@router.get("/{doc_id}/chunks")
+async def get_document_chunks(doc_id: str):
+    """
+    Returns all vector chunks associated with a specific document for inspection.
+    """
+    store = VectorMemoryStore()
+    try:
+        query_result = store.collection.get(where={"doc_id": doc_id}, include=["documents", "metadatas"])
+        chunks = []
+        if query_result and "ids" in query_result:
+            ids = query_result["ids"]
+            docs = query_result.get("documents", [])
+            metas = query_result.get("metadatas", [])
+            for i in range(len(ids)):
+                chunks.append({
+                    "chunk_id": ids[i],
+                    "content": docs[i] if i < len(docs) else "",
+                    "metadata": metas[i] if i < len(metas) else {}
+                })
+        return {"doc_id": doc_id, "total_chunks": len(chunks), "chunks": chunks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chunks for {doc_id}: {str(e)}")
 
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: str):

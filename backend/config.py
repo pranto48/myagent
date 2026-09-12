@@ -5,8 +5,14 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Server Ports
-    WEB_PORT: int = 3000
+    WEB_PORT: int = 3399
     BACKEND_PORT: int = 8000
+
+    # Admin Authentication Credentials
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "Aa987654"
+    JWT_SECRET: str = "company-secret-jwt-token-key-3399-2026"
+    JWT_EXPIRATION_HOURS: int = 72
 
     # Remote / Local LLM Server (OpenAI-compatible)
     LLM_BASE_URL: str = "http://192.168.9.10:11434/v1"
@@ -29,6 +35,7 @@ class Settings(BaseSettings):
     DOCUMENTS_DIR: str = "/app/data/documents"
     CHROMA_DIR: str = "/app/data/chroma_db"
     UPLOADS_DIR: str = "/app/data/uploads"
+    SESSION_DB_PATH: str = "/app/data/chat_history.db"
 
     class Config:
         env_file = ".env"
@@ -43,6 +50,7 @@ class Settings(BaseSettings):
             self.DOCUMENTS_DIR = "./data/documents"
             self.CHROMA_DIR = "./data/chroma_db"
             self.UPLOADS_DIR = "./data/uploads"
+            self.SESSION_DB_PATH = "./data/chat_history.db"
 
         os.makedirs(self.DOCUMENTS_DIR, exist_ok=True)
         os.makedirs(self.CHROMA_DIR, exist_ok=True)

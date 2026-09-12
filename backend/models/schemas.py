@@ -6,6 +6,7 @@ class ChatMessage(BaseModel):
     content: str = Field(..., description="Content of the message")
 
 class ChatRequest(BaseModel):
+    session_id: Optional[str] = Field(default=None, description="Active conversation session ID for persistent storage")
     prompt: str = Field(..., description="User query or message")
     history: List[ChatMessage] = Field(default_factory=list, description="Recent conversation messages")
     use_memory: bool = Field(default=True, description="Whether to perform RAG vector memory retrieval")
