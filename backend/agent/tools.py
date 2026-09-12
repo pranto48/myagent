@@ -1,62 +1,655 @@
-# ==============================================================================
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
-# Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 2.0.0
-# ==============================================================================
-
-"""
-Autonomous Agent Tools Definition for Reasoning over Company Data, Big Data, and Web.
-"""
-
-from typing import Dict, Any, List
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
+import os
+import sys
+import math
+import time
+import json
+import sqlite3
+import logging
+from typing import Dict, Any, List, Optional
 import httpx
+from bs4 import BeautifulSoup
 from memory.vector_store import VectorMemoryStore
+from config import settings
+
+logger = logging.getLogger("myagent.tools")
 
 class AgentTools:
-    """Toolbox accessible by the Company AI Agent."""
+    """
+    Comprehensive Open Source Toolbox for the Enterprise AI Agent.
+    Includes:
+      - Big Data Analyzer (Pandas, CSV/TSV)
+      - Document Readers (PDF, Word docx, Excel xlsx/xls, Photo OCR)
+      - Safe Python Code & Math Runner
+      - Web Search & BeautifulSoup Scraper
+      - Local File System Operator
+      - SQLite Query Engine
+      - System & Container Diagnostics
+      - Super Fast Hybrid Company Memory
+    """
 
     @staticmethod
     def query_company_memory(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
-        """Tool to retrieve semantic matches from company vector memory."""
+        """Tool to retrieve semantic and keyword matches from company hybrid memory (< 10ms)."""
         store = VectorMemoryStore()
-        return store.search_memory(query=query, top_k=top_k)
+        return store.super_fast_search(query=query, top_k=top_k)
 
     @staticmethod
     async def web_search(query: str) -> str:
-        """Autonomous live web search tool using DuckDuckGo Instant Answers."""
+        """Autonomous live web search using DuckDuckGo Instant Answers."""
         try:
             url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1"
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=6.0) as client:
                 res = await client.get(url)
                 if res.status_code == 200:
                     data = res.json()
                     abstract = data.get("AbstractText", "")
                     if abstract:
-                        return f"[Web Search Result]: {abstract}"
+                        return f"[ওয়েব সার্চ ফলাফল]: {abstract}"
                     related = [t.get("Text", "") for t in data.get("RelatedTopics", []) if "Text" in t]
                     if related:
-                        return f"[Web Search Result]: {related[0]}"
-            return f"No direct web answer found for '{query}'."
+                        return f"[ওয়েব সার্চ ফলাফল]: {related[0]}"
+            return f"DuckDuckGo-তে '{query}' সম্পর্কে কোনো সরাসরি উত্তর পাওয়া যায়নি।"
         except Exception as e:
             return f"Web search service error: {str(e)}"
 
     @staticmethod
-    def calculate(expression: str) -> str:
-        """Safely evaluates basic mathematical calculations for financial/numerical company reports."""
-        import math
-        allowed_names = {
-            "sum": sum,
-            "max": max,
-            "min": min,
-            "abs": abs,
-            "round": round,
-            "math": math
-        }
+    async def web_scrape(url: str, max_chars: int = 3500) -> str:
+        """Fetches public webpage content and extracts clean, readable text using BeautifulSoup."""
         try:
-            code = compile(expression, "<string>", "eval")
-            for name in code.co_names:
-                if name not in allowed_names:
-                    raise NameError(f"Use of {name} not allowed in calculator")
-            return str(eval(code, {"__builtins__": {}}, allowed_names))
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MyAgent/2.1.0"
+            }
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, headers=headers) as client:
+                res = await client.get(url)
+                if res.status_code != 200:
+                    return f"Webpage returned status {res.status_code}."
+
+                soup = BeautifulSoup(res.text, "html.parser")
+                # Strip script and style tags
+                for script in soup(["script", "style", "nav", "footer", "header", "noscript"]):
+                    script.extract()
+
+                text = soup.get_text(separator="\n")
+                # Collapse whitespace
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                clean_text = "\n".join(lines)
+
+                if len(clean_text) > max_chars:
+                    return f"[Webpage Snippet: {url}]\n" + clean_text[:max_chars] + f"\n... [Truncated {len(clean_text) - max_chars} characters]"
+                return f"[Webpage Content: {url}]\n" + clean_text
         except Exception as e:
-            return f"Calculation error: {str(e)}"
+            return f"Web scrape error for {url}: {str(e)}"
+
+    @staticmethod
+    def python_runner(code: str) -> str:
+        """
+        Executes Python code or mathematical expressions in a constrained execution sandbox.
+        Useful for complex statistics, business calculations, financial formulas, and date math.
+        """
+        import io
+        import contextlib
+
+        stdout_capture = io.StringIO()
+        safe_globals = {
+            "math": math,
+            "json": json,
+            "time": time,
+            "len": len,
+            "range": range,
+            "min": min,
+            "max": max,
+            "sum": sum,
+            "round": round,
+            "abs": abs,
+            "sorted": sorted,
+            "enumerate": enumerate,
+            "zip": zip,
+            "list": list,
+            "dict": dict,
+            "set": set,
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": bool
+        }
+
+        # Try evaluating as an expression first
+        try:
+            expr_res = eval(code.strip(), safe_globals)
+            if expr_res is not None:
+                return f"[Result]: {expr_res}"
+        except Exception:
+            pass
+
+        # Execute as statements and capture stdout
+        try:
+            with contextlib.redirect_stdout(stdout_capture):
+                exec(code, safe_globals)
+            output = stdout_capture.getvalue().strip()
+            return f"[Output]:\n{output}" if output else "[Code executed successfully with no stdout output]"
+        except Exception as e:
+            return f"Python Execution Error: {str(e)}"
+
+    @staticmethod
+    def calculate(expression: str) -> str:
+        """Safely evaluates basic mathematical calculations."""
+        return AgentTools.python_runner(expression)
+
+    @staticmethod
+    def analyze_big_data(filepath: str, query_type: str = "summary") -> str:
+        """
+        Big Data tabular analysis tool for CSV, TSV, or Excel datasets using Pandas.
+        query_type options: 'summary', 'head', 'columns', 'statistics', 'nulls'.
+        """
+        try:
+            import pandas as pd
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                # Search inside data directory
+                for root_dir in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    candidate = os.path.join(root_dir, filepath)
+                    if os.path.exists(candidate):
+                        target_path = candidate
+                        break
+
+            if not os.path.exists(target_path):
+                return f"Dataset file '{filepath}' not found."
+
+            if target_path.endswith(".csv"):
+                df = pd.read_csv(target_path)
+            elif target_path.endswith(".tsv"):
+                df = pd.read_csv(target_path, sep="\t")
+            elif target_path.endswith((".xlsx", ".xls")):
+                df = pd.read_excel(target_path)
+            elif target_path.endswith(".json"):
+                df = pd.read_json(target_path)
+            else:
+                return f"Unsupported tabular format for '{filepath}'."
+
+            if query_type == "summary":
+                rows, cols = df.shape
+                col_names = list(df.columns)
+                num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+                stats_str = df.describe().to_string() if len(num_cols) > 0 else "No numerical columns"
+                return (
+                    f"=== ডাটাসেট বিশ্লেষণ: {os.path.basename(target_path)} ===\n"
+                    f"মোট সারি (Rows): {rows}, মোট কলাম (Columns): {cols}\n"
+                    f"কলামসমূহ: {', '.join(col_names)}\n\n"
+                    f"নমুনা ডাটা (Top 3):\n{df.head(3).to_string()}\n\n"
+                    f"পরিসংখ্যান (Summary Stats):\n{stats_str}"
+                )
+            elif query_type == "head":
+                return f"Top 10 Rows of {os.path.basename(target_path)}:\n" + df.head(10).to_string()
+            elif query_type == "columns":
+                return f"Columns in {os.path.basename(target_path)}:\n" + "\n".join([f"- {c} ({df[c].dtype})" for c in df.columns])
+            elif query_type == "nulls":
+                null_counts = df.isnull().sum()
+                return f"Missing/Null Values:\n" + null_counts[null_counts > 0].to_string()
+            else:
+                return df.head(5).to_string()
+        except Exception as e:
+            return f"Big Data analysis error: {str(e)}"
+
+    @staticmethod
+    def read_pdf_document(filepath: str, max_pages: int = 15) -> str:
+        """Reads and extracts structured text from PDF documents page by page."""
+        try:
+            import pypdf
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    if os.path.exists(os.path.join(d, filepath)):
+                        target_path = os.path.join(d, filepath)
+                        break
+
+            if not os.path.exists(target_path):
+                return f"PDF file '{filepath}' not found."
+
+            reader = pypdf.PdfReader(target_path)
+            total_pages = len(reader.pages)
+            content_parts = []
+            for i, page in enumerate(reader.pages[:max_pages], 1):
+                t = page.extract_text() or ""
+                if t.strip():
+                    content_parts.append(f"--- [পৃষ্ঠা {i} / {total_pages}] ---\n{t.strip()}")
+
+            return f"=== PDF ডকুমেন্ট: {os.path.basename(target_path)} (মোট পৃষ্ঠা: {total_pages}) ===\n" + "\n\n".join(content_parts)
+        except Exception as e:
+            return f"PDF reading error: {str(e)}"
+
+    @staticmethod
+    def read_word_document(filepath: str) -> str:
+        """Reads and extracts paragraphs and tables from Word (.docx) documents."""
+        try:
+            import docx
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    if os.path.exists(os.path.join(d, filepath)):
+                        target_path = os.path.join(d, filepath)
+                        break
+
+            if not os.path.exists(target_path):
+                return f"Word document '{filepath}' not found."
+
+            doc = docx.Document(target_path)
+            text_blocks = []
+            for p in doc.paragraphs:
+                if p.text.strip():
+                    text_blocks.append(p.text.strip())
+
+            table_blocks = []
+            for t_idx, table in enumerate(doc.tables, 1):
+                rows_data = []
+                for row in table.rows:
+                    rows_data.append(" | ".join([cell.text.strip() for cell in row.cells]))
+                if rows_data:
+                    table_blocks.append(f"[টেবিল {t_idx}]:\n" + "\n".join(rows_data))
+
+            combined = "\n\n".join(text_blocks)
+            if table_blocks:
+                combined += "\n\n=== সংলগ্ন টেবিলসমূহ ===\n" + "\n\n".join(table_blocks)
+
+            return f"=== Word ডকুমেন্ট: {os.path.basename(target_path)} ===\n" + combined
+        except Exception as e:
+            return f"Word document reading error: {str(e)}"
+
+    @staticmethod
+    def read_excel_spreadsheet(filepath: str, sheet_name: Optional[str] = None, max_rows: int = 50) -> str:
+        """Reads sheets, columns, and rows from Excel (.xlsx / .xls) spreadsheets."""
+        try:
+            import openpyxl
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    if os.path.exists(os.path.join(d, filepath)):
+                        target_path = os.path.join(d, filepath)
+                        break
+
+            if not os.path.exists(target_path):
+                return f"Excel file '{filepath}' not found."
+
+            wb = openpyxl.load_workbook(target_path, data_only=True)
+            sheet = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
+
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows:
+                return f"Excel sheet '{sheet.title}' is empty."
+
+            headers = [str(h) if h is not None else f"Col_{idx}" for idx, h in enumerate(rows[0], 1)]
+            row_texts = []
+            for r_idx, row in enumerate(rows[1:max_rows+1], 2):
+                entries = [f"{headers[i]}: {val}" for i, val in enumerate(row) if val is not None and str(val).strip()]
+                if entries:
+                    row_texts.append(f"Row {r_idx} -> " + ", ".join(entries))
+
+            return (
+                f"=== Excel ফাইল: {os.path.basename(target_path)} | শিট: '{sheet.title}' ===\n"
+                f"শিটসমূহ: {', '.join(wb.sheetnames)}\n"
+                f"কলাম হেডার: {', '.join(headers)}\n\n"
+                f"ডাটা রেকর্ডস (শীর্ষ {len(row_texts)} সারি):\n" + "\n".join(row_texts)
+            )
+        except Exception as e:
+            return f"Excel reading error: {str(e)}"
+
+    @staticmethod
+    def read_image_ocr(filepath: str) -> str:
+        """Reads text from photos/images (.png, .jpg, .webp) using Pillow and OCR."""
+        try:
+            from PIL import Image
+            import pytesseract
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    if os.path.exists(os.path.join(d, filepath)):
+                        target_path = os.path.join(d, filepath)
+                        break
+
+            if not os.path.exists(target_path):
+                return f"Image file '{filepath}' not found."
+
+            img = Image.open(target_path)
+            extracted_text = pytesseract.image_to_string(img)
+            if extracted_text and extracted_text.strip():
+                return f"=== ফটো/ছবি OCR ফলাফল: {os.path.basename(target_path)} ===\n" + extracted_text.strip()
+            else:
+                return f"ছবি '{os.path.basename(target_path)}' ({img.size[0]}x{img.size[1]} {img.format}) থেকে কোনো টেক্সট শনাক্ত করা যায়নি।"
+        except Exception as e:
+            return f"Photo OCR error: {str(e)}"
+
+    @staticmethod
+    def fs_list_files(directory: str = "") -> str:
+        """Lists files and folders in the internal data storage directory."""
+        try:
+            base = settings.DATA_DIR
+            target = os.path.join(base, directory.strip("/")) if directory else base
+            if not os.path.exists(target):
+                return f"Directory '{directory}' does not exist."
+
+            entries = []
+            for item in os.listdir(target):
+                full = os.path.join(target, item)
+                is_dir = os.path.isdir(full)
+                size_kb = round(os.path.getsize(full) / 1024, 1) if not is_dir else "-"
+                mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(full)))
+                entries.append(f"{'[DIR]' if is_dir else '[FILE]'} {item} ({size_kb} KB, {mtime})")
+
+            return f"=== ফাইল তালিকা: {target} ===\n" + "\n".join(entries)
+        except Exception as e:
+            return f"File system list error: {str(e)}"
+
+    @staticmethod
+    def fs_read_file(filepath: str, max_chars: int = 5000) -> str:
+        """Reads text, markdown, json, or code file contents from data storage."""
+        try:
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
+                    if os.path.exists(os.path.join(d, filepath)):
+                        target_path = os.path.join(d, filepath)
+                        break
+
+            if not os.path.exists(target_path):
+                return f"File '{filepath}' not found."
+
+            with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read(max_chars)
+            return f"=== ফাইল কনটেন্ট: {os.path.basename(target_path)} ===\n" + content
+        except Exception as e:
+            return f"File read error: {str(e)}"
+
+    @staticmethod
+    def fs_write_file(filepath: str, content: str) -> str:
+        """Writes AI analysis notes or reports to the reports folder."""
+        try:
+            reports_dir = os.path.join(settings.DATA_DIR, "reports")
+            os.makedirs(reports_dir, exist_ok=True)
+            filename = os.path.basename(filepath)
+            dest = os.path.join(reports_dir, filename)
+            with open(dest, "w", encoding="utf-8") as f:
+                f.write(content)
+            return f"সফলভাবে সংরক্ষিত হয়েছে: {dest} ({len(content)} অক্ষর)"
+        except Exception as e:
+            return f"File write error: {str(e)}"
+
+    @staticmethod
+    def sqlite_query(query: str, db_name: str = "chat_history.db") -> str:
+        """Executes safe read-only SQL queries against SQLite databases."""
+        try:
+            q_lower = query.strip().lower()
+            if not q_lower.startswith("select") and not q_lower.startswith("pragma") and not q_lower.startswith("explain"):
+                return "Security Error: Only SELECT or PRAGMA read queries are permitted."
+
+            db_path = os.path.join(settings.DATA_DIR, db_name)
+            if not os.path.exists(db_path):
+                return f"Database '{db_name}' not found."
+
+            with sqlite3.connect(db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(query)
+                rows = cursor.fetchall()
+                if not rows:
+                    return "Query returned 0 rows."
+                col_names = [col[0] for col in cursor.description]
+                result_lines = [" | ".join(col_names)]
+                result_lines.append("-" * 40)
+                for r in rows[:50]:
+                    result_lines.append(" | ".join([str(r[c]) for c in col_names]))
+                return f"=== SQL ফলাফল ({len(rows)} সারি) ===\n" + "\n".join(result_lines)
+        except Exception as e:
+            return f"SQLite Query Error: {str(e)}"
+
+    @staticmethod
+    def system_info() -> str:
+        """Returns container diagnostics: uptime, memory, disk, and CPU load."""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage(settings.DATA_DIR)
+            cpu = psutil.cpu_percent(interval=0.2)
+            boot_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(psutil.boot_time()))
+            return (
+                f"=== সিস্টেম ও ডকার ডায়াগনস্টিকস ===\n"
+                f"CPU ব্যবহার: {cpu}%\n"
+                f"র‍্যাম ব্যবহার: {mem.percent}% (ব্যবহৃত: {round(mem.used/(1024**3), 2)} GB / মোট: {round(mem.total/(1024**3), 2)} GB)\n"
+                f"ডিস্ক স্পেস: {disk.percent}% (ফ্রি: {round(disk.free/(1024**3), 2)} GB / মোট: {round(disk.total/(1024**3), 2)} GB)\n"
+                f"সিস্টেম বুট টাইম: {boot_time}\n"
+                f"ডাটা ডিরেক্টরি: {settings.DATA_DIR}"
+            )
+        except Exception as e:
+            return f"System info error: {str(e)}"
+
+    @classmethod
+    async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
+        """Dynamically dispatches a tool call by name and executes it."""
+        try:
+            if tool_name == "query_company_memory":
+                q = args.get("query", "")
+                k = int(args.get("top_k", 4))
+                hits = cls.query_company_memory(query=q, top_k=k)
+                return json.dumps(hits, ensure_ascii=False, indent=2)
+
+            elif tool_name == "web_search":
+                return await cls.web_search(args.get("query", ""))
+
+            elif tool_name == "web_scrape":
+                return await cls.web_scrape(args.get("url", ""))
+
+            elif tool_name == "python_runner":
+                return cls.python_runner(args.get("code", ""))
+
+            elif tool_name == "calculate":
+                return cls.calculate(args.get("expression", ""))
+
+            elif tool_name == "analyze_big_data":
+                return cls.analyze_big_data(args.get("filepath", ""), args.get("query_type", "summary"))
+
+            elif tool_name == "read_pdf_document":
+                return cls.read_pdf_document(args.get("filepath", ""), int(args.get("max_pages", 15)))
+
+            elif tool_name == "read_word_document":
+                return cls.read_word_document(args.get("filepath", ""))
+
+            elif tool_name == "read_excel_spreadsheet":
+                return cls.read_excel_spreadsheet(args.get("filepath", ""), args.get("sheet_name"), int(args.get("max_rows", 50)))
+
+            elif tool_name == "read_image_ocr":
+                return cls.read_image_ocr(args.get("filepath", ""))
+
+            elif tool_name == "fs_list_files":
+                return cls.fs_list_files(args.get("directory", ""))
+
+            elif tool_name == "fs_read_file":
+                return cls.fs_read_file(args.get("filepath", ""), int(args.get("max_chars", 5000)))
+
+            elif tool_name == "fs_write_file":
+                return cls.fs_write_file(args.get("filepath", ""), args.get("content", ""))
+
+            elif tool_name == "sqlite_query":
+                return cls.sqlite_query(args.get("query", ""), args.get("db_name", "chat_history.db"))
+
+            elif tool_name == "system_info":
+                return cls.system_info()
+
+            else:
+                # Check dynamic MCP manager
+                from mcp.manager import MCPManager
+                return await MCPManager.call_tool(tool_name, args)
+        except Exception as e:
+            logger.error(f"Error dispatching tool {tool_name}: {e}")
+            return f"Error executing tool '{tool_name}': {str(e)}"
+
+    @classmethod
+    def get_openai_tools_schema(cls) -> List[Dict[str, Any]]:
+        """Returns standard OpenAI Function Calling tool definitions for all built-in tools."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_company_memory",
+                    "description": "Super-fast hybrid search into indexed company documents, policies, notes, and past records.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search keyword or question about company data"},
+                            "top_k": {"type": "integer", "description": "Number of top chunks to retrieve (default: 4)"}
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Live DuckDuckGo web search for real-time external knowledge, news, or general public facts.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query for the web"}
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "web_scrape",
+                    "description": "Fetches and cleans public web page contents using BeautifulSoup to extract text.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Full HTTP or HTTPS URL to read"}
+                        },
+                        "required": ["url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "python_runner",
+                    "description": "Executes Python code or mathematical formulas in a secure sandbox for statistics, calculations, or data formatting.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string", "description": "Python snippet or mathematical expression to evaluate"}
+                        },
+                        "required": ["code"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "analyze_big_data",
+                    "description": "Analyzes big tabular data files (CSV, TSV, Excel, JSON) using Pandas. Computes column stats, summary, head rows, or null counts.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Path or filename of the dataset (e.g. sales_2026.csv)"},
+                            "query_type": {"type": "string", "enum": ["summary", "head", "columns", "nulls"], "description": "Type of analysis"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_pdf_document",
+                    "description": "Reads and extracts text from a PDF file page by page.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Path or filename of the PDF"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_word_document",
+                    "description": "Reads and extracts paragraphs and tables from a Word document (.docx).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Path or filename of the Word document"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_excel_spreadsheet",
+                    "description": "Reads rows, columns, and sheets from Excel spreadsheets (.xlsx, .xls).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Path or filename of the Excel sheet"},
+                            "sheet_name": {"type": "string", "description": "Optional specific sheet name"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_image_ocr",
+                    "description": "Extracts text from images, photos, scanned documents, or screenshots using OCR.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Path or filename of the image (.png, .jpg, .webp)"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fs_list_files",
+                    "description": "Lists stored documents and data files in the local data directory.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "directory": {"type": "string", "description": "Subdirectory name (optional, defaults to root)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "sqlite_query",
+                    "description": "Executes read-only SELECT queries on internal SQLite databases.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "SQL SELECT query to execute"},
+                            "db_name": {"type": "string", "description": "Database filename, default: chat_history.db"}
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "system_info",
+                    "description": "Returns Docker container runtime health: CPU load, RAM usage, and available disk space.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            }
+        ]

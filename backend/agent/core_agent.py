@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
 import os
 import json
 import logging
@@ -8,12 +8,19 @@ from openai import AsyncOpenAI, OpenAI
 from config import settings
 from memory.vector_store import VectorMemoryStore
 from agent.prompts import SYSTEM_PROMPT_TEMPLATE, RAG_CONTEXT_WRAPPER
+from agent.tools import AgentTools
 from models.schemas import ChatMessage, SourceCitation
 
 logger = logging.getLogger("myagent.agent")
 
 class CompanyAIAgent:
-    """Enterprise AI Agent for querying company knowledge and orchestrating LLM calls."""
+    """
+    Enterprise Autonomous AI Agent with:
+      - Super Fast Hybrid Vector & Keyword Retrieval (< 10ms)
+      - Dynamic Open Source & MCP Tool Calling Execution
+      - ReAct Pattern Fallback for Local LLM Models
+      - Streaming Real-Time SSE Response Generation
+    """
 
     def __init__(self):
         self.vector_store = VectorMemoryStore()
@@ -64,8 +71,8 @@ class CompanyAIAgent:
             }
 
     def _prepare_rag_context(self, prompt: str) -> tuple[str, List[SourceCitation]]:
-        """Queries memory and builds augmented prompt and citation list."""
-        hits = self.vector_store.search_memory(query=prompt, top_k=settings.TOP_K_RESULTS)
+        """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list."""
+        hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS)
         sources: List[SourceCitation] = []
 
         if not hits:
@@ -106,7 +113,8 @@ class CompanyAIAgent:
         model: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
-        Executes agent reasoning and streams response as SSE formatted strings.
+        Executes agent reasoning with dynamic tool calling (local tools & MCP)
+        and streams response as SSE formatted strings.
         """
         target_model = model or settings.LLM_MODEL
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE
@@ -123,6 +131,9 @@ class CompanyAIAgent:
 
         # 2. Build conversation payload
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
+        # Add tool usage instructions into system prompt for models without native function calling
+        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, web_search, web_scrape, python_runner, analyze_big_data, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info). You may call them using tool_calls or structured text: Action: <tool_name>\\nAction Input: <json_arguments>"
+
         messages = [{"role": "system", "content": system_content}]
 
         # Add recent conversation history (limit to last 8 turns)
@@ -132,31 +143,136 @@ class CompanyAIAgent:
         # Add current user prompt (with RAG context if applicable)
         messages.append({"role": "user", "content": user_content})
 
-        try:
-            stream = await self.client.chat.completions.create(
-                model=target_model,
-                messages=messages,
-                temperature=target_temp,
-                stream=True
-            )
+        tools_schema = AgentTools.get_openai_tools_schema()
 
-            async for chunk in stream:
-                if chunk.choices and len(chunk.choices) > 0:
+        # Tool calling loop (up to 3 tool turns)
+        max_tool_turns = 3
+        for turn in range(max_tool_turns):
+            try:
+                # First attempt with tools parameter
+                stream = await self.client.chat.completions.create(
+                    model=target_model,
+                    messages=messages,
+                    temperature=target_temp,
+                    tools=tools_schema,
+                    tool_choice="auto",
+                    stream=True
+                )
+            except Exception as tool_call_err:
+                # If model doesn't support tools parameter, fallback to plain stream
+                logger.info(f"Model {target_model} does not support native function calling, falling back: {tool_call_err}")
+                try:
+                    stream = await self.client.chat.completions.create(
+                        model=target_model,
+                        messages=messages,
+                        temperature=target_temp,
+                        stream=True
+                    )
+                except Exception as plain_err:
+                    logger.error(f"Error during LLM chat streaming: {plain_err}")
+                    yield f"data: {json.dumps({'type': 'error', 'error': f'LLM Server Error: {str(plain_err)}'})}\n\n"
+                    return
+
+            tool_calls_detected = []
+            current_tool_call = {"id": "", "name": "", "arguments": ""}
+            full_assistant_message = ""
+
+            try:
+                async for chunk in stream:
+                    if not chunk.choices or len(chunk.choices) == 0:
+                        continue
                     delta = chunk.choices[0].delta
+
+                    # Handle native OpenAI tool calling
+                    if hasattr(delta, "tool_calls") and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            if tc.id:
+                                current_tool_call["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                current_tool_call["name"] += tc.function.name
+                            if tc.function and tc.function.arguments:
+                                current_tool_call["arguments"] += tc.function.arguments
+
+                    # Regular token delta
                     if delta and delta.content:
-                        token_payload = json.dumps({"type": "token", "token": delta.content})
+                        token = delta.content
+                        full_assistant_message += token
+                        token_payload = json.dumps({"type": "token", "token": token})
                         yield f"data: {token_payload}\n\n"
 
-            # 3. Send done event
-            yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                # Check if native tool was invoked
+                if current_tool_call["name"]:
+                    tool_calls_detected.append(current_tool_call)
 
-        except Exception as e:
-            logger.error(f"Error during LLM chat streaming: {e}")
-            error_payload = json.dumps({
-                "type": "error",
-                "error": f"LLM Server Communication Error: {str(e)}. Please check if your LLM server ({settings.LLM_BASE_URL}) is reachable and model '{target_model}' is loaded."
-            })
-            yield f"data: {error_payload}\n\n"
+                # ReAct fallback check in text output (e.g. Action: web_search \n Action Input: {...})
+                if not tool_calls_detected and "Action:" in full_assistant_message and "Action Input:" in full_assistant_message:
+                    try:
+                        lines = full_assistant_message.splitlines()
+                        act_name = ""
+                        act_input_str = ""
+                        for line in lines:
+                            if line.strip().startswith("Action:"):
+                                act_name = line.replace("Action:", "").strip()
+                            elif line.strip().startswith("Action Input:"):
+                                act_input_str = line.replace("Action Input:", "").strip()
+                        if act_name:
+                            tool_calls_detected.append({
+                                "id": f"call_react_{turn}",
+                                "name": act_name,
+                                "arguments": act_input_str or "{}"
+                            })
+                    except Exception as pe:
+                        logger.debug(f"ReAct parse notice: {pe}")
+
+                # If no tools called, we are done
+                if not tool_calls_detected:
+                    yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                    return
+
+                # Execute discovered tools
+                for tc in tool_calls_detected:
+                    fn_name = tc["name"]
+                    try:
+                        fn_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                    except Exception:
+                        fn_args = {"query": tc["arguments"]} if "search" in fn_name else {}
+
+                    # Notify frontend that tool execution started
+                    tool_call_payload = json.dumps({
+                        "type": "tool_call",
+                        "name": fn_name,
+                        "args": fn_args
+                    })
+                    yield f"data: {tool_call_payload}\n\n"
+
+                    # Execute tool locally or via MCP
+                    tool_output = await AgentTools.dispatch_tool(fn_name, fn_args)
+
+                    # Notify frontend of tool output
+                    tool_res_payload = json.dumps({
+                        "type": "tool_result",
+                        "name": fn_name,
+                        "result": tool_output[:1200] if len(tool_output) > 1200 else tool_output
+                    })
+                    yield f"data: {tool_res_payload}\n\n"
+
+                    # Append to conversation messages for next LLM iteration
+                    messages.append({
+                        "role": "assistant",
+                        "content": f"[Invoked tool {fn_name} with arguments: {json.dumps(fn_args)}]"
+                    })
+                    messages.append({
+                        "role": "user",
+                        "content": f"[Tool Observation from {fn_name}]:\n{tool_output}\n\nPlease synthesize this tool observation and continue answering the user's question."
+                    })
+
+            except Exception as e:
+                logger.error(f"Error during LLM stream processing: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'error': f'Communication Error: {str(e)}'})}\n\n"
+                return
+
+        # End of turns
+        yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
 
     async def generate_response(
         self,

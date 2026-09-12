@@ -1,7 +1,7 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 2.0.0
+ * Project: MyAgent | Version: 2.1.0
  * ============================================================================== */
 
 // Main Application Logic, Mobile Drawer, Chat Streaming & UI Interactions
@@ -19,9 +19,9 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all 5 views
+// Tab Switching across all 6 views
 function switchTab(tabName) {
-  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models'];
+  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -59,10 +59,15 @@ function switchTab(tabName) {
     topbarDesc.innerText = 'PDF, Word, Excel, CSV ও ফটো/ছবি OCR প্রসেসিং';
     if (typeof loadDocumentList === 'function') loadDocumentList();
     if (typeof loadMemoryStats === 'function') loadMemoryStats();
+    if (typeof loadChunksList === 'function') loadChunksList();
   } else if (tabName === 'models') {
     topbarTitle.innerText = 'এআই মডেল হাব ও রিয়েলটাইম পিং টেস্ট';
     topbarDesc.innerText = 'বাহ্যিক এলএলএম সার্ভারের সংযোগ ও রেসপন্স টাইম (ms)';
     if (typeof loadModelsOverview === 'function') loadModelsOverview();
+  } else if (tabName === 'mcp') {
+    topbarTitle.innerText = 'টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব';
+    topbarDesc.innerText = 'ওপেন-সোর্স টুলস স্যুট ও ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা';
+    if (typeof loadMcpDashboard === 'function') loadMcpDashboard();
   }
 }
 
@@ -333,6 +338,12 @@ async function sendMessage() {
             const data = JSON.parse(jsonStr);
             if (data.type === 'sources') {
               citations = data.sources || [];
+            } else if (data.type === 'tool_call') {
+              assistantContent += `\n\n⚙️ *[টুল কল করা হচ্ছে: **${data.name}**...]*\n`;
+              updateAssistantMessage(assistantBubble, assistantContent, true);
+            } else if (data.type === 'tool_result') {
+              assistantContent += `\n> 💡 **[${data.name} রেজাল্ট]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
+              updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'token') {
               assistantContent += data.token;
               updateAssistantMessage(assistantBubble, assistantContent, true);

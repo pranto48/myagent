@@ -1,4 +1,4 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -8,10 +8,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system build dependencies and curl for healthchecks
+# Install system build dependencies, curl for healthchecks, and tesseract-ocr for image reading
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install python packages

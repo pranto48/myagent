@@ -130,7 +130,7 @@ chmod +x deploy.sh
 ## 📜 কপিরাইট ও লাইসেন্স (Copyright & License)
 
 ```
-Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
+Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
 ```
 
 All Rights Reserved. Developed by **Arif Mahmud** ([arifmahmud.com](https://arifmahmud.com/)) for **IT support BD** ([itsupport.com.bd](https://itsupport.com.bd)).

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.0.0
+// Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.1.0
 // Admin Authentication & Security Management
 
 const TOKEN_KEY = 'myagent_access_token';

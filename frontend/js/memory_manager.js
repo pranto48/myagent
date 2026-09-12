@@ -1,13 +1,17 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 2.0.0
+ * Project: MyAgent | Version: 2.1.0
  * ============================================================================== */
 
 // Company Knowledge Base, Big Data & Vector Memory Manager
+// Full CRUD: View, Search, Edit Wrong Data, Delete Chunks & Documents
 
 let activeFilter = 'all';
 let allLoadedDocs = [];
+let currentEditingChunkId = null;
+let currentChunksPage = 0;
+const CHUNKS_PER_PAGE = 25;
 
 function handleDragOver(e) {
   e.preventDefault();
@@ -60,6 +64,7 @@ async function uploadFiles(files) {
       showToast('ফাইল সফলভাবে মেমোরিতে ইনজেস্ট করা হয়েছে!', 'success');
       loadDocumentList();
       loadMemoryStats();
+      loadChunksList();
       if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     } else {
       showToast(`ইনজেস্ট ত্রুটি: ${data.detail || data.message || 'ব্যর্থ'}`, 'error');
@@ -80,126 +85,81 @@ function setDocFilter(type) {
   renderFilteredDocs();
 }
 
-function renderFilteredDocs() {
-  const listEl = document.getElementById('doc-inventory-list');
-  if (!listEl) return;
-
-  let filtered = allLoadedDocs;
-  if (activeFilter !== 'all') {
-    filtered = allLoadedDocs.filter(d => {
-      const ext = (d.filename.split('.').pop() || '').toLowerCase();
-      if (activeFilter === 'pdf') return ext === 'pdf';
-      if (activeFilter === 'excel') return ['xlsx', 'xls', 'csv'].includes(ext);
-      if (activeFilter === 'word') return ['docx', 'doc'].includes(ext);
-      if (activeFilter === 'photo') return ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext);
-      if (activeFilter === 'text') return ['txt', 'md', 'json', 'log'].includes(ext);
-      return true;
-    });
-  }
-
-  if (filtered.length === 0) {
-    listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">এই ক্যাটাগরিতে কোনো ফাইল নেই।</div>';
-    return;
-  }
-
-  listEl.innerHTML = filtered.map(doc => {
-    const ext = (doc.filename.split('.').pop() || '').toLowerCase();
-    let icon = '📄';
-    if (['xlsx', 'xls', 'csv'].includes(ext)) icon = '📊';
-    else if (['docx', 'doc'].includes(ext)) icon = '📝';
-    else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) icon = '🖼️';
-
-    return `
-      <div class="doc-item" id="doc-${doc.doc_id}">
-        <div class="doc-info">
-          <div class="doc-icon">${icon}</div>
-          <div>
-            <div class="doc-title">${escapeHtml(doc.filename)}</div>
-            <div class="doc-meta">
-              ${formatBytes(doc.size_bytes)} • ${doc.chunks_count}টি ভেক্টর চাঙ্ক • ${doc.created_at}
-            </div>
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; gap: 8px;">
-          <button class="btn-inspect-chunks" onclick="inspectChunks('${doc.doc_id}', '${escapeHtml(doc.filename)}')">
-            চাঙ্কস দেখুন
-          </button>
-          <span class="doc-badge">মেমোরিতে ইনডেক্সড</span>
-          <button class="delete-doc-btn" title="মুছে ফেলুন" onclick="deleteDocument('${doc.doc_id}')">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-// Fetch and Render Documents
+// Fetch Document List from Backend
 async function loadDocumentList() {
-  const listEl = document.getElementById('doc-inventory-list');
-  if (!listEl) return;
+  const listElem = document.getElementById('document-list-body');
+  if (!listElem) return;
 
   try {
     const res = await fetch('/api/documents', {
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
-    if (res.ok) {
-      allLoadedDocs = await res.json();
-      renderFilteredDocs();
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const docs = await res.json();
+    allLoadedDocs = docs;
+    renderFilteredDocs();
   } catch (err) {
-    listEl.innerHTML = `<div style="color:var(--rose-red); padding:10px;">তালিকা লোড ব্যর্থ: ${err.message}</div>`;
+    listElem.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--rose-red);">ডকুমেন্ট লোড করতে ব্যর্থ: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
-// Inspect Document Chunks in Vector Store Modal
-async function inspectChunks(docId, filename) {
-  const modal = document.getElementById('chunks-modal');
-  const title = document.getElementById('chunks-modal-title');
-  const meta = document.getElementById('chunks-modal-meta');
-  const list = document.getElementById('chunks-viewer-list');
+function renderFilteredDocs() {
+  const listElem = document.getElementById('document-list-body');
+  if (!listElem) return;
 
-  title.innerText = `চাঙ্কস প্রিভিউ: ${filename}`;
-  meta.innerText = 'ChromaDB থেকে ভেক্টর চাঙ্কস লোড হচ্ছে...';
-  list.innerHTML = '';
-  modal.classList.add('open');
-
-  try {
-    const res = await fetch(`/api/documents/${docId}/chunks`, {
-      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+  let filtered = allLoadedDocs;
+  if (activeFilter !== 'all') {
+    filtered = allLoadedDocs.filter(d => {
+      const ext = (d.file_type || d.filename.split('.').pop() || '').toLowerCase();
+      if (activeFilter === 'pdf') return ext === 'pdf';
+      if (activeFilter === 'excel') return ['xlsx', 'xls', 'csv', 'tsv'].includes(ext);
+      if (activeFilter === 'word') return ['docx', 'doc'].includes(ext);
+      if (activeFilter === 'photo') return ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext);
+      return true;
     });
-    if (res.ok) {
-      const data = await res.json();
-      meta.innerText = `মোট ভেক্টর চাঙ্কস: ${data.total_chunks || 0}টি`;
-      if (!data.chunks || data.chunks.length === 0) {
-        list.innerHTML = '<div style="color:var(--text-muted); padding:20px;">কোনো চাঙ্ক পাওয়া যায়নি।</div>';
-        return;
-      }
-
-      list.innerHTML = data.chunks.map(c => `
-        <div class="chunk-card">
-          <div class="chunk-card-meta">
-            <span>ID: ${escapeHtml(c.chunk_id)}</span>
-            <span>পৃষ্ঠা / সেকশন: ${c.metadata ? (c.metadata.page || 1) : 1}</span>
-          </div>
-          <div class="chunk-card-body">${escapeHtml(c.content)}</div>
-        </div>
-      `).join('');
-    }
-  } catch (err) {
-    meta.innerText = `ত্রুটি: ${err.message}`;
   }
+
+  if (filtered.length === 0) {
+    listElem.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:30px;">কোনো ফাইল পাওয়া যায়নি।</td></tr>`;
+    return;
+  }
+
+  listElem.innerHTML = filtered.map(doc => {
+    const ext = (doc.file_type || doc.filename.split('.').pop() || '').toUpperCase();
+    let badgeColor = 'var(--cyan-glow)';
+    if (ext === 'PDF') badgeColor = '#f43f5e';
+    else if (['XLSX', 'XLS', 'CSV'].includes(ext)) badgeColor = '#10b981';
+    else if (['DOCX', 'DOC'].includes(ext)) badgeColor = '#3b82f6';
+    else if (['PNG', 'JPG', 'WEBP'].includes(ext)) badgeColor = '#a855f7';
+
+    return `
+      <tr>
+        <td style="font-weight: 600; color: white;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="file-badge" style="background:${badgeColor}20; color:${badgeColor}; border:1px solid ${badgeColor}40;">${ext}</span>
+            <span>${escapeHtml(doc.filename)}</span>
+          </div>
+        </td>
+        <td>${doc.total_chunks || 1} চাঙ্কস</td>
+        <td>${formatBytes(doc.size_bytes || 0)}</td>
+        <td style="color:var(--text-muted); font-size:0.8rem;">${doc.uploaded_at || 'সম্প্রতি'}</td>
+        <td style="text-align:right;">
+          <button class="btn-sm-action" onclick="inspectDocumentChunks('${doc.id}', '${escapeHtml(doc.filename)}')">
+            চাঙ্কস
+          </button>
+          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteDocument('${doc.id}', '${escapeHtml(doc.filename)}')">
+            🗑️ ডিলিট
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
-function closeChunksModal() {
-  document.getElementById('chunks-modal').classList.remove('open');
-}
-
-// Delete Document from Vector Store and Disk
-async function deleteDocument(docId) {
-  if (!confirm('আপনি কি নিশ্চিত যে এই ডকুমেন্টটি মেমোরি থেকে সম্পূর্ণ মুছে ফেলতে চান?')) {
+// Delete Entire Document and all its vectors
+async function deleteDocument(docId, filename) {
+  if (!confirm(`আপনি কি নিশ্চিত যে আপনি '${filename}' এবং এর সমস্ত মেমোরি ভেক্টর মুছে ফেলতে চান?`)) {
     return;
   }
 
@@ -208,58 +168,214 @@ async function deleteDocument(docId) {
       method: 'DELETE',
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
+
     if (res.ok) {
-      showToast('ডকুমেন্টটি মেমোরি থেকে মুছে ফেলা হয়েছে।', 'info');
+      showToast(`'${filename}' সফলভাবে মেমোরি থেকে মুছে ফেলা হয়েছে!`, 'success');
       loadDocumentList();
       loadMemoryStats();
+      loadChunksList();
       if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     } else {
-      showToast('ডকুমেন্ট ডিলিট করতে ব্যর্থ হয়েছে।', 'error');
+      showToast('ডকুমেন্ট মুছতে ব্যর্থ হয়েছে।', 'error');
     }
   } catch (err) {
     showToast(`ত্রুটি: ${err.message}`, 'error');
   }
 }
 
-// Direct Semantic Memory Search Sandbox
-async function executeMemorySearch() {
-  const query = document.getElementById('memory-search-input').value.trim();
-  const resultsContainer = document.getElementById('memory-search-results');
+// -----------------------------------------------------------------------------
+// CHUNKS EXPLORER: VIEW, SEARCH, EDIT WRONG DATA, DELETE SPECIFIC CHUNK
+// -----------------------------------------------------------------------------
 
-  if (!query) {
-    showToast('অনুগ্রহ করে সার্চ কোয়েরি লিখুন।', 'info');
+async function loadChunksList(page = 0) {
+  currentChunksPage = page;
+  const tbody = document.getElementById('chunks-table-body');
+  const searchInput = document.getElementById('chunk-search-input');
+  const countBadge = document.getElementById('chunks-total-count-badge');
+  if (!tbody) return;
+
+  const query = searchInput ? searchInput.value.trim() : '';
+  const offset = page * CHUNKS_PER_PAGE;
+
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--cyan-glow);">সুপার ফাস্ট ইনডেক্স থেকে ডাটা লোড হচ্ছে...</td></tr>`;
+
+  try {
+    let url = `/api/memory/chunks?limit=${CHUNKS_PER_PAGE}&offset=${offset}`;
+    if (query) url += `&query=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    const chunks = data.chunks || [];
+    const total = data.total || 0;
+
+    if (countBadge) countBadge.innerText = `${total}টি চাঙ্ক`;
+
+    if (chunks.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">কোনো মেমোরি চাঙ্ক পাওয়া যায়নি।</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = chunks.map(c => `
+      <tr>
+        <td style="font-family:monospace; font-size:0.75rem; color:var(--cyan-glow);">${escapeHtml(c.id)}</td>
+        <td style="font-weight:600; font-size:0.85rem; color:white;">${escapeHtml(c.source)}</td>
+        <td><span class="badge-tag">পৃষ্ঠা ${c.page || 1}</span></td>
+        <td style="font-size:0.82rem; color:var(--text-muted); max-width:420px;">
+          <div style="max-height:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${escapeHtml(c.content)}
+          </div>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn-sm-action" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4);" onclick="openEditChunkModal('${c.id}')" title="ভুল তথ্য সংশোধন / এডিট">
+            ✏️ এডিট
+          </button>
+          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteChunk('${c.id}')" title="চাঙ্ক মুছে ফেলুন">
+            🗑️ ডিলিট
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--rose-red);">চাঙ্কস লোড ত্রুটি: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Open Edit Chunk Modal for Correcting Wrong Data
+async function openEditChunkModal(chunkId) {
+  currentEditingChunkId = chunkId;
+  const modal = document.getElementById('edit-chunk-modal');
+  const title = document.getElementById('edit-chunk-id-display');
+  const textarea = document.getElementById('edit-chunk-textarea');
+  const sourceDisplay = document.getElementById('edit-chunk-source-display');
+
+  title.innerText = `চাঙ্ক আইডি: ${chunkId}`;
+  textarea.value = 'ডাটা লোড হচ্ছে...';
+  modal.style.display = 'flex';
+
+  try {
+    const res = await fetch(`/api/memory/chunks/${chunkId}`, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) throw new Error('চাঙ্ক তথ্য লোড করা যায়নি');
+
+    const chunk = await res.json();
+    textarea.value = chunk.content || '';
+    if (sourceDisplay) {
+      sourceDisplay.innerText = `উৎস: ${chunk.source} (পৃষ্ঠা: ${chunk.page || 1})`;
+    }
+  } catch (err) {
+    textarea.value = `ত্রুটি: ${err.message}`;
+  }
+}
+
+function closeEditChunkModal() {
+  document.getElementById('edit-chunk-modal').style.display = 'none';
+  currentEditingChunkId = null;
+}
+
+// Save Edited Chunk with New Vector Embedding
+async function saveEditedChunk() {
+  if (!currentEditingChunkId) return;
+
+  const textarea = document.getElementById('edit-chunk-textarea');
+  const newText = textarea.value.trim();
+
+  if (!newText) {
+    showToast('টেক্সট খালি রাখা যাবে না!', 'error');
     return;
   }
 
-  resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">মেমোরিতে সেমান্টিক সার্চ চলছে...</div>';
+  showToast('সংশোধিত তথ্য সংরক্ষণ ও নতুন এমবেডিং তৈরি হচ্ছে...', 'info');
 
   try {
-    const res = await fetch('/api/memory/search', {
-      method: 'POST',
+    const res = await fetch(`/api/memory/chunks/${currentEditingChunkId}`, {
+      method: 'PUT',
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: query, top_k: 4 })
+      body: JSON.stringify({ content: newText })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('মেমোরি চাঙ্ক সফলভাবে আপডেট করা হয়েছে! এজেন্ট এখন নতুন তথ্য ব্যবহার করবে।', 'success');
+      closeEditChunkModal();
+      loadChunksList(currentChunksPage);
+      loadMemoryStats();
+    } else {
+      showToast(`সংরক্ষণ ব্যর্থ: ${data.detail || 'ত্রুটি'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+// Delete Single Memory Chunk
+async function deleteChunk(chunkId) {
+  if (!confirm(`আপনি কি নিশ্চিত যে আপনি মেমোরি চাঙ্ক '${chunkId}' মুছে ফেলতে চান?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/memory/chunks/${chunkId}`, {
+      method: 'DELETE',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
 
     if (res.ok) {
-      const hits = await res.json();
-      if (!hits || hits.length === 0) {
-        resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">কোনো প্রাসঙ্গিক তথ্য খুঁজে পাওয়া যায়নি।</div>';
-        return;
-      }
+      showToast('মেমোরি চাঙ্ক সফলভাবে মুছে ফেলা হয়েছে!', 'success');
+      loadChunksList(currentChunksPage);
+      loadMemoryStats();
+    } else {
+      showToast('মুছতে ব্যর্থ হয়েছে।', 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
 
-      resultsContainer.innerHTML = hits.map(h => `
-        <div class="search-hit-card">
-          <div class="hit-meta">
-            <span>📄 ${escapeHtml(h.source)} (পৃষ্ঠা ${h.page || 1})</span>
-            <span>স্কোর: ${(h.score * 100).toFixed(1)}%</span>
+// Inspect Chunks of a specific Document
+async function inspectDocumentChunks(docId, filename) {
+  const modal = document.getElementById('chunk-modal');
+  const title = document.getElementById('chunk-modal-title');
+  const body = document.getElementById('chunk-modal-body');
+
+  title.innerText = `ভেক্টর চাঙ্কস: ${filename}`;
+  body.innerHTML = '<div style="text-align:center; padding:30px; color:var(--cyan-glow);">চাঙ্কস লোড হচ্ছে...</div>';
+  modal.style.display = 'flex';
+
+  try {
+    const res = await fetch(`/api/documents/${docId}/chunks`, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    const data = await res.json();
+    const chunks = data.chunks || [];
+
+    if (chunks.length === 0) {
+      body.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">কোনো সংরক্ষিত চাঙ্ক পাওয়া যায়নি।</div>';
+    } else {
+      body.innerHTML = chunks.map((c, idx) => `
+        <div class="chunk-card">
+          <div class="chunk-header">
+            <span>চাঙ্ক #${idx + 1} (${escapeHtml(c.chunk_id)})</span>
+            <div>
+              <button class="btn-sm-action" style="color:var(--cyan-glow);" onclick="closeChunkModal(); openEditChunkModal('${c.chunk_id}')">✏️ এডিট</button>
+              <button class="btn-sm-action" style="color:var(--rose-red);" onclick="deleteChunk('${c.chunk_id}')">🗑️ ডিলিট</button>
+            </div>
           </div>
-          <div>${escapeHtml(h.content)}</div>
+          <div class="chunk-content">${escapeHtml(c.content)}</div>
         </div>
       `).join('');
     }
   } catch (err) {
-    resultsContainer.innerHTML = `<div style="color:var(--rose-red); padding:10px;">সার্চ ত্রুটি: ${err.message}</div>`;
+    body.innerHTML = `<div style="color:var(--rose-red); padding:20px;">চাঙ্কস লোড করতে ত্রুটি: ${err.message}</div>`;
   }
+}
+
+function closeChunkModal() {
+  document.getElementById('chunk-modal').style.display = 'none';
 }
 
 // Save Direct Corporate Note to Memory
@@ -273,7 +389,7 @@ async function saveDirectNote() {
   }
 
   try {
-    const res = await fetch('/api/memory/note', {
+    const res = await fetch('/api/memory/notes', {
       method: 'POST',
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, content, tags: ['corporate_note', 'policy'] })
@@ -285,6 +401,7 @@ async function saveDirectNote() {
       document.getElementById('note-content').value = '';
       loadDocumentList();
       loadMemoryStats();
+      loadChunksList();
       if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
     }
   } catch (err) {
@@ -332,4 +449,5 @@ function escapeHtml(text) {
 document.addEventListener('DOMContentLoaded', () => {
   loadDocumentList();
   loadMemoryStats();
+  loadChunksList();
 });

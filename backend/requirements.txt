@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 2.0.0
+# Project: MyAgent | Version: 2.1.0
 # ==============================================================================
 
 fastapi==0.110.0
@@ -18,9 +18,12 @@ openpyxl==3.1.2
 pandas>=2.2.0
 pillow>=10.2.0
 pytesseract>=0.3.10
+beautifulsoup4==4.12.3
+psutil==5.9.8
 python-multipart==0.0.9
 aiofiles==23.2.1
 numpy>=1.24.0,<2.0.0
 pyjwt==2.8.0
 passlib==1.7.4
 aiosqlite==0.20.0
+
