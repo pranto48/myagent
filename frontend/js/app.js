@@ -97,9 +97,9 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all 8 views
+// Tab Switching across all views (including Full-Page Admin & Settings)
 function switchTab(tabName) {
-  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup'];
+  const tabs = ['chat', 'admin', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup', 'settings'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -124,6 +124,10 @@ function switchTab(tabName) {
   if (tabName === 'chat') {
     if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট';
     if (topbarDesc) topbarDesc.innerText = 'ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই';
+  } else if (tabName === 'admin') {
+    if (topbarTitle) topbarTitle.innerText = 'অ্যাডমিন কমান্ড সেন্টার ও সিস্টেম কন্ট্রোল';
+    if (topbarDesc) topbarDesc.innerText = 'সার্ভার হার্টবিট, ক্লাউড মেট্রিক্স ও ইনস্ট্যান্ট অ্যাডমিন অ্যাকশন হাব';
+    if (typeof loadAdminDashboard === 'function') loadAdminDashboard();
   } else if (tabName === 'dashboard') {
     if (topbarTitle) topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
     if (topbarDesc) topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
@@ -154,6 +158,11 @@ function switchTab(tabName) {
     if (topbarTitle) topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
     if (topbarDesc) topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
     if (typeof loadBackupDashboard === 'function') loadBackupDashboard();
+  } else if (tabName === 'settings') {
+    if (topbarTitle) topbarTitle.innerText = 'সিস্টেম সেটিংস ও এআই ইঞ্জিন কনফিগারেশন';
+    if (topbarDesc) topbarDesc.innerText = 'থিম সিলেকশন, LM Studio সংযোগ, মডেল প্যারামিটার ও সিকিউরিটি কন্ট্রোল';
+    if (typeof loadSettingsHub === 'function') loadSettingsHub();
+    else if (typeof loadSettings === 'function') loadSettings();
   }
 }
 
@@ -522,11 +531,14 @@ function renderMessage(role, text, isStreaming = false) {
   const messageEl = document.createElement('div');
   messageEl.className = `chat-message ${role}-message`;
 
-  const avatar = role === 'user' ? '👤' : '🤖';
+  const avatar = role === 'user' ? '👤' : '✨';
   const senderTitle = role === 'user' ? 'আপনি' : 'MyAgent AI';
+  const avatarStyle = role === 'assistant' 
+    ? 'background: linear-gradient(135deg, #4285f4, #9b72cb); color: #ffffff; box-shadow: 0 0 12px rgba(155, 114, 203, 0.45);' 
+    : '';
 
   messageEl.innerHTML = `
-    <div class="chat-avatar">${avatar}</div>
+    <div class="chat-avatar" style="${avatarStyle}">${avatar}</div>
     <div class="message-content-wrapper">
       <div class="message-sender-name">${senderTitle}</div>
       <div class="message-bubble">
@@ -587,6 +599,31 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
     sourcesSlot.innerHTML = '';
   }
 
+  // Add ChatGPT-style action toolbar upon stream completion
+  if (!isStreaming) {
+    let toolbar = messageEl.querySelector('.msg-action-toolbar');
+    if (!toolbar) {
+      const bubble = messageEl.querySelector('.message-bubble');
+      if (bubble) {
+        toolbar = document.createElement('div');
+        toolbar.className = 'msg-action-toolbar';
+        toolbar.innerHTML = `
+          <button class="msg-tool-btn" onclick="copyMessageText(this)" title="কপি করুন">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            কপি
+          </button>
+          <button class="msg-tool-btn" onclick="retryLastPrompt()" title="পুনরায় চেষ্টা করুন">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            রিট্রাই
+          </button>
+          <button class="msg-tool-btn" onclick="toggleMsgLike(this, 'like')" title="পছন্দ হয়েছে">👍</button>
+          <button class="msg-tool-btn" onclick="toggleMsgLike(this, 'dislike')" title="অপছন্দ হয়েছে">👎</button>
+        `;
+        bubble.appendChild(toolbar);
+      }
+    }
+  }
+
   const feed = document.getElementById('chat-feed');
   if (feed) feed.scrollTop = feed.scrollHeight;
 }
@@ -599,9 +636,20 @@ function renderMarkdown(md) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Code blocks
+  // ChatGPT-style Code blocks with header and Copy Code button
   html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
+    const codeId = 'code_' + Math.random().toString(36).substring(2, 9);
+    const displayLang = lang ? lang.toLowerCase() : 'code';
+    return `<div class="chatgpt-code-box">
+      <div class="code-box-header">
+        <span class="code-lang-label">${displayLang}</span>
+        <button class="copy-code-btn" type="button" onclick="copyCodeBlock(this, '${codeId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          কপি কোড
+        </button>
+      </div>
+      <pre class="code-box-content" id="${codeId}"><code class="lang-${displayLang}">${code.trim()}</code></pre>
+    </div>`;
   });
 
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -616,7 +664,7 @@ function renderMarkdown(md) {
 
   const paragraphs = html.split(/\n\n+/);
   return paragraphs.map(p => {
-    if (p.startsWith('<pre>') || p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<h4>') || p.startsWith('<ul>') || p.startsWith('<blockquote>')) {
+    if (p.startsWith('<div class="chatgpt-code-box"') || p.startsWith('<pre>') || p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<h4>') || p.startsWith('<ul>') || p.startsWith('<blockquote>')) {
       return p;
     }
     return `<p>${p.replace(/\n/g, '<br>')}</p>`;
@@ -632,3 +680,64 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// Clipboard & Action Helpers for ChatGPT / Gemini Chat
+function copyCodeBlock(btn, codeId) {
+  const codeEl = document.getElementById(codeId);
+  if (!codeEl) return;
+  const text = codeEl.innerText || codeEl.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓ কপি হয়েছে!';
+    btn.style.color = '#34d399';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.color = '';
+    }, 2000);
+  }).catch(() => {
+    showToast('ক্লিপবোর্ডে কপি করা যায়নি', 'error');
+  });
+}
+
+function copyMessageText(btn) {
+  const bubble = btn.closest('.message-bubble');
+  if (!bubble) return;
+  const textEl = bubble.querySelector('.message-text');
+  if (!textEl) return;
+  const text = textEl.innerText || textEl.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓ কপি হয়েছে!';
+    btn.style.color = '#34d399';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.color = '';
+    }, 2000);
+  }).catch(() => {
+    showToast('ক্লিপবোর্ডে কপি করা যায়নি', 'error');
+  });
+}
+
+function retryLastPrompt() {
+  if (!conversationHistory || conversationHistory.length === 0) return;
+  const lastUserMsg = [...conversationHistory].reverse().find(m => m.role === 'user');
+  if (lastUserMsg) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+      input.value = lastUserMsg.content;
+      autoResizeTextarea(input);
+      sendMessage();
+    }
+  }
+}
+
+function toggleMsgLike(btn, type) {
+  if (type === 'like') {
+    btn.classList.toggle('active-like');
+    showToast('ফিডব্যাকের জন্য ধন্যবাদ!', 'success');
+  } else {
+    btn.classList.toggle('active-dislike');
+    showToast('ফিডব্যাক গ্রহণ করা হয়েছে। আমরা মডেল উন্নত করছি।', 'info');
+  }
+}
+

@@ -90,21 +90,13 @@ function updateThemeCardSelection(theme) {
 }
 
 function openSettingsModal() {
-  const modal = document.getElementById('settings-modal');
-  if (modal) modal.classList.add('open');
-  const currentTheme = localStorage.getItem('myagent_theme') || 'dark';
-  updateThemeCardSelection(currentTheme);
-  loadSettings();
+  if (typeof switchTab === 'function') {
+    switchTab('settings');
+  }
 }
 
 function closeSettingsModal() {
-  const modal = document.getElementById('settings-modal');
-  if (modal) modal.classList.remove('open');
-  const badge = document.getElementById('test-connection-badge');
-  if (badge) {
-    badge.className = 'test-res-badge';
-    badge.style.display = 'none';
-  }
+  // No modal to close in full-page mode
 }
 
 // Load current configuration
@@ -115,9 +107,15 @@ async function loadSettings() {
     });
     if (res.ok) {
       const data = await res.json();
-      document.getElementById('setting-llm-url').value = data.llm_base_url || '';
-      document.getElementById('setting-llm-model').value = data.llm_model || '';
-      document.getElementById('setting-agent-temp').value = data.agent_temperature || 0.3;
+      const urlInput = document.getElementById('setting-llm-url');
+      const modelInput = document.getElementById('setting-llm-model');
+      const tempInput = document.getElementById('setting-agent-temp');
+      const tempDisplay = document.getElementById('temp-val-display');
+
+      if (urlInput) urlInput.value = data.llm_base_url || '';
+      if (modelInput) modelInput.value = data.llm_model || '';
+      if (tempInput) tempInput.value = data.agent_temperature || 0.3;
+      if (tempDisplay) tempDisplay.innerText = data.agent_temperature !== undefined ? data.agent_temperature : '0.3';
       
       const modelLabel = document.getElementById('sidebar-model-name');
       if (modelLabel) modelLabel.innerText = data.llm_model || 'Unknown';
@@ -129,6 +127,8 @@ async function loadSettings() {
     console.warn('Error loading settings:', err);
   }
 }
+
+const loadSettingsHub = loadSettings;
 
 // Update Model Select Dropdown in Topbar
 function updateModelDropdown(models, activeModel) {
@@ -206,15 +206,34 @@ async function saveSettings() {
 
     if (res.ok) {
       showToast('সেটিংস সফলভাবে সংরক্ষিত হয়েছে!', 'success');
-      document.getElementById('sidebar-model-name').innerText = model;
+      const sideModel = document.getElementById('sidebar-model-name');
+      if (sideModel) sideModel.innerText = model;
       updateModelDropdown([model], model);
-      closeSettingsModal();
     } else {
       showToast('সেটিংস সেভ করতে ব্যর্থ হয়েছে।', 'error');
     }
   } catch (err) {
     showToast(`ত্রুটি: ${err.message}`, 'error');
   }
+}
+
+function resetSettingsDefaults() {
+  if (document.getElementById('setting-llm-url')) {
+    document.getElementById('setting-llm-url').value = 'http://192.168.20.10:1234/v1';
+  }
+  if (document.getElementById('setting-llm-model')) {
+    document.getElementById('setting-llm-model').value = 'gemma-4-e2b-it-qat';
+  }
+  if (document.getElementById('setting-llm-key')) {
+    document.getElementById('setting-llm-key').value = 'sk-lm-itvN1hr4:n8gt8iapM8Slt3NqjlHk';
+  }
+  if (document.getElementById('setting-agent-temp')) {
+    document.getElementById('setting-agent-temp').value = '0.3';
+  }
+  if (document.getElementById('temp-val-display')) {
+    document.getElementById('temp-val-display').innerText = '0.3';
+  }
+  showToast('ডিফল্ট LM Studio কনফিগারেশন সেট করা হয়েছে। সেভ করতে "সেটিংস সংরক্ষণ" চাপুন।', 'info');
 }
 
 // Auto-initialize Theme immediately and on DOM ready

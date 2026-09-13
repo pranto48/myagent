@@ -36,7 +36,7 @@
       <div class="brand-icon" style="margin: 0 auto 12px; width: 50px; height: 50px;">
         <img src="favicon.svg" alt="MyAgent Logo" style="width: 32px; height: 32px;">
       </div>
-      <h2 class="animated-gradient-text">MyAgent v2.1.0</h2>
+      <h2 class="animated-gradient-text">MyAgent v2.2.0</h2>
       <p>কোম্পানির সংবেদনশীল ডেটা ও এআই এজেন্ট ব্যবস্থাপনায় অ্যাডমিন লগইন আবশ্যক</p>
 
       <form onsubmit="performLogin(event)" style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
@@ -110,6 +110,13 @@
           <span>এআই চ্যাট (Chat)</span>
         </button>
 
+        <button class="nav-btn" id="nav-admin-btn" onclick="switchTab('admin')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+          </svg>
+          <span>অ্যাডমিন কমান্ড সেন্টার</span>
+        </button>
+
         <button class="nav-btn" id="nav-dashboard-btn" onclick="switchTab('dashboard')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -159,7 +166,7 @@
           <span>ব্যাকআপ ও রিস্টোর</span>
         </button>
 
-        <button class="nav-btn" id="nav-settings-btn" onclick="openSettingsModal()">
+        <button class="nav-btn" id="nav-settings-btn" onclick="switchTab('settings')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -196,7 +203,7 @@
       <!-- Official Brand Copyright Footer -->
       <div class="sidebar-brand-footer">
         <div>© 2026 <a href="https://itsupport.com.bd" target="_blank">IT support BD</a></div>
-        <div>Made By <a href="https://arifmahmud.com/" target="_blank">Arif</a> • v2.1.0</div>
+        <div>Made By <a href="https://arifmahmud.com/" target="_blank">Arif</a> • v2.2.0</div>
       </div>
 
     </aside>
@@ -249,77 +256,116 @@
         </div>
       </header>
 
-      <!-- View 1: AI Chat View -->
+      <!-- View 1: AI Chat View (Google Gemini & ChatGPT Architecture) -->
       <section class="tab-view active" id="view-chat">
-        <div class="chat-container">
+        <div class="chat-container gemini-chat-container">
           
-          <!-- Message Feed -->
+          <!-- Message Feed (Centered Stream) -->
           <div class="messages-scroll" id="chat-feed">
-            <!-- Empty Hero State -->
-            <div class="empty-chat-hero" id="empty-hero">
-              <div class="hero-icon">
-                <img src="favicon.svg" alt="AI Agent Icon" style="width: 40px; height: 40px;">
+            
+            <!-- Gemini Sparkle Hero State -->
+            <div class="gemini-hero-container" id="empty-hero">
+              <div class="gemini-sparkle-pill">
+                <span class="sparkle-spark">✨</span>
+                <span>MyAgent Enterprise AI</span>
               </div>
-              <h3 class="animated-gradient-text">কোম্পানি এআই এজেন্ট প্রস্তুত</h3>
-              <p>আপনার অভ্যন্তরীণ কোম্পানির ফাইল (PDF, Word, Excel, CSV, ফটো ও ডকুমেন্টস)-এর ভিত্তিতে নির্ভুল বিশ্লেষণ এবং সিদ্ধান্ত প্রদান করবে।</p>
+              <h2 class="gemini-greeting-title">
+                হ্যালো, <span class="gemini-user-highlight" id="gemini-user-name">Admin</span><br>
+                <span class="gemini-sub-sparkle">আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?</span>
+              </h2>
+              <p class="gemini-hero-desc">
+                কোম্পানির নিজস্ব সিকিউর ডাটাবেস ও অন-প্রিমিসেস এআই মডেলে পরিচালিত আপনার স্মার্ট কর্পোরেট সহকারী।
+              </p>
               
-              <div class="prompt-suggestions">
-                <div class="suggestion-card" onclick="usePrompt('আমাদের কোম্পানির অভ্যন্তরীণ নীতিমালা এবং ছুটির নিয়মগুলো কি?')">
-                  📌 কোম্পানির নীতিমালা ও ছুটির নিয়মাবলী
+              <!-- Gemini Interactive Suggestion Cards Grid -->
+              <div class="gemini-cards-grid">
+                <div class="gemini-card" onclick="usePrompt('আমাদের কোম্পানির অভ্যন্তরীণ নীতিমালা এবং ছুটির নিয়মগুলো বিস্তারিত জানাও')">
+                  <div class="card-icon-bubble icon-blue">📄</div>
+                  <div class="card-content">
+                    <h4>কোম্পানি পলিসি ও রুলস</h4>
+                    <p>অভ্যন্তরীণ কর্মপদ্ধতি, ছুটি ও নিয়মাবলী অনুসন্ধান</p>
+                  </div>
+                  <span class="card-arrow">↗</span>
                 </div>
-                <div class="suggestion-card" onclick="usePrompt('আপলোড করা এক্সেল ফাইলের হিসাব ও বিক্রয় ডেটা বিশ্লেষণ করো')">
-                  📊 এক্সেল স্প্রেডশিট ও বিগ ডাটা অ্যানালাইটিক্স
+                
+                <div class="gemini-card" onclick="usePrompt('আপলোড করা এক্সেল ফাইলের হিসাব, বিক্রয় তথ্য ও প্রধান পরিসংখ্যান বিশ্লেষণ করো')">
+                  <div class="card-icon-bubble icon-purple">📊</div>
+                  <div class="card-content">
+                    <h4>বিগ ডেটা ও এক্সেল অ্যানালাইসিস</h4>
+                    <p>স্প্রেডশিটের হিসাব, মেট্রিক্স ও ট্রেন্ড টেবিল তৈরি</p>
+                  </div>
+                  <span class="card-arrow">↗</span>
                 </div>
-                <div class="suggestion-card" onclick="usePrompt('আপলোড করা ছবির মধ্যে কি কি টেক্সট বা তথ্য রয়েছে ব্যাখ্যা করো')">
-                  🖼️ ফটো ও ইমেজ OCR ডেটা রিডিং
+
+                <div class="gemini-card" onclick="usePrompt('আমাদের সাম্প্রতিক কোম্পানির নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ রিপোর্ট তৈরি করো')">
+                  <div class="card-icon-bubble icon-emerald">📑</div>
+                  <div class="card-content">
+                    <h4>এক্সিকিউটিভ ডাটা রিপোর্ট</h4>
+                    <p>অটোমেটেড রিপোর্ট জেনারেশন ও পরবর্তী করণীয়</p>
+                  </div>
+                  <span class="card-arrow">↗</span>
                 </div>
-                <div class="suggestion-card" onclick="usePrompt('বর্তমানে তোমার মেমোরিতে কোন কোন ফাইল সংরক্ষিত আছে?')">
-                  🧠 এজেন্টের বর্তমান মেমোরি অডিট
+
+                <div class="gemini-card" onclick="usePrompt('আপলোড করা ইমেজ বা ছবির মধ্যে কী কী টেক্সট বা তথ্য রয়েছে বিস্তারিত ব্যাখ্যা করো')">
+                  <div class="card-icon-bubble icon-amber">🖼️</div>
+                  <div class="card-content">
+                    <h4>ফটো ও ইমেজ OCR রিডিং</h4>
+                    <p>ছবি থেকে টেক্সট ও ডকুমেন্ট সারসংক্ষেপ নিষ্কাশন</p>
+                  </div>
+                  <span class="card-arrow">↗</span>
                 </div>
               </div>
             </div>
-          <!-- Productivity Quick Action Chips Bar -->
-          <div class="productivity-quick-bar" id="productivity-quick-bar">
-            <span class="quick-bar-label">⚡ অ্যাকশন:</span>
-            <button class="quick-chip" onclick="useProductivityAction('data_analysis')">📊 বিগ ডেটা অ্যানালাইসিস</button>
-            <button class="quick-chip" onclick="useProductivityAction('memory_search')">🔍 নলেজবেস ও পলিসি সার্চ</button>
-            <button class="quick-chip" onclick="useProductivityAction('generate_report')">📑 এক্সিকিউটিভ রিপোর্ট তৈরি</button>
-            <button class="quick-chip" onclick="useProductivityAction('python_sandbox')">🐍 পাইথন ম্যাথ ক্যালকুলেশন</button>
-            <button class="quick-chip" onclick="useProductivityAction('security_audit')">🛡️ সিকিউরিটি ও কমপ্লায়েন্স</button>
+
           </div>
 
-          <!-- Bottom Chat Input Bar -->
-          <div class="chat-input-bar">
-            <div class="input-box-wrapper">
+          <!-- Bottom Chat Input Area (ChatGPT / Gemini Floating Pill Box) -->
+          <div class="chat-input-wrapper-outer">
+            <!-- Productivity Quick Action Chips Bar -->
+            <div class="productivity-quick-bar" id="productivity-quick-bar">
+              <span class="quick-bar-label">⚡ অ্যাকশন:</span>
+              <button class="quick-chip" onclick="useProductivityAction('data_analysis')">📊 বিগ ডেটা</button>
+              <button class="quick-chip" onclick="useProductivityAction('memory_search')">🔍 পলিসি সার্চ</button>
+              <button class="quick-chip" onclick="useProductivityAction('generate_report')">📑 রিপোর্ট তৈরি</button>
+              <button class="quick-chip" onclick="useProductivityAction('python_sandbox')">🐍 পাইথন স্যান্ডবক্স</button>
+              <button class="quick-chip" onclick="useProductivityAction('security_audit')">🛡️ সিকিউরিটি</button>
+            </div>
+
+            <!-- ChatGPT / Gemini Style Floating Rounded Prompt Pill -->
+            <div class="chatgpt-input-pill" id="chatgpt-input-pill">
+              <div class="pill-tools-left">
+                <button type="button" class="pill-btn-icon" title="ফাইল বা ডকুমেন্ট ইনজেস্ট করুন" onclick="switchTab('knowledge')">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+                <label class="memory-pill-toggle" id="memory-toggle-btn" onclick="toggleMemoryUsage()" title="কোম্পানি ভেক্টর মেমোরি সার্চ চালু/বন্ধ">
+                  <input type="checkbox" id="chk-use-memory" checked style="display:none;">
+                  <span class="memory-dot"></span>
+                  <span id="memory-toggle-text">মেমোরি অন</span>
+                </label>
+              </div>
+
               <textarea 
                 id="chat-input" 
-                class="chat-textarea" 
-                placeholder="কোম্পানির ডেটা, হিসাব বা যেকোনো বিষয় নিয়ে প্রশ্ন করুন... (Shift+Enter নতুন লাইনের জন্য)" 
+                class="chatgpt-textarea" 
+                placeholder="MyAgent-কে যেকোনো প্রশ্ন বা নির্দেশনা দিন... (Shift+Enter নতুন লাইনের জন্য)" 
                 rows="1"
                 oninput="autoResizeTextarea(this)"
                 onkeydown="handleTextareaKey(event)"
               ></textarea>
-              
-              <div class="input-actions-row">
-                <div class="input-tools">
-                  <label class="memory-toggle" id="memory-toggle-btn" onclick="toggleMemoryUsage()">
-                    <input type="checkbox" id="chk-use-memory" checked style="display:none;">
-                    <span id="memory-toggle-icon">🧠</span>
-                    <span id="memory-toggle-text">মেমোরি: সক্রিয়</span>
-                  </label>
-                  <button class="icon-btn" title="ফাইল বা ছবি আপলোড করুন" onclick="switchTab('knowledge')">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
-                </div>
 
-                <button type="button" class="send-btn" id="btn-send-message" onclick="sendMessage()" title="বার্তা পাঠান (Enter)" aria-label="বার্তা পাঠান">
-                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              <div class="pill-tools-right">
+                <button type="button" class="pill-send-btn" id="btn-send-message" onclick="sendMessage()" title="বার্তা পাঠান (Enter)" aria-label="বার্তা পাঠান">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                   </svg>
                 </button>
               </div>
+            </div>
+
+            <div class="chat-privacy-footer">
+              <span>🔒 MyAgent Enterprise • সুরক্ষিত অন-প্রিমিসেস ডেটাবেস ও নিজস্ব এলএলএম সার্ভারে পরিচালিত</span>
             </div>
           </div>
 
@@ -970,6 +1016,425 @@
           </div>
 
         </div>
+      <!-- View 9: Full-Page Futuristic Admin Command Center (No Popups) -->
+      <section class="tab-view" id="view-admin">
+        <div class="admin-view-container">
+          
+          <!-- Futuristic Cyber HUD Banner -->
+          <div class="cyber-hud-banner">
+            <div class="hud-left">
+              <div class="pulse-core-wrap">
+                <span class="pulse-core-ring"></span>
+                <span class="pulse-core-dot"></span>
+              </div>
+              <div>
+                <div class="hud-title-row">
+                  <h3 class="animated-gradient-text">অ্যাডমিন কমান্ড ও কন্ট্রোল সেন্টার</h3>
+                  <span class="cyber-badge-online">SYSTEM OPERATIONAL</span>
+                </div>
+                <p class="hud-subtitle">হোস্ট সার্ভার: <code>192.168.9.9:3399</code> • এনক্রিপশন: <code>AES-256-GCM</code> • হাইব্রিড মেমোরি ইঞ্জিন অ্যাক্টিভ</p>
+              </div>
+            </div>
+            <div class="hud-right">
+              <div class="hud-stat-pill">
+                <span class="hud-label">সক্রিয় এআই মডেল</span>
+                <span class="hud-val" id="admin-active-model-badge">gemma-4-e2b-it-qat</span>
+              </div>
+              <div class="hud-stat-pill">
+                <span class="hud-label">ল্যাটেন্সি পিং</span>
+                <span class="hud-val text-cyan" id="admin-ping-latency">~2 ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Futuristic KPI Matrix -->
+          <div class="futuristic-kpi-grid">
+            <div class="cyber-kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-icon-glow">🧠</span>
+                <span class="kpi-tag text-cyan">AI ENGINE</span>
+              </div>
+              <div class="kpi-number" id="admin-kpi-model">Active</div>
+              <div class="kpi-meta" id="admin-kpi-model-meta">192.168.20.10:1234 (LM Studio)</div>
+            </div>
+
+            <div class="cyber-kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-icon-glow">⚡</span>
+                <span class="kpi-tag text-purple">VECTOR CHUNKS</span>
+              </div>
+              <div class="kpi-number" id="admin-kpi-chunks">০</div>
+              <div class="kpi-meta">ChromaDB + SQLite FTS5 (&lt; 5ms)</div>
+            </div>
+
+            <div class="cyber-kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-icon-glow">🛡️</span>
+                <span class="kpi-tag text-emerald">SECURITY SHIELD</span>
+              </div>
+              <div class="kpi-number" id="admin-kpi-security">100%</div>
+              <div class="kpi-meta" id="admin-kpi-sec-meta">Firewall Active • DLP Ready</div>
+            </div>
+
+            <div class="cyber-kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-icon-glow">💾</span>
+                <span class="kpi-tag text-amber">DATA VAULT</span>
+              </div>
+              <div class="kpi-number" id="admin-kpi-backup">সুরক্ষিত</div>
+              <div class="kpi-meta" id="admin-kpi-backup-meta">ফুল ব্যাকআপ সেন্টার সক্রিয়</div>
+            </div>
+
+            <div class="cyber-kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-icon-glow">👥</span>
+                <span class="kpi-tag text-rose">ADMIN ACCESS</span>
+              </div>
+              <div class="kpi-number" id="admin-kpi-users">১</div>
+              <div class="kpi-meta" id="admin-kpi-users-meta">সক্রিয় ইউজার সেশন</div>
+            </div>
+          </div>
+
+          <!-- Quick Cyber Actions Grid -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">⚡</span>
+                <h4>এক-ক্লিক সুপার অ্যাডমিন অ্যাকশন হাব</h4>
+              </div>
+              <span class="section-badge">ADMIN CONTROL</span>
+            </div>
+            <div class="cyber-action-grid">
+              <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('flush_cache')">
+                <div class="btn-icon">🧹</div>
+                <div class="btn-text">
+                  <span class="btn-title">মেমোরি ক্যাশ ফ্লাশ</span>
+                  <span class="btn-desc">LRU ভেক্টর ক্যাশ খালি ও রিলোড</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('clean_placeholders')">
+                <div class="btn-icon">🧼</div>
+                <div class="btn-text">
+                  <span class="btn-title">করূপ্ট ডাটা অটো-ক্লিন</span>
+                  <span class="btn-desc">প্রশ্নচিহ্ন বা অকার্যকর এন্ট্রি দূরীকরণ</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('instant_backup')">
+                <div class="btn-icon">📦</div>
+                <div class="btn-text">
+                  <span class="btn-title">তাৎক্ষণিক ব্যাকআপ জেনারেটর</span>
+                  <span class="btn-desc">১ ক্লিকে পুরো সিস্টেমের জিপ স্ন্যাপশট</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="switchTab('settings')">
+                <div class="btn-icon">⚙️</div>
+                <div class="btn-text">
+                  <span class="btn-title">মডেল ও সার্ভার সেটিংস</span>
+                  <span class="btn-desc">LM Studio আইপি ও পোর্ট কনফিগার</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="switchTab('security')">
+                <div class="btn-icon">🛡️</div>
+                <div class="btn-text">
+                  <span class="btn-title">সিকিউরিটি অডিট ট্রেইল</span>
+                  <span class="btn-desc">লগইন, এক্সেস ও ফায়ারওয়াল ইভেন্ট</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="refreshSystemData()">
+                <div class="btn-icon">🔄</div>
+                <div class="btn-text">
+                  <span class="btn-title">সিস্টেম মেট্রিক্স রিফ্রেশ</span>
+                  <span class="btn-desc">টেলিমেট্রি ডাটা লাইভ আপডেট</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Inline User Management (NO POPUP WINDOW!) -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">👥</span>
+                <h4>ইউজার ম্যানেজমেন্ট ও রোল পারমিশন (ইনলাইন কনসোল)</h4>
+              </div>
+              <button type="button" class="btn-primary" onclick="toggleInlineAddUserForm()">
+                <span id="btn-toggle-user-icon">+</span> নতুন ইউজার যোগ করুন
+              </button>
+            </div>
+
+            <!-- Inline Slide-down Add User Glass Form -->
+            <div class="inline-glass-form" id="inline-add-user-form" style="display:none;">
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label>ইউজারনেম (Username)</label>
+                  <input type="text" id="inline-user-name" class="text-input" placeholder="e.g. officer1">
+                </div>
+                <div class="form-group">
+                  <label>পাসওয়ার্ড (Password)</label>
+                  <input type="password" id="inline-user-pass" class="text-input" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                  <label>ভূমিকা (Role)</label>
+                  <select id="inline-user-role" class="text-input">
+                    <option value="Member">Member (সদস্য - চ্যাট ও ডাটা এক্সেস)</option>
+                    <option value="Admin">Admin (প্রশাসক - পূর্ণ নিয়ন্ত্রণ)</option>
+                    <option value="Viewer">Viewer (দর্শক - কেবল চ্যাট)</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button type="button" class="btn-secondary" onclick="toggleInlineAddUserForm()">বাতিল</button>
+                <button type="button" class="btn-primary" onclick="submitInlineAddUser()">ইউজার সংরক্ষণ করুন</button>
+              </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="data-table-wrapper" style="margin-top:14px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ইউজারনেম</th>
+                    <th>ভূমিকা (Role)</th>
+                    <th>তৈরির তারিখ</th>
+                    <th>অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-table-body">
+                  <tr><td colspan="4" style="text-align:center; padding:16px;">ইউজার লোড হচ্ছে...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Live Docker & Process Telemetry -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">🖥️</span>
+                <h4>ডকার সার্ভিসেস ও ব্যাকএন্ড প্রসেস হেলথ</h4>
+              </div>
+              <span class="section-badge">DOCKER COMPOSE</span>
+            </div>
+            <div class="docker-services-grid">
+              <div class="service-chip">
+                <div class="service-indicator online"></div>
+                <div class="service-meta">
+                  <span class="service-name">myagent-backend</span>
+                  <span class="service-info">Port: 8008 (Uvicorn / FastAPI Core)</span>
+                </div>
+                <span class="service-status-pill">HEALTHY</span>
+              </div>
+              <div class="service-chip">
+                <div class="service-indicator online"></div>
+                <div class="service-meta">
+                  <span class="service-name">myagent-web</span>
+                  <span class="service-info">Port: 3399 (Nginx High-Speed Gateway)</span>
+                </div>
+                <span class="service-status-pill">HEALTHY</span>
+              </div>
+              <div class="service-chip">
+                <div class="service-indicator online" id="lmstudio-indicator"></div>
+                <div class="service-meta">
+                  <span class="service-name">LM Studio (AI Engine)</span>
+                  <span class="service-info" id="lmstudio-info">http://192.168.20.10:1234/v1</span>
+                </div>
+                <span class="service-status-pill" id="lmstudio-status-pill">CONNECTED</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- View 10: Full-Page Futuristic Settings Hub (No Popups!) -->
+      <section class="tab-view" id="view-settings">
+        <div class="admin-view-container">
+          
+          <div class="cyber-hud-banner">
+            <div class="hud-left">
+              <span style="font-size:2rem;">⚙️</span>
+              <div>
+                <div class="hud-title-row">
+                  <h3 class="animated-gradient-text">সিস্টেম ও সার্ভার সেটিংস কন্ট্রোল</h3>
+                  <span class="cyber-badge-online">SETTINGS HUB</span>
+                </div>
+                <p class="hud-subtitle">থিম স্টাইলিং, বাহ্যিক এআই মডেল কনফিগারেশন ও রিয়েলটাইম পিং টেস্ট সেন্টার</p>
+              </div>
+            </div>
+            <div class="hud-right">
+              <button type="button" class="btn-primary" onclick="saveSettings()">
+                💾 সেটিংস সংরক্ষণ করুন
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 1: Display & Theme Engine -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">🎨</span>
+                <h4>ডিসপ্লে ও থিম মোড (Display & Theme Engine)</h4>
+              </div>
+              <span class="section-badge">UI PREFERENCES</span>
+            </div>
+            <div class="theme-options-grid" style="margin-top:10px;">
+              <div class="theme-option-card" id="theme-card-dark" data-theme="dark" onclick="selectTheme('dark')">
+                <span class="theme-card-icon">🌙</span>
+                <span class="theme-card-title">ডার্ক মোড (Dark Mode)</span>
+                <span class="theme-card-desc">স্লিক অনিক্স, নিয়ন গ্লো ও সাইবারপঙ্ক লুক</span>
+              </div>
+              <div class="theme-option-card" id="theme-card-light" data-theme="light" onclick="selectTheme('light')">
+                <span class="theme-card-icon">☀️</span>
+                <span class="theme-card-title">লাইট মোড (Light Mode)</span>
+                <span class="theme-card-desc">ক্লিন, ক্রিস্প ও হাই-কন্ট্রাস্ট কর্পোরেট লুক</span>
+              </div>
+              <div class="theme-option-card" id="theme-card-system" data-theme="system" onclick="selectTheme('system')">
+                <span class="theme-card-icon">💻</span>
+                <span class="theme-card-title">সিস্টেম অটো (Auto)</span>
+                <span class="theme-card-desc">ডিভাইস ও অপারেটিং সিস্টেম প্রেফারেন্স অনুযায়ী</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: AI Model Engine & Server Connectivity -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">🤖</span>
+                <h4>এআই মডেল ইঞ্জিন ও সার্ভার এন্ডপয়েন্ট (AI Core Parameters)</h4>
+              </div>
+              <span class="section-badge">LLM CONFIG</span>
+            </div>
+
+            <div class="form-grid-2" style="margin-top:14px;">
+              <div class="form-group">
+                <label>বাহ্যিক এলএলএম সার্ভার URL (OpenAI-সামঞ্জস্যপূর্ণ)</label>
+                <input type="text" id="setting-llm-url" class="text-input" placeholder="http://192.168.20.10:1234/v1">
+                <small>যেমন: LM Studio (<code>http://192.168.20.10:1234/v1</code>), Ollama বা vLLM এন্ডপয়েন্ট</small>
+              </div>
+
+              <div class="form-group">
+                <label>এলএলএম মডেলের নাম (Model Name)</label>
+                <input type="text" id="setting-llm-model" class="text-input" placeholder="gemma-4-e2b-it-qat">
+                <small>যেমন: <code>gemma-4-e2b-it-qat</code>, <code>llama3.3</code>, <code>deepseek-r1</code>, <code>qwen2.5</code></small>
+              </div>
+            </div>
+
+            <div class="form-grid-2" style="margin-top:10px;">
+              <div class="form-group">
+                <label>এপিআই কি (API Key)</label>
+                <input type="password" id="setting-llm-key" class="text-input" placeholder="sk-lm-...">
+                <small>লোকাল LM Studio বা ক্লাউড এন্ডপয়েন্টের অথেনটিকেশন টোকেন</small>
+              </div>
+
+              <div class="form-group">
+                <label>এজেন্ট টেম্পারেচার (Temperature): <strong id="temp-val-display" style="color:var(--cyan-glow);">0.3</strong></label>
+                <input type="range" id="setting-agent-temp" class="cyber-range-slider" min="0" max="1" step="0.05" value="0.3" oninput="document.getElementById('temp-val-display').innerText = this.value">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                  <span>০.০ (নির্ভুল ও সুনির্দিষ্ট)</span>
+                  <span>১.০ (সৃজনশীল ও উন্মুক্ত)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Radar Ping Test -->
+            <div style="margin-top:16px; padding:16px; background:rgba(6, 182, 212, 0.05); border:1px solid rgba(6, 182, 212, 0.2); border-radius:var(--radius-md);">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <h5 style="margin-bottom:4px; font-size:0.95rem; color:var(--text-primary);">📡 লাইভ সার্ভার কানেকশন ও পিং টেস্ট</h5>
+                  <p style="font-size:0.8rem; color:var(--text-muted);">রিমোট এলএলএম সার্ভারের কানেক্টিভিটি, মডেল প্রাপ্যতা ও রেসপন্স টাইম পরীক্ষা করুন।</p>
+                </div>
+                <button type="button" class="btn-secondary" id="btn-test-conn" onclick="testConnection()" style="border-color:var(--cyan-glow); color:var(--cyan-glow);">
+                  ⚡ সংযোগ পরীক্ষা (Ping Test)
+                </button>
+              </div>
+              <div id="test-connection-badge" class="test-res-badge" style="display:none; margin-top:12px;"></div>
+            </div>
+          </div>
+
+          <!-- Section 3: Vector Memory & RAG Retrieval Tuning -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">🧠</span>
+                <h4>ভেক্টর মেমোরি ও RAG রিট্রিভাল টিউনিং (Hybrid Search)</h4>
+              </div>
+              <span class="section-badge">RAG ENGINE</span>
+            </div>
+            <div class="form-grid-3" style="margin-top:14px;">
+              <div class="form-group">
+                <label>সর্বোচ্চ সোর্স রেজাল্ট (Top-K)</label>
+                <select id="setting-top-k" class="text-input">
+                  <option value="3">৩টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
+                  <option value="4" selected>৪টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক (প্রস্তাবিত)</option>
+                  <option value="6">৬টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
+                  <option value="8">৮টি গভীর ডকুমেন্ট চাঙ্ক</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>মিনিমাম সিমিলারিটি থ্রেশহোল্ড</label>
+                <select id="setting-sim-threshold" class="text-input">
+                  <option value="0.55">০.৫৫ (শিথিল ফিল্টার)</option>
+                  <option value="0.65" selected>০.৬৫ (প্রস্তাবিত ব্যালেন্সড)</option>
+                  <option value="0.75">০.৭৫ (কঠোর ফিল্টার)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>SQLite FTS5 কি-ওয়ার্ড সার্চ</label>
+                <select id="setting-fts-toggle" class="text-input">
+                  <option value="true" selected>সক্রিয় (সাব-মিলিটিসেকেন্ড গতি)</option>
+                  <option value="false">নিষ্ক্রিয়</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Enterprise Security & Data Vault Shortlink -->
+          <div class="cyber-section-card">
+            <div class="section-card-header">
+              <div class="header-left">
+                <span class="section-icon">🛡️</span>
+                <h4>সাইবার সিকিউরিটি পলিসি ও ডাটা প্রোটেকশন</h4>
+              </div>
+              <span class="section-badge">SECURITY SHIELD</span>
+            </div>
+            <div class="form-grid-2" style="margin-top:14px;">
+              <div class="form-group">
+                <label>প্রম্পট ইনজেকশন ফায়ারওয়াল মোড</label>
+                <select id="setting-firewall-mode" class="text-input">
+                  <option value="strict" selected>Strict (সর্বোচ্চ নিরাপত্তা ও ব্লক)</option>
+                  <option value="standard">Standard (সাধারণ মনিটরিং)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>PII ও সংবেদনশীল ডাটা DLP রিডাকশন</label>
+                <select id="setting-dlp-mode" class="text-input">
+                  <option value="auto" selected>স্বয়ংক্রিয় রিডাকশন (Auto Masking)</option>
+                  <option value="audit_only">কেবলমাত্র অডিট লগ তৈরি</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-subtle);">
+              <button type="button" class="btn-secondary" onclick="switchTab('backup')" style="border-color:var(--cyan-glow); color:var(--cyan-glow);">
+                💾 সম্পূর্ণ ডাটা ব্যাকআপ ও রিস্টোর সেন্টার ↗
+              </button>
+              <div style="display:flex; gap:10px;">
+                <button type="button" class="btn-secondary" onclick="resetSettingsDefaults()">
+                  ডিফল্ট সেটিংস
+                </button>
+                <button type="button" class="btn-primary" onclick="saveSettings()">
+                  💾 সেটিংস সেভ করুন
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
       </section>
 
     </main>
@@ -1212,6 +1677,7 @@
   <script src="js/mcp_manager.js"></script>
   <script src="js/security_manager.js"></script>
   <script src="js/backup_manager.js"></script>
+  <script src="js/admin_manager.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/app.js"></script>
 </body>
