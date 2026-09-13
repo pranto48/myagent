@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_HOURS: int = 72
 
     # Remote / Local LLM Server (OpenAI-compatible)
-    LLM_BASE_URL: str = "http://192.168.9.10:11434/v1"
-    LLM_API_KEY: str = "not-needed"
-    LLM_MODEL: str = "llama3.3"
+    LLM_BASE_URL: str = "http://192.168.20.10:1234/v1"
+    LLM_API_KEY: str = "sk-lm-itvN1hr4:n8gt8iapM8Slt3NqjlHk"
+    LLM_MODEL: str = "gemma-4-e2b-it-qat"
 
     # Agent Persona & Behavior
     AGENT_NAME: str = "Company Data Intelligence Agent"
