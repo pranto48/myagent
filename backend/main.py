@@ -101,13 +101,13 @@ app.include_router(settings_router)
 async def get_version():
     """Returns official project version and branding information."""
     return {
-        "version": "2.2.0",
+        "version": "3.0.0",
         "company": "IT support BD",
         "company_url": "https://itsupport.com.bd",
         "author": "Arif",
         "author_url": "https://arifmahmud.com/",
         "web_port": settings.WEB_PORT,
-        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0"
+        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0"
     }
 
 @app.get("/api/health")
@@ -115,7 +115,7 @@ async def health_check():
     """Health check endpoint for Docker container monitoring."""
     return {
         "status": "healthy",
-        "version": "2.2.0",
+        "version": "3.0.0",
         "service": "myagent-backend",
         "web_port": settings.WEB_PORT
     }
