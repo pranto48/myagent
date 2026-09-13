@@ -519,3 +519,6 @@ class VectorMemoryStore:
             "cache_size": len(self.cache.cache),
             "fts_enabled": os.path.exists(self.fts_db_path)
         }
+
+VectorStore = VectorMemoryStore
+
