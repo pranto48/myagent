@@ -24,13 +24,82 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 
+// ==============================================================================
+// Theme Switching & Appearance Manager
+// ==============================================================================
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('myagent_theme') || 'dark';
+  applyTheme(savedTheme, false);
+}
+
+function applyTheme(theme, notify = true) {
+  let effectiveTheme = theme;
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    effectiveTheme = prefersDark ? 'dark' : 'light';
+  }
+
+  if (effectiveTheme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.body.classList.add('light-theme');
+    const toggleIcon = document.getElementById('theme-toggle-icon');
+    if (toggleIcon) toggleIcon.innerText = '☀️';
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.body.classList.remove('light-theme');
+    const toggleIcon = document.getElementById('theme-toggle-icon');
+    if (toggleIcon) toggleIcon.innerText = '🌙';
+  }
+
+  localStorage.setItem('myagent_theme', theme);
+  updateThemeCardSelection(theme);
+
+  if (notify && typeof showToast === 'function') {
+    if (theme === 'light') {
+      showToast('☀️ লাইট মোড (Light Mode) সক্রিয় করা হয়েছে।', 'success');
+    } else if (theme === 'dark') {
+      showToast('🌙 ডার্ক মোড (Dark Mode) সক্রিয় করা হয়েছে।', 'success');
+    } else {
+      showToast('💻 সিস্টেম প্রেফারেন্স অনুযায়ী থিম স্বয়ংক্রিয়ভাবে সেট করা হয়েছে।', 'info');
+    }
+  }
+}
+
+function selectTheme(theme) {
+  applyTheme(theme, true);
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('myagent_theme') || 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next, true);
+}
+
+function updateThemeCardSelection(theme) {
+  ['dark', 'light', 'system'].forEach(t => {
+    const card = document.getElementById(`theme-card-${t}`);
+    if (card) {
+      if (t === theme) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+    }
+  });
+}
+
 function openSettingsModal() {
-  document.getElementById('settings-modal').classList.add('open');
+  const modal = document.getElementById('settings-modal');
+  if (modal) modal.classList.add('open');
+  const currentTheme = localStorage.getItem('myagent_theme') || 'dark';
+  updateThemeCardSelection(currentTheme);
   loadSettings();
 }
 
 function closeSettingsModal() {
-  document.getElementById('settings-modal').classList.remove('open');
+  const modal = document.getElementById('settings-modal');
+  if (modal) modal.classList.remove('open');
   const badge = document.getElementById('test-connection-badge');
   if (badge) {
     badge.className = 'test-res-badge';
@@ -148,6 +217,9 @@ async function saveSettings() {
   }
 }
 
+// Auto-initialize Theme immediately and on DOM ready
+initTheme();
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   loadSettings();
 });

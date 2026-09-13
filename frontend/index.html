@@ -8,10 +8,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MyAgent v2.1.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স প্ল্যাটফর্ম</title>
+  <title>MyAgent v2.2.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স প্ল্যাটফর্ম</title>
   <meta name="description" content="ডকারাইজড কোম্পানি এআই এজেন্ট, পারসিসটেন্ট মেমোরি, অ্যাডমিন ড্যাশবোর্ড ও বিগ ডাটা অ্যানালিটিক্স (সার্ভার ১৯২.১৬৮.৯.৯:৩৩৯৯)">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('myagent_theme') || 'dark';
+        if (t === 'system') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        if (t === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -197,6 +212,11 @@
               <option value="llama3.3">llama3.3</option>
             </select>
           </div>
+
+          <!-- Quick Theme Toggle Action -->
+          <button class="btn-icon-theme" id="quick-theme-toggle" onclick="toggleTheme()" title="থিম পরিবর্তন করুন (ডার্ক / লাইট)">
+            <span id="theme-toggle-icon">🌙</span>
+          </button>
 
           <!-- Export Chat Action -->
           <button class="btn-secondary" id="btn-export-chat" onclick="exportChatConversation()" title="চ্যাট এক্সপোর্ট করুন">
@@ -854,10 +874,37 @@
 
     <!-- Settings Modal -->
     <div class="modal-backdrop" id="settings-modal">
-      <div class="modal-window">
+      <div class="modal-window" style="max-width: 580px;">
         <div class="modal-header">
-          <h3>সিস্টেম ও সার্ভার সেটিংস</h3>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">⚙️</span>
+            <h3>সিস্টেম ও সার্ভার সেটিংস</h3>
+          </div>
           <button class="close-modal-btn" onclick="closeSettingsModal()">&times;</button>
+        </div>
+
+        <!-- Theme & Appearance Switching Section -->
+        <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+          <div class="theme-section-title">
+            <span>🎨 ডিসপ্লে ও থিম মোড (Theme Mode)</span>
+          </div>
+          <div class="theme-options-grid">
+            <div class="theme-option-card" id="theme-card-dark" data-theme="dark" onclick="selectTheme('dark')">
+              <span class="theme-card-icon">🌙</span>
+              <span class="theme-card-title">ডার্ক মোড</span>
+              <span class="theme-card-desc">স্লিক অনিক্স ও নিয়ন গ্লো</span>
+            </div>
+            <div class="theme-option-card" id="theme-card-light" data-theme="light" onclick="selectTheme('light')">
+              <span class="theme-card-icon">☀️</span>
+              <span class="theme-card-title">লাইট মোড</span>
+              <span class="theme-card-desc">ক্লিন ও ক্রিস্প কর্পোরেট</span>
+            </div>
+            <div class="theme-option-card" id="theme-card-system" data-theme="system" onclick="selectTheme('system')">
+              <span class="theme-card-icon">💻</span>
+              <span class="theme-card-title">সিস্টেম অটো</span>
+              <span class="theme-card-desc">ওএস প্রেফারেন্স অনুযায়ী</span>
+            </div>
+          </div>
         </div>
 
         <div class="form-group">
