@@ -630,46 +630,6 @@ class VectorMemoryStore:
             logger.error(f"Failed to delete document vectors for {doc_id}: {e}")
             return False
 
-    def add_note(self, title: str, content: str, tags: List[str] = None) -> str:
-        """Adds a direct corporate memory note without file upload."""
-        import uuid
-        title_str = str(title or "").strip()
-        content_str = str(content or "").strip()
-
-        # Reject corrupted question-mark placeholder notes
-        if "????" in title_str or "????" in content_str or (content_str.count("?") > 5 and content_str.count("?") / max(len(content_str), 1) > 0.15):
-            raise ValueError("নোটের শিরোনাম বা তথ্যে অতিরিক্ত প্রশ্নচিহ্ন ('????') বা ত্রুটিপূর্ণ টেক্সট পাওয়া গেছে। অনুগ্রহ করে সঠিক ইউনিকোড টেক্সট লিখুন।")
-
-        self.cache.clear()
-        note_id = f"note_{uuid.uuid4().hex[:8]}"
-        metadata = {
-            "doc_id": note_id,
-            "filename": f"Note: {title_str}",
-            "page": 1,
-            "chunk_index": 1,
-            "tags": ",".join(tags) if tags else "manual_note",
-            "category": "direct_note"
-        }
-        full_content = f"TITLE: {title_str}\nNOTE:\n{content_str}"
-
-        self.collection.upsert(
-            ids=[note_id],
-            documents=[full_content],
-            metadatas=[metadata]
-        )
-
-        try:
-            with sqlite3.connect(self.fts_db_path) as conn:
-                conn.execute("""
-                    INSERT INTO fts_chunks (chunk_id, doc_id, filename, page, content, category)
-                    VALUES (?, ?, ?, 1, ?, 'direct_note')
-                """, (note_id, note_id, f"Note: {title}", full_content))
-                conn.commit()
-        except Exception as e:
-            logger.warning(f"FTS5 note insert: {e}")
-
-        return note_id
-
     def get_stats(self) -> Dict[str, Any]:
         """Returns statistics about indexed memories."""
         total_chunks = self.collection.count()
