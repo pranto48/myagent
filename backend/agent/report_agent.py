@@ -20,16 +20,18 @@ logger = logging.getLogger("myagent.report_agent")
 
 
 REPORT_SYSTEM_PROMPT = """You are an expert Enterprise Report Generator AI for {agent_name}.
-Your task is to generate structured, professional business reports in Markdown format.
+Your task is to generate structured, professional business reports in Markdown format EXCLUSIVELY based on internal company data and records.
 
-RULES:
-1. Always generate reports in Bangla (বাংলা) unless explicitly requested in English.
-2. Use proper Markdown: headings (##, ###), tables, bullet points, bold text.
-3. Include an Executive Summary at the top.
-4. Include a "তথ্য সূত্র" (Data Sources) section at the end citing the documents used.
-5. Be data-driven, precise, and professional.
-6. For analytical reports, include numerical tables when data is available.
-7. End every report with "পরবর্তী পদক্ষেপ" (Next Actions) recommendations.
+STRICT DATA SOURCE & INTEGRITY RULES:
+1. STRICT COMPANY DATA REQUIREMENT: You must ONLY use the provided internal company data and documents. DO NOT use or introduce data, benchmarks, or information from external/other companies.
+2. If internal company data for certain sections is missing, DO NOT fabricate metrics or guess facts. Instead, clearly designate that section as "[কোম্পানি ডেটা পেন্ডিং: নথি বা তথ্য আপলোড প্রয়োজন]" and outline the exact data requirements.
+3. Always generate reports in Bangla (বাংলা) unless explicitly requested in English.
+4. Use proper Markdown: headings (##, ###), tables, bullet points, bold text.
+5. Include an Executive Summary (সারসংক্ষেপ) at the top.
+6. Include a "তথ্য সূত্র" (Data Sources) section at the end citing the internal company documents used.
+7. Be data-driven, precise, and professional.
+8. For analytical reports, include numerical tables when data is available.
+9. End every report with "পরবর্তী পদক্ষেপ" (Next Actions) recommendations.
 
 Copyright footer: "© 2026 IT support BD | তৈরি: Arif | MyAgent v3.0.0"
 """
@@ -150,7 +152,13 @@ class ReportAgent:
                 sources_used.append({"source": source, "score": round(score, 3)})
 
         # 2. Build prompt
-        rag_context = "\n\n".join(context_blocks) if context_blocks else "কোম্পানির মেমোরি থেকে প্রাসঙ্গিক তথ্য পাওয়া যায়নি। সাধারণ জ্ঞান ও বিষয়বস্তুর উপর ভিত্তি করে রিপোর্ট তৈরি করুন।"
+        if context_blocks:
+            rag_context = "\n\n".join(context_blocks)
+        else:
+            rag_context = (
+                "⚠️ সতর্কতা: কোম্পানির অভ্যন্তরীণ নলেজ বেস থেকে এই বিষয়ের কোনো রেকর্ড পাওয়া যায়নি।\n"
+                "কঠোর নির্দেশ: কাল্পনিক তথ্য বা অন্য কোনো কোম্পানির তথ্য ব্যবহার করবেন না। রিপোর্টে স্পষ্টভাবে উল্লেখ করুন যে কোম্পানির ডেটাবেজে এই তথ্যটি এখনো অন্তর্ভুক্ত নেই এবং কোন কোন ফাইল বা ডেটা পয়েন্ট প্রয়োজন।"
+            )
 
         user_prompt = f"""
 {template['prompt_prefix']}

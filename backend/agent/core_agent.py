@@ -110,7 +110,7 @@ class CompanyAIAgent:
 
         return False
 
-    def _prepare_rag_context(self, prompt: str, user_role: str = "admin") -> tuple[str, List[SourceCitation]]:
+    def _prepare_rag_context(self, prompt: str, user_role: str = "admin", has_attachments: bool = False) -> tuple[str, List[SourceCitation]]:
         """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list with DLS."""
         # 1. Skip RAG completely for greetings and casual pleasantries
         if self.is_conversational_greeting(prompt):
@@ -120,52 +120,63 @@ class CompanyAIAgent:
         hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS, user_role=user_role)
         sources: List[SourceCitation] = []
 
-        if not hits:
-            return prompt, []
-
         context_blocks = []
         seen_snippets = set()
-        for hit in hits:
-            source_file = str(hit.get("source", "Document"))
-            page_num = hit.get("page", 1)
-            chunk_content = str(hit.get("content", "")).strip()
-            score = float(hit.get("score", 0.0))
+        if hits:
+            for hit in hits:
+                source_file = str(hit.get("source", "Document"))
+                page_num = hit.get("page", 1)
+                chunk_content = str(hit.get("content", "")).strip()
+                score = float(hit.get("score", 0.0))
 
-            # Quality filter: skip corrupt or placeholder entries
-            if "????" in source_file or "????" in chunk_content:
-                continue
-            if chunk_content.count("?") > 5 and (chunk_content.count("?") / max(len(chunk_content), 1)) > 0.15:
-                continue
+                # Quality filter: skip corrupt or placeholder entries
+                if "????" in source_file or "????" in chunk_content:
+                    continue
+                if chunk_content.count("?") > 5 and (chunk_content.count("?") / max(len(chunk_content), 1)) > 0.15:
+                    continue
 
-            # Minimum relevance threshold for semantic-only matches
-            if score < 0.65 and not hit.get("is_keyword_match", False):
-                continue
+                # Minimum relevance threshold for semantic-only matches
+                if score < 0.65 and not hit.get("is_keyword_match", False):
+                    continue
 
-            # Deduplication fingerprint: skip redundant overlapping sentences
-            snippet_fp = " ".join(chunk_content[:90].lower().split())
-            if snippet_fp in seen_snippets:
-                continue
-            seen_snippets.add(snippet_fp)
+                # Deduplication fingerprint: skip redundant overlapping sentences
+                snippet_fp = " ".join(chunk_content[:90].lower().split())
+                if snippet_fp in seen_snippets:
+                    continue
+                seen_snippets.add(snippet_fp)
 
-            idx = len(context_blocks) + 1
-            context_blocks.append(
-                f"[Source #{idx}: {source_file} (Page {page_num})]\n{chunk_content}"
-            )
-            sources.append(
-                SourceCitation(
-                    source=source_file,
-                    chunk_id=hit.get("id", ""),
-                    content=chunk_content[:200] + "..." if len(chunk_content) > 200 else chunk_content,
-                    score=score,
-                    page=page_num
+                idx = len(context_blocks) + 1
+                context_blocks.append(
+                    f"[Source #{idx}: {source_file} (Page {page_num})]\n{chunk_content}"
                 )
-            )
-            if len(context_blocks) >= 4:
-                break
+                sources.append(
+                    SourceCitation(
+                        source=source_file,
+                        chunk_id=hit.get("id", ""),
+                        content=chunk_content[:200] + "..." if len(chunk_content) > 200 else chunk_content,
+                        score=score,
+                        page=page_num
+                    )
+                )
+                if len(context_blocks) >= 4:
+                    break
 
-        # If no quality hits survived filtering, don't force RAG wrapper
+        # If no quality hits survived filtering
         if not context_blocks:
-            return prompt, []
+            if has_attachments:
+                # Chat-attached files will supply the context directly
+                return prompt, []
+
+            # Strict company data mode: inform agent that no records exist in company memory
+            no_context_msg = (
+                "⚠️ [কোম্পানির নলেজবেস ও ভেক্টর মেমোরিতে এই অনুসন্ধানের সাথে সম্পর্কিত কোনো অভ্যন্তরীণ নথি বা তথ্য পাওয়া যায়নি।]\n"
+                "[নির্দেশনা: কাল্পনিক বা অন্য কোনো কোম্পানির তথ্য প্রদান করবেন না। ব্যবহারকারীকে বিনীতভাবে জানান যে এই তথ্যটি কোম্পানির মেমোরিতে সংরক্ষিত নেই এবং প্রয়োজনীয় ফাইল বা তথ্য আপলোড করার পরামর্শ দিন।]"
+            )
+            augmented_prompt = RAG_CONTEXT_WRAPPER.format(
+                context_chunks=no_context_msg,
+                query=prompt
+            )
+            return augmented_prompt, []
 
         merged_context = "\n\n".join(context_blocks)
         augmented_prompt = RAG_CONTEXT_WRAPPER.format(
@@ -252,11 +263,12 @@ class CompanyAIAgent:
         sources: List[SourceCitation] = []
         user_content = prompt
 
+        has_attachments = bool(attached_files and len(attached_files) > 0)
         if use_memory and prompt.strip():
-            user_content, sources = self._prepare_rag_context(prompt, user_role=user_role)
+            user_content, sources = self._prepare_rag_context(prompt, user_role=user_role, has_attachments=has_attachments)
 
         # 3. Incorporate Chat-Attached Files (Excel, Photo OCR, Documents) directly into context
-        if attached_files and len(attached_files) > 0:
+        if has_attachments:
             attachment_blocks = []
             for af in attached_files:
                 fname = af.get("filename", "File")
@@ -288,7 +300,7 @@ class CompanyAIAgent:
         # 5. Build conversation payload
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
         # Add tool usage instructions into system prompt for models without native function calling
-        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, web_search, web_scrape, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. You may call them using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
+        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. NOTE: Do not search for other companies on the web. Only company internal memory and files are permitted for company operations. You may call tools using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
 
         messages = [{"role": "system", "content": system_content}]
 

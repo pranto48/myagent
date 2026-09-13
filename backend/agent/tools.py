@@ -560,7 +560,7 @@ class AgentTools:
                 "type": "function",
                 "function": {
                     "name": "web_search",
-                    "description": "Live DuckDuckGo web search for real-time external knowledge, news, or general public facts.",
+                    "description": "Live DuckDuckGo web search for general knowledge. STRICT NOTE: Do NOT use for company data, business operations, or external companies. Company inquiries must strictly use query_company_memory.",
                     "parameters": {
                         "type": "object",
                         "properties": {
