@@ -89,6 +89,19 @@ async def upload_documents(files: List[UploadFile] = File(...)):
         "documents": processed_files
     }
 
+def parse_doc_filename(name: str):
+    """
+    Parses 'doc_<hex>_<realname>' into (doc_id, realname).
+    Returns (None, None) if not matching.
+    """
+    if not name.startswith("doc_"):
+        return None, None
+    parts = name.split("_", 2)
+    if len(parts) >= 3:
+        doc_id = f"{parts[0]}_{parts[1]}"
+        return doc_id, parts[2]
+    return None, None
+
 @router.get("", response_model=List[DocumentInfo])
 async def list_documents():
     """
@@ -103,32 +116,29 @@ async def list_documents():
     results = []
     seen_ids = set()
 
-    for file_path in docs_dir.glob("*_*"):
+    for file_path in docs_dir.glob("doc_*_*"):
         if file_path.is_file() and not file_path.name.startswith("."):
-            parts = file_path.name.split("_", 1)
-            if len(parts) == 2 and parts[0].startswith("doc_"):
-                doc_id = parts[0]
-                filename = parts[1]
-                if doc_id in seen_ids:
-                    continue
-                seen_ids.add(doc_id)
+            doc_id, filename = parse_doc_filename(file_path.name)
+            if not doc_id or doc_id in seen_ids:
+                continue
+            seen_ids.add(doc_id)
 
-                size = file_path.stat().st_size
-                mtime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(file_path.stat().st_mtime))
+            size = file_path.stat().st_size
+            mtime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(file_path.stat().st_mtime))
 
-                try:
-                    query_result = store.collection.get(where={"doc_id": doc_id})
-                    chunks_count = len(query_result["ids"]) if query_result and "ids" in query_result else 0
-                except Exception:
-                    chunks_count = 0
+            try:
+                query_result = store.collection.get(where={"doc_id": doc_id})
+                chunks_count = len(query_result["ids"]) if query_result and "ids" in query_result else 0
+            except Exception:
+                chunks_count = 0
 
-                results.append(DocumentInfo(
-                    doc_id=doc_id,
-                    filename=filename,
-                    size_bytes=size,
-                    chunks_count=chunks_count,
-                    created_at=mtime
-                ))
+            results.append(DocumentInfo(
+                doc_id=doc_id,
+                filename=filename,
+                size_bytes=size,
+                chunks_count=chunks_count,
+                created_at=mtime
+            ))
 
     return results
 
@@ -195,21 +205,18 @@ async def reindex_documents(doc_id: str = None):
     files_to_process = []
     seen_ids = set()
 
-    for file_path in docs_dir.glob("*_*"):
+    for file_path in docs_dir.glob("doc_*_*"):
         if file_path.is_file() and not file_path.name.startswith("."):
-            parts = file_path.name.split("_", 1)
-            if len(parts) == 2 and parts[0].startswith("doc_"):
-                d_id = parts[0]
-                filename = parts[1]
-                if doc_id and d_id != doc_id:
-                    continue
-                if d_id in seen_ids:
-                    continue
-                seen_ids.add(d_id)
-                files_to_process.append((file_path, d_id, filename))
+            d_id, filename = parse_doc_filename(file_path.name)
+            if not d_id or (doc_id and d_id != doc_id):
+                continue
+            if d_id in seen_ids:
+                continue
+            seen_ids.add(d_id)
+            files_to_process.append((file_path, d_id, filename))
 
     if not files_to_process:
-        return {"success": True, "message": "রি-ইনডেক্স করার মতো কোনো ফাইল পাওয়া যায়নি।", "reindexed_count": 0}
+        return {"success": True, "message": "রি-ইনডেক্স করার মতো কোনো ফাইল পাওয়া যায়নি।", "total_files": 0, "total_chunks": 0}
 
     total_chunks = 0
     reindexed_files = []
