@@ -128,7 +128,11 @@ async def system_status():
         status="online",
         agent_name=settings.AGENT_NAME,
         llm_model=settings.LLM_MODEL,
+        llm_base_url=settings.LLM_BASE_URL,
         llm_endpoint=settings.LLM_BASE_URL,
+        total_documents=stats.get("total_documents", 0),
+        total_memory_chunks=stats.get("total_chunks", 0),
         total_indexed_chunks=stats.get("total_chunks", 0),
+        chroma_connected=True,
         embedding_model=settings.EMBEDDING_MODEL
     )

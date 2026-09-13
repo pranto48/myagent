@@ -57,10 +57,14 @@ class DocumentInfo(BaseModel):
     created_at: str
 
 class SystemStatusResponse(BaseModel):
-    status: str
-    agent_name: str
-    llm_base_url: str
-    llm_model: str
-    total_documents: int
-    total_memory_chunks: int
-    chroma_connected: bool
+    status: str = "online"
+    agent_name: str = "MyAgent"
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_endpoint: Optional[str] = None
+    total_documents: int = 0
+    total_memory_chunks: int = 0
+    total_indexed_chunks: Optional[int] = 0
+    chroma_connected: bool = True
+    embedding_model: Optional[str] = None
+
