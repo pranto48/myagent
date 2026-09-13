@@ -124,6 +124,7 @@ class CompanyAIAgent:
             return prompt, []
 
         context_blocks = []
+        seen_snippets = set()
         for hit in hits:
             source_file = str(hit.get("source", "Document"))
             page_num = hit.get("page", 1)
@@ -140,6 +141,12 @@ class CompanyAIAgent:
             if score < 0.65 and not hit.get("is_keyword_match", False):
                 continue
 
+            # Deduplication fingerprint: skip redundant overlapping sentences
+            snippet_fp = " ".join(chunk_content[:90].lower().split())
+            if snippet_fp in seen_snippets:
+                continue
+            seen_snippets.add(snippet_fp)
+
             idx = len(context_blocks) + 1
             context_blocks.append(
                 f"[Source #{idx}: {source_file} (Page {page_num})]\n{chunk_content}"
@@ -153,6 +160,8 @@ class CompanyAIAgent:
                     page=page_num
                 )
             )
+            if len(context_blocks) >= 4:
+                break
 
         # If no quality hits survived filtering, don't force RAG wrapper
         if not context_blocks:
@@ -212,6 +221,30 @@ class CompanyAIAgent:
                     details={"redacted_count": dlp_res["redacted_count"], "types": [f["type"] for f in dlp_res["findings"]]}
                 )
                 prompt = dlp_res["sanitized_text"]
+
+            # 3. Autonomous Direct Memory Save Instruction Handling
+            lower_p = prompt.strip().lower()
+            if lower_p.startswith(("মনে রেখো", "মনে রাখো", "save to memory:", "/remember", "/save")):
+                clean_instruction = prompt.strip()
+                for prefix in ["মনে রেখো:", "মনে রেখো", "মনে রাখো:", "মনে রাখো", "save to memory:", "/remember", "/save"]:
+                    if clean_instruction.lower().startswith(prefix):
+                        clean_instruction = clean_instruction[len(prefix):].strip()
+                        break
+                if clean_instruction:
+                    try:
+                        title_candidate = clean_instruction.split("\n")[0][:40]
+                        save_res = self.vector_store.add_note(
+                            title=title_candidate,
+                            content=clean_instruction,
+                            category="user_instruction",
+                            security_level="INTERNAL"
+                        )
+                        reply_text = f"✅ **তথ্যটি সফলভাবে MyAgent-এর স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!**\n\n- **নোট আইডি:** `{save_res['doc_id']}`\n- **সংরক্ষিত বিবরণ:** {clean_instruction}\n\nভবিষ্যতে যেকোনো প্রাসঙ্গিক অনুসন্ধানে আমি এই তথ্যটি স্বয়ংক্রিয়ভাবে রেফারেন্স হিসেবে ব্যবহার করব।"
+                        yield f"data: {json.dumps({'type': 'token', 'token': reply_text})}\n\n"
+                        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                        return
+                    except Exception as save_err:
+                        logger.warning(f"Autonomous memory save notice: {save_err}")
 
         target_model = model or settings.LLM_MODEL
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE

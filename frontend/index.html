@@ -227,6 +227,19 @@
             </select>
           </div>
 
+          <!-- Chat Search Box -->
+          <div class="chat-search-wrap">
+            <input type="text" id="chat-search-input" class="chat-search-input" placeholder="🔍 খুঁজুন..." oninput="filterChatMessages(this.value)" title="বর্তমান চ্যাট মেসেজের ভেতর অনুসন্ধান করুন">
+          </div>
+
+          <!-- Quick Note to Memory Button -->
+          <button class="btn-secondary" id="btn-quick-note" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য/নোট সেভ করুন">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span class="hide-mobile">নোট সেভ</span>
+          </button>
+
           <!-- Quick Theme Toggle Action -->
           <button class="btn-icon-theme" id="quick-theme-toggle" onclick="toggleTheme()" title="থিম পরিবর্তন করুন (ডার্ক / লাইট)">
             <span id="theme-toggle-icon">🌙</span>
@@ -324,11 +337,18 @@
             <!-- Productivity Quick Action Chips Bar -->
             <div class="productivity-quick-bar" id="productivity-quick-bar">
               <span class="quick-bar-label">⚡ অ্যাকশন:</span>
+              <button class="quick-chip highlight-chip" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য সংরক্ষণ">📌 মেমোরিতে নোট সেভ</button>
               <button class="quick-chip" onclick="useProductivityAction('data_analysis')">📊 বিগ ডেটা</button>
               <button class="quick-chip" onclick="useProductivityAction('memory_search')">🔍 পলিসি সার্চ</button>
               <button class="quick-chip" onclick="useProductivityAction('generate_report')">📑 রিপোর্ট তৈরি</button>
               <button class="quick-chip" onclick="useProductivityAction('python_sandbox')">🐍 পাইথন স্যান্ডবক্স</button>
               <button class="quick-chip" onclick="useProductivityAction('security_audit')">🛡️ সিকিউরিটি</button>
+            </div>
+
+            <!-- Real-time Upload & Memory Indexing Progress Pill -->
+            <div class="upload-progress-pill" id="upload-progress-pill" style="display: none;">
+              <span class="spinner-inline" style="width: 13px; height: 13px; border-width: 2px;"></span>
+              <span id="upload-progress-text">মেমোরি ইনডেক্সিং হচ্ছে...</span>
             </div>
 
             <!-- ChatGPT / Gemini Style Floating Rounded Prompt Pill -->
@@ -1677,6 +1697,39 @@
         <div id="mcp-tools-modal-body" style="overflow-y:auto; flex:1; margin-top:10px;">
           লোড হচ্ছে...
         </div>
+      </div>
+    </div>
+
+    <!-- Quick Memory / Note Modal -->
+    <div class="modal-backdrop" id="quick-memory-modal" style="display:none;">
+      <div class="modal-window" style="max-width: 520px;">
+        <div class="modal-header">
+          <h3>📌 সরাসরি মেমোরিতে নোট/তথ্য সংরক্ষণ</h3>
+          <button class="close-modal-btn" type="button" onclick="closeQuickMemoryModal()">&times;</button>
+        </div>
+        <form onsubmit="submitQuickNote(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+          <div class="form-group">
+            <label>নোটের শিরোনাম বা বিষয়</label>
+            <input type="text" id="quick-note-title" class="text-input" placeholder="যেমন: ধানমন্ডি অফিসের নতুন ঠিকানা বা নীতিমালা" required>
+          </div>
+          <div class="form-group">
+            <label>ক্যাটাগরি</label>
+            <select id="quick-note-category" class="text-input">
+              <option value="notes">সাধারণ নোট (General Notes)</option>
+              <option value="company_policy">কোম্পানি পলিসি ও রুলস (Policies)</option>
+              <option value="technical_guide">টেকনিক্যাল গাইডলাইন (Technical)</option>
+              <option value="credentials">এক্সেস / ক্রেডেনশিয়াল গাইড (Credentials)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>বিস্তারিত তথ্য / গাইডলাইন</label>
+            <textarea id="quick-note-content" class="text-input" rows="5" placeholder="যে তথ্যটি এআই এজেন্টের সারাজীবন মনে রাখা প্রয়োজন..." required></textarea>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+            <button type="button" class="btn-secondary" onclick="closeQuickMemoryModal()">বাতিল</button>
+            <button type="submit" class="btn-primary" id="btn-submit-quick-note">মেমোরিতে সেভ করুন</button>
+          </div>
+        </form>
       </div>
     </div>
 

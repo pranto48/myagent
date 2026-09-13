@@ -12,6 +12,25 @@ let useMemory = true;
 let isGenerating = false;
 let isStreaming = false;
 let attachedChatFiles = [];
+let currentChatAbortController = null;
+
+function stopGenerating() {
+  if (currentChatAbortController) {
+    currentChatAbortController.abort();
+    currentChatAbortController = null;
+  }
+  isGenerating = false;
+  isStreaming = false;
+  const sendBtn = document.getElementById('btn-send-message');
+  if (sendBtn) {
+    sendBtn.classList.remove('streaming-active');
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = SEND_ICON_SVG;
+    sendBtn.title = 'বার্তা পাঠান (Enter)';
+  }
+  attachChatEventListeners();
+  showToast('উত্তর তৈরি বন্ধ করা হয়েছে।', 'info');
+}
 
 // Original Send Button SVG Icon
 const SEND_ICON_SVG = `
@@ -637,6 +656,7 @@ async function sendMessage() {
 
   // Step 1: Upload attached files to backend if any
   if (hasAttachments) {
+    showUploadProgress(`${attachedChatFiles.length}টি ফাইল আপলোড ও মেমোরি ইনডেক্সিং হচ্ছে...`);
     try {
       const formData = new FormData();
       for (const item of attachedChatFiles) {
@@ -644,7 +664,6 @@ async function sendMessage() {
       }
 
       const uploadHeaders = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
-      // Delete Content-Type so browser sets multipart boundary automatically
       delete uploadHeaders['Content-Type'];
 
       const uploadRes = await fetch('/api/chat/upload', {
@@ -663,8 +682,8 @@ async function sendMessage() {
 
       attachedFilesForDisplay = serverAttachedFiles.map(f => ({
         name: f.filename,
-        size: f.size,
-        extension: f.extension
+        size: f.size_bytes || f.size || 0,
+        extension: f.extension || f.filename.split('.').pop()
       }));
 
       // Free local object URLs and clear shelf
@@ -683,6 +702,8 @@ async function sendMessage() {
         sendBtn.innerHTML = SEND_ICON_SVG;
       }
       return;
+    } finally {
+      hideUploadProgress();
     }
   }
 
@@ -696,6 +717,22 @@ async function sendMessage() {
   const assistantBubble = renderMessage('assistant', '', true);
   isGenerating = true;
   isStreaming = true;
+  currentChatAbortController = new AbortController();
+
+  if (sendBtn) {
+    sendBtn.disabled = false;
+    sendBtn.classList.add('streaming-active');
+    sendBtn.title = 'উত্তর তৈরি থামান (Stop Generating)';
+    sendBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="pointer-events:none;">
+        <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+      </svg>
+    `;
+    sendBtn.onclick = function(e) {
+      if (e) e.preventDefault();
+      stopGenerating();
+    };
+  }
 
   let assistantContent = '';
   let citations = [];
@@ -705,6 +742,7 @@ async function sendMessage() {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: headers,
+      signal: currentChatAbortController.signal,
       body: JSON.stringify({
         session_id: currentSessionId,
         prompt: prompt,
@@ -765,15 +803,24 @@ async function sendMessage() {
     loadChatSessions();
 
   } catch (err) {
-    assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}। অনুগ্রহ করে নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিসটি সক্রিয় রয়েছে।`;
-    updateAssistantMessage(assistantBubble, assistantContent, false);
+    if (err.name === 'AbortError') {
+      assistantContent += `\n\n⏹️ *[ব্যবহারকারী কর্তৃক উত্তর তৈরি থামানো হয়েছে]*`;
+      updateAssistantMessage(assistantBubble, assistantContent, false);
+    } else {
+      assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}। অনুগ্রহ করে নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিসটি সক্রিয় রয়েছে।`;
+      updateAssistantMessage(assistantBubble, assistantContent, false);
+    }
   } finally {
     isGenerating = false;
     isStreaming = false;
+    currentChatAbortController = null;
     if (sendBtn) {
+      sendBtn.classList.remove('streaming-active');
       sendBtn.disabled = false;
       sendBtn.innerHTML = SEND_ICON_SVG;
+      sendBtn.title = 'বার্তা পাঠান (Enter)';
     }
+    attachChatEventListeners();
     input.focus();
   }
 }
@@ -881,6 +928,10 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
           <button class="msg-tool-btn" onclick="copyMessageText(this)" title="কপি করুন">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             কপি
+          </button>
+          <button class="msg-tool-btn" onclick="saveMsgToAgentMemory(this)" title="এআই-এর উত্তরটি কোম্পানির স্থায়ী মেমোরিতে সেভ করুন">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            মেমোরিতে সেভ
           </button>
           <button class="msg-tool-btn" onclick="retryLastPrompt()" title="পুনরায় চেষ্টা করুন">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -1042,5 +1093,168 @@ function toggleMsgLike(btn, type) {
     btn.classList.toggle('active-dislike');
     showToast('ফিডব্যাক গ্রহণ করা হয়েছে। আমরা মডেল উন্নত করছি।', 'info');
   }
+}
+
+// ==============================================================================
+// Instant Note / Agent Memory Saver & Chat Search Enhancements
+// ==============================================================================
+
+function openQuickMemoryModal() {
+  const modal = document.getElementById('quick-memory-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const titleInput = document.getElementById('quick-note-title');
+    if (titleInput) {
+      titleInput.focus();
+    }
+  }
+}
+
+function closeQuickMemoryModal() {
+  const modal = document.getElementById('quick-memory-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitQuickNote(event) {
+  if (event) event.preventDefault();
+  const titleInput = document.getElementById('quick-note-title');
+  const catInput = document.getElementById('quick-note-category');
+  const contentInput = document.getElementById('quick-note-content');
+  const submitBtn = document.getElementById('btn-submit-quick-note');
+
+  if (!titleInput || !contentInput) return;
+  const title = titleInput.value.trim();
+  const content = contentInput.value.trim();
+  const category = catInput ? catInput.value : 'notes';
+
+  if (!title || !content) {
+    showToast('দয়া করে শিরোনাম ও বিস্তারিত কনটেন্ট লিখুন', 'error');
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'সেভ হচ্ছে...';
+  }
+
+  try {
+    const res = await fetch('/api/documents/quick-note', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title,
+        content: content,
+        category: category,
+        security_level: 'INTERNAL'
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'মেমোরি সেভ ব্যর্থ হয়েছে');
+    }
+
+    const data = await res.json();
+    showToast(data.message || 'নোট সফলভাবে মেমোরিতে সংরক্ষিত হয়েছে!', 'success');
+    titleInput.value = '';
+    contentInput.value = '';
+    closeQuickMemoryModal();
+
+    if (typeof loadDocumentList === 'function') loadDocumentList();
+    if (typeof loadMemoryStats === 'function') loadMemoryStats();
+    if (typeof loadChunksList === 'function') loadChunksList();
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'মেমোরিতে সেভ করুন';
+    }
+  }
+}
+
+async function saveMsgToAgentMemory(btn) {
+  const bubble = btn.closest('.message-bubble');
+  if (!bubble) return;
+  const textEl = bubble.querySelector('.message-text');
+  if (!textEl) return;
+  const content = (textEl.innerText || textEl.textContent).trim();
+  if (!content) return;
+
+  const firstLine = content.split('\n')[0].replace(/^[#\*\s\-]+/, '').trim().slice(0, 45) || 'চ্যাট নোট';
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerText = 'সেভ হচ্ছে...';
+
+  try {
+    const res = await fetch('/api/documents/quick-note', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: firstLine,
+        content: content,
+        category: 'saved_replies',
+        security_level: 'INTERNAL'
+      })
+    });
+
+    if (res.ok) {
+      btn.innerHTML = '✓ সেভ হয়েছে!';
+      btn.style.color = '#34d399';
+      showToast(`'${firstLine}' সফলভাবে এজেন্টের স্থায়ী মেমোরিতে সেভ হয়েছে!`, 'success');
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.style.color = '';
+        btn.disabled = false;
+      }, 3000);
+    } else {
+      throw new Error('সার্ভারে সেভ করা যায়নি');
+    }
+  } catch (err) {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+    showToast('মেমোরিতে সেভ ব্যর্থ হয়েছে', 'error');
+  }
+}
+
+// Real-time Upload & Indexing Progress Bar Helpers
+function showUploadProgress(text) {
+  const pill = document.getElementById('upload-progress-pill');
+  const label = document.getElementById('upload-progress-text');
+  if (pill) {
+    pill.style.display = 'inline-flex';
+    if (label && text) label.innerText = text;
+  }
+}
+
+function hideUploadProgress() {
+  const pill = document.getElementById('upload-progress-pill');
+  if (pill) pill.style.display = 'none';
+}
+
+// Chat Message Search & In-conversation Filter
+function filterChatMessages(query) {
+  const feed = document.getElementById('chat-feed');
+  if (!feed) return;
+  const messages = feed.querySelectorAll('.chat-message');
+  const cleanQ = (query || '').trim().toLowerCase();
+
+  if (!cleanQ) {
+    messages.forEach(m => {
+      m.style.display = '';
+      m.style.opacity = '1';
+    });
+    return;
+  }
+
+  messages.forEach(m => {
+    const txt = (m.innerText || '').toLowerCase();
+    if (txt.includes(cleanQ)) {
+      m.style.display = '';
+      m.style.opacity = '1';
+    } else {
+      m.style.display = 'none';
+    }
+  });
 }
 

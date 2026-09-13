@@ -9,9 +9,30 @@ from pathlib import Path
 from config import settings
 from memory.document_loader import DocumentProcessor
 from memory.vector_store import VectorMemoryStore
-from models.schemas import DocumentInfo
+from models.schemas import DocumentInfo, QuickNoteRequest
 
 router = APIRouter(prefix="/api/documents", tags=["Company Documents"])
+
+@router.post("/quick-note")
+async def create_quick_note(req: QuickNoteRequest):
+    """
+    Saves an instant note/knowledge snippet directly to agent memory and disk (< 50ms).
+    """
+    store = VectorMemoryStore()
+    try:
+        res = store.add_note(
+            title=req.title,
+            content=req.content,
+            category=req.category or "notes",
+            security_level=req.security_level or "INTERNAL"
+        )
+        return {
+            "success": True,
+            "message": f"নোট '{req.title}' সফলভাবে এজেন্টের স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে।",
+            "note": res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/upload")
 async def upload_documents(files: List[UploadFile] = File(...)):

@@ -69,3 +69,9 @@ class SystemStatusResponse(BaseModel):
     chroma_connected: bool = True
     embedding_model: Optional[str] = None
 
+class QuickNoteRequest(BaseModel):
+    title: str = Field(..., description="Note title or topic")
+    content: str = Field(..., description="Detailed content or guidelines to remember")
+    category: Optional[str] = Field(default="notes", description="Category classification")
+    security_level: Optional[str] = Field(default="INTERNAL", description="Document security level")
+

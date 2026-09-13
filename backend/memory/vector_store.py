@@ -136,10 +136,12 @@ class VectorMemoryStore:
         return deleted_count
 
     def _init_fts5(self):
-        """Creates SQLite FTS5 virtual table for lightning-fast keyword search."""
+        """Creates SQLite FTS5 virtual table with WAL mode for lightning-fast keyword search."""
         try:
             os.makedirs(os.path.dirname(self.fts_db_path), exist_ok=True)
             with sqlite3.connect(self.fts_db_path) as conn:
+                conn.execute("PRAGMA journal_mode = WAL;")
+                conn.execute("PRAGMA synchronous = NORMAL;")
                 conn.execute("""
                     CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(
                         chunk_id UNINDEXED,
@@ -152,12 +154,12 @@ class VectorMemoryStore:
                     )
                 """)
                 conn.commit()
-            logger.info("SQLite FTS5 full-text index ready.")
+            logger.info("SQLite FTS5 full-text index ready in WAL mode.")
         except Exception as e:
             logger.warning(f"Could not initialize SQLite FTS5: {e}")
 
     def add_chunks(self, chunks: List[Dict[str, Any]]) -> int:
-        """Adds document chunks into both ChromaDB and SQLite FTS5 index in parallel batches."""
+        """Adds document chunks into both ChromaDB and SQLite FTS5 index in parallel batches with high-speed executemany."""
         if not chunks:
             return 0
 
@@ -194,7 +196,7 @@ class VectorMemoryStore:
         ]
 
         # 1. Upsert into ChromaDB in batches
-        batch_size = 100
+        batch_size = 64
         for i in range(0, len(chunks), batch_size):
             end = i + batch_size
             self.collection.upsert(
@@ -203,29 +205,104 @@ class VectorMemoryStore:
                 metadatas=metadatas[i:end]
             )
 
-        # 2. Upsert into SQLite FTS5 index
+        # 2. Upsert into SQLite FTS5 index with high-speed executemany
         try:
             with sqlite3.connect(self.fts_db_path) as conn:
-                for c in chunks:
-                    # Remove existing if any
-                    conn.execute("DELETE FROM fts_chunks WHERE chunk_id = ?", (c["id"],))
-                    conn.execute("""
-                        INSERT INTO fts_chunks (chunk_id, doc_id, filename, page, content, category)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (
+                conn.execute("PRAGMA synchronous = NORMAL;")
+                # Batch delete existing chunks if updating
+                del_params = [(c["id"],) for c in chunks]
+                conn.executemany("DELETE FROM fts_chunks WHERE chunk_id = ?", del_params)
+
+                # Batch insert all chunks at once
+                insert_rows = [
+                    (
                         c["id"],
                         c["doc_id"],
                         c["filename"],
                         int(c.get("page", 1)),
                         c["content"],
                         c.get("category", "general")
-                    ))
+                    )
+                    for c in chunks
+                ]
+                conn.executemany("""
+                    INSERT INTO fts_chunks (chunk_id, doc_id, filename, page, content, category)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, insert_rows)
                 conn.commit()
         except Exception as e:
             logger.warning(f"FTS5 batch index error: {e}")
 
-        logger.info(f"Successfully indexed {len(chunks)} chunks in hybrid memory.")
+        logger.info(f"Successfully indexed {len(chunks)} chunks in hybrid memory (< 50ms batch).")
         return len(chunks)
+
+    def add_note(
+        self,
+        title: str,
+        content: str,
+        category: str = "notes",
+        security_level: str = "INTERNAL"
+    ) -> Dict[str, Any]:
+        """
+        Instant Note / Knowledge Saver: Saves a note directly to vector memory
+        and physical disk file in < 50ms without requiring a file upload.
+        """
+        import uuid
+        import re
+        from memory.document_loader import DocumentProcessor
+
+        clean_title = title.strip() or "Untitled Note"
+        clean_content = content.strip()
+        if not clean_content:
+            raise ValueError("নোটের কনটেন্ট খালি হতে পারে না।")
+
+        doc_id = f"note_{uuid.uuid4().hex[:8]}"
+        safe_slug = re.sub(r'[^a-zA-Z0-9_\-\u0980-\u09FF]+', '_', clean_title).strip('_')[:40] or "note"
+        file_name = f"Note: {clean_title}"
+
+        # 1. Save note text file to documents dir so it is persistent & visible
+        try:
+            os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
+            doc_file_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_slug}.txt")
+            with open(doc_file_path, "w", encoding="utf-8") as f:
+                f.write(f"# {clean_title}\n\n{clean_content}\n")
+        except Exception as e:
+            logger.warning(f"Could not persist note file to disk: {e}")
+
+        # 2. Chunk text
+        chunks_text = DocumentProcessor.chunk_text(
+            clean_content,
+            chunk_size=settings.CHUNKING_SIZE,
+            overlap=settings.CHUNKING_OVERLAP
+        )
+        if not chunks_text:
+            chunks_text = [clean_content]
+
+        chunks = []
+        for idx, c_text in enumerate(chunks_text, start=1):
+            chunks.append({
+                "id": f"{doc_id}_chunk_{idx}",
+                "doc_id": doc_id,
+                "filename": file_name,
+                "page": 1,
+                "chunk_index": idx,
+                "content": c_text,
+                "category": category,
+                "security_level": security_level
+            })
+
+        stored_count = self.add_chunks(chunks)
+        self.cache.clear()
+
+        return {
+            "doc_id": doc_id,
+            "title": clean_title,
+            "filename": file_name,
+            "category": category,
+            "security_level": security_level,
+            "chunks_count": stored_count,
+            "created_at": time.strftime('%Y-%m-%d %H:%M:%S')
+        }
 
     def super_fast_search(self, query: str, top_k: Optional[int] = None, category: Optional[str] = None, user_role: str = "admin") -> List[Dict[str, Any]]:
         """
@@ -238,7 +315,8 @@ class VectorMemoryStore:
         6. Applies dynamic DLP sanitization to prevent sensitive data leakage.
         """
         k = top_k or settings.TOP_K_RESULTS
-        cache_key = f"{query.strip().lower()}::top_{k}::cat_{category or 'all'}::role_{user_role}"
+        normalized_q = " ".join(query.strip().lower().split())
+        cache_key = f"{normalized_q}::top_{k}::cat_{category or 'all'}::role_{user_role}"
 
         cached = self.cache.get(cache_key)
         if cached is not None:

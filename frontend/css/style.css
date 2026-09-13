@@ -3201,3 +3201,85 @@ body.light-theme .markdown-table tr:hover,
 [data-theme="light"] .markdown-table tr:hover {
   background: #f8fafc;
 }
+
+/* ==============================================================================
+   Chat Stop Generating, Upload Progress & Chat Search Enhancements
+   ============================================================================== */
+
+/* Red Pulsing Stop Generating Button */
+.pill-send-btn.streaming-active {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.6) !important;
+  animation: pulseStop 1.8s infinite !important;
+  cursor: pointer !important;
+}
+
+@keyframes pulseStop {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
+  50% { transform: scale(1.06); box-shadow: 0 0 22px rgba(239, 68, 68, 0.85); }
+}
+
+/* Chat Header Search Bar */
+.chat-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.chat-search-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  width: 120px;
+  transition: all 0.25s ease;
+}
+
+.chat-search-input:focus {
+  width: 180px;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+  outline: none;
+}
+
+/* Real-time Upload & Memory Indexing Progress Indicator */
+.upload-progress-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: var(--accent-primary);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+  animation: fadeIn 0.2s ease;
+  align-self: flex-start;
+}
+
+/* Highlighted Action Chip */
+.highlight-chip {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25)) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+  font-weight: 600 !important;
+}
+
+body.light-theme .chat-search-input,
+[data-theme="light"] .chat-search-input {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+body.light-theme .upload-progress-pill,
+[data-theme="light"] .upload-progress-pill {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #6d28d9;
+}
