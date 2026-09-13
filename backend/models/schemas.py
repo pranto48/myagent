@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     use_memory: bool = Field(default=True, description="Whether to perform RAG vector memory retrieval")
     temperature: Optional[float] = Field(default=None, description="Sampling temperature override")
     model: Optional[str] = Field(default=None, description="Specific model override")
+    attached_files: Optional[List[Dict[str, Any]]] = Field(default=None, description="Metadata and extracted summaries of files attached from chat bar")
 
 class SourceCitation(BaseModel):
     source: str

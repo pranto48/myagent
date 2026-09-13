@@ -7,11 +7,14 @@
 import os
 import uuid
 import re
+import logging
 from typing import List, Dict, Any, Tuple
 from pathlib import Path
 from pypdf import PdfReader
 from docx import Document as DocxDocument
 from config import settings
+
+logger = logging.getLogger("myagent.document_loader")
 
 class DocumentProcessor:
     """
@@ -62,35 +65,70 @@ class DocumentProcessor:
         # 3. Excel Spreadsheets & Big Data Table Analysis (XLSX, XLS)
         elif ext in [".xlsx", ".xls"]:
             try:
-                from openpyxl import load_workbook
-                wb = load_workbook(file_path, data_only=True, read_only=True)
+                import pandas as pd
                 sheets_text = []
-                for sheet_name in wb.sheetnames:
-                    ws = wb[sheet_name]
-                    rows_data = []
-                    headers = []
-                    for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
-                        clean_row = [str(cell).strip() if cell is not None else "" for cell in row]
-                        if not any(clean_row):
-                            continue
-                        if not headers:
-                            headers = clean_row
-                            rows_data.append(f"[Worksheet: {sheet_name}] Headers: " + " | ".join(headers))
-                        else:
-                            row_pairs = []
-                            for i in range(min(len(headers), len(clean_row))):
-                                if clean_row[i]:
-                                    h_name = headers[i] if i < len(headers) and headers[i] else f"Col_{i+1}"
-                                    row_pairs.append(f"{h_name}: {clean_row[i]}")
-                            if row_pairs:
-                                rows_data.append(f"[Sheet: {sheet_name}, Row {row_idx + 1}]: " + ", ".join(row_pairs))
-                            else:
-                                rows_data.append(f"[Sheet: {sheet_name}, Row {row_idx + 1}]: " + " | ".join(clean_row))
-                    if rows_data:
-                        sheets_text.append("\n".join(rows_data))
-                wb.close()
+                sheet_names = []
+                try:
+                    excel_file = pd.ExcelFile(file_path)
+                    sheet_names = excel_file.sheet_names
+                except Exception:
+                    pass
+
+                if sheet_names:
+                    for sheet_name in sheet_names:
+                        try:
+                            df = pd.read_excel(file_path, sheet_name=sheet_name)
+                            total_rows, total_cols = df.shape
+                            col_list = [str(c) for c in df.columns]
+                            sheet_header = f"### [Worksheet: {sheet_name}] (মোট {total_rows}টি রেকর্ড, {total_cols}টি কলাম: {', '.join(col_list)})\n"
+                            
+                            # Numeric Statistics Summary
+                            num_summary = ""
+                            try:
+                                desc = df.describe()
+                                if not desc.empty:
+                                    num_summary = f"\n[পরিসংখ্যানগত সারসংক্ষেপ (Numeric Summary)]:\n{desc.to_string()}\n"
+                            except Exception:
+                                pass
+
+                            # Top 25 rows as clean Markdown Table
+                            top_df = df.head(25)
+                            try:
+                                md_table = top_df.to_markdown(index=False)
+                            except Exception:
+                                md_table = top_df.to_string(index=False)
+
+                            # Detailed row-by-row lines for vector search
+                            row_lines = []
+                            for idx, row in df.head(200).iterrows():
+                                pairs = [f"{col}: {row[col]}" for col in df.columns if pd.notna(row[col])]
+                                if pairs:
+                                    row_lines.append(f"[সারি {idx+1}]: " + ", ".join(pairs))
+
+                            full_sheet_doc = sheet_header + num_summary + f"\n[ডাটা টেবিল নমুনা (First {min(25, total_rows)} Rows)]:\n{md_table}\n\n" + "\n".join(row_lines)
+                            sheets_text.append(full_sheet_doc)
+                        except Exception as sheet_err:
+                            sheets_text.append(f"[Worksheet: {sheet_name}] লোড করতে ত্রুটি: {str(sheet_err)}")
+
+                # Fallback to openpyxl if pandas yielded no sheets
+                if not sheets_text:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, data_only=True, read_only=True)
+                    for sheet_name in wb.sheetnames:
+                        ws = wb[sheet_name]
+                        rows_data = []
+                        for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+                            clean_row = [str(cell).strip() if cell is not None else "" for cell in row]
+                            if any(clean_row):
+                                rows_data.append(f"[Sheet {sheet_name}, Row {row_idx+1}]: " + " | ".join(clean_row))
+                        if rows_data:
+                            sheets_text.append("\n".join(rows_data[:250]))
+                    wb.close()
+
                 if sheets_text:
-                    extracted_pages.append(("\n\n".join(sheets_text), 1))
+                    extracted_pages.append(("\n\n---\n\n".join(sheets_text), 1))
+                else:
+                    extracted_pages.append((f"[Excel File: {path.name}] (খালি অথবা রিড করা যায়নি)", 1))
             except Exception as e:
                 raise ValueError(f"Failed to read Excel file: {str(e)}")
 
@@ -99,20 +137,28 @@ class DocumentProcessor:
             try:
                 from PIL import Image
                 img = Image.open(file_path)
-                image_info = f"[Photo/Image File: {path.name}, Dimensions: {img.width}x{img.height}, Mode: {img.mode}]"
+                image_info = f"[Photo/Image File: {path.name}, Dimensions: {img.width}x{img.height}, Format: {img.format or ext[1:].upper()}, Mode: {img.mode}]"
                 
-                # Attempt OCR with pytesseract
+                # Preprocess image for OCR
+                processed_img = img
+                if processed_img.mode in ("RGBA", "P"):
+                    processed_img = processed_img.convert("RGB")
+
+                # Attempt OCR with pytesseract (Bangla + English)
                 ocr_text = ""
                 try:
                     import pytesseract
-                    ocr_text = pytesseract.image_to_string(img).strip()
-                except Exception:
-                    pass
+                    try:
+                        ocr_text = pytesseract.image_to_string(processed_img, lang="eng+ben").strip()
+                    except Exception:
+                        ocr_text = pytesseract.image_to_string(processed_img, lang="eng").strip()
+                except Exception as ocr_err:
+                    logger.warning(f"Tesseract OCR notice: {ocr_err}")
 
                 if ocr_text:
-                    extracted_pages.append((f"{image_info}\n[Extracted Text via OCR]:\n{ocr_text}", 1))
+                    extracted_pages.append((f"{image_info}\n\n[ফটো থেকে প্রাপ্ত টেক্সট (Optical Character Recognition - OCR)]:\n{ocr_text}", 1))
                 else:
-                    extracted_pages.append((f"{image_info}\n(Image analyzed and indexed into company media assets)", 1))
+                    extracted_pages.append((f"{image_info}\n\n[ফটো বিশ্লেষণ]: এই ছবিতে কোনো মুদ্রণযোগ্য টেক্সট সরাসরি সনাক্ত হয়নি। ছবিটি সফলভাবে কোম্পানি মিডিয়া লাইব্রেরিতে সংরক্ষিত হয়েছে।", 1))
             except Exception as e:
                 raise ValueError(f"Failed to read Photo/Image file: {str(e)}")
 
@@ -131,7 +177,6 @@ class DocumentProcessor:
                     summary_lines.append(f"Row {idx+1}: " + ", ".join([f"{col}={row[col]}" for col in df.columns if pd.notna(row[col])]))
                 extracted_pages.append(("\n".join(summary_lines), 1))
             except Exception:
-                # Fallback to direct read
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     extracted_pages.append((f.read().strip(), 1))
 
@@ -222,3 +267,119 @@ class DocumentProcessor:
                 })
 
         return processed_chunks
+
+    @classmethod
+    def generate_file_quick_summary(cls, file_path: str, filename: str) -> Dict[str, Any]:
+        """
+        Generates a quick, rich structural summary and preview of an uploaded file
+        for immediate injection into chat prompt context and UI preview.
+        """
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        size_bytes = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+        # Human-readable size
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.1f} KB"
+        else:
+            size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+
+        file_type = "document"
+        summary = f"নথি ফাইল: {filename} ({size_str})"
+        preview_text = ""
+        table_markdown = ""
+        ocr_text = ""
+
+        try:
+            if ext in [".xlsx", ".xls"]:
+                file_type = "excel"
+                import pandas as pd
+                try:
+                    excel_file = pd.ExcelFile(file_path)
+                    sheets = excel_file.sheet_names
+                    first_df = pd.read_excel(file_path, sheet_name=sheets[0])
+                    rows, cols = first_df.shape
+                    summary = f"Excel স্প্রেডশিট: {len(sheets)}টি শিট ({', '.join(sheets[:3])})। প্রথম শিটে {rows}টি সারি ও {cols}টি কলাম রয়েছে।"
+                    try:
+                        table_markdown = first_df.head(15).to_markdown(index=False)
+                    except Exception:
+                        table_markdown = first_df.head(15).to_string()
+                    preview_text = f"কলামসমূহ: {list(first_df.columns)}\n\nনমুনা ডাটা:\n{table_markdown}"
+                except Exception as e:
+                    summary = f"Excel ফাইল: {filename} ({size_str})"
+                    preview_text = str(e)
+
+            elif ext in [".csv", ".tsv"]:
+                file_type = "excel"
+                import pandas as pd
+                try:
+                    df = pd.read_csv(file_path, nrows=50)
+                    rows, cols = df.shape
+                    summary = f"CSV ডাটা টেবিল: {cols}টি কলাম ও {rows}+ রেকর্ড।"
+                    try:
+                        table_markdown = df.head(15).to_markdown(index=False)
+                    except Exception:
+                        table_markdown = df.head(15).to_string()
+                    preview_text = f"কলামসমূহ: {list(df.columns)}\n\n{table_markdown}"
+                except Exception:
+                    summary = f"CSV ফাইল: {filename} ({size_str})"
+
+            elif ext in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]:
+                file_type = "photo"
+                from PIL import Image
+                img = Image.open(file_path)
+                summary = f"ফটো/ছবি: {img.width}x{img.height} পিক্সেল ({img.format or ext[1:].upper()})"
+                try:
+                    import pytesseract
+                    pimg = img.convert("RGB") if img.mode in ("RGBA", "P") else img
+                    try:
+                        ocr_text = pytesseract.image_to_string(pimg, lang="eng+ben").strip()
+                    except Exception:
+                        ocr_text = pytesseract.image_to_string(pimg, lang="eng").strip()
+                    if ocr_text:
+                        preview_text = f"[OCR নিষ্কাশিত টেক্সট]:\n{ocr_text[:800]}"
+                        summary += f" • OCR টেক্সট প্রাপ্ত ({len(ocr_text)} অক্ষর)"
+                    else:
+                        preview_text = "(ছবিতে কোনো সরাসরি মুদ্রণযোগ্য টেক্সট সনাক্ত হয়নি)"
+                except Exception:
+                    preview_text = "(OCR প্রসেসিং উপলব্ধ নয়)"
+
+            elif ext == ".pdf":
+                file_type = "pdf"
+                reader = PdfReader(file_path)
+                num_pages = len(reader.pages)
+                summary = f"PDF ডকুমেন্ট: মোট {num_pages}টি পৃষ্ঠা ({size_str})"
+                first_page_text = reader.pages[0].extract_text() if num_pages > 0 else ""
+                preview_text = first_page_text[:800].strip() if first_page_text else "(খালি পৃষ্ঠা)"
+
+            elif ext in [".docx", ".doc"]:
+                file_type = "word"
+                doc = DocxDocument(file_path)
+                paras = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+                summary = f"Word ডকুমেন্ট: {len(paras)}টি অনুচ্ছেদ ({size_str})"
+                preview_text = "\n".join(paras[:5])[:800]
+
+            else:
+                file_type = "text"
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    preview_text = f.read(1000).strip()
+                summary = f"টেক্সট ফাইল: {filename} ({size_str})"
+
+        except Exception as err:
+            logger.warning(f"Error generating quick summary for {filename}: {err}")
+            summary = f"সংযুক্ত ফাইল: {filename} ({size_str})"
+            preview_text = f"প্রসেসিং নোট: {str(err)}"
+
+        return {
+            "filename": filename,
+            "file_type": file_type,
+            "size_bytes": size_bytes,
+            "size_str": size_str,
+            "summary": summary,
+            "preview_text": preview_text,
+            "table_markdown": table_markdown,
+            "ocr_text": ocr_text
+        }
+

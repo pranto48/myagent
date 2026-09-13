@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     tesseract-ocr \
+    tesseract-ocr-ben \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install python packages

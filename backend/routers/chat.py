@@ -1,11 +1,19 @@
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
+import os
 import json
-from fastapi import APIRouter, HTTPException, Depends
+import uuid
+import shutil
+from pathlib import Path
+from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
 from agent.core_agent import CompanyAIAgent
 from memory.chat_session_store import ChatSessionStore
+from memory.document_loader import DocumentProcessor
+from memory.vector_store import VectorMemoryStore
 from routers.auth import get_optional_current_user
+from config import settings
 
 router = APIRouter(prefix="/api/chat", tags=["Chat & Agent"])
 
@@ -17,6 +25,68 @@ def get_agent() -> CompanyAIAgent:
         _agent_instance = CompanyAIAgent()
     return _agent_instance
 
+@router.post("/upload")
+async def upload_chat_files(
+    files: List[UploadFile] = File(...),
+    session_id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_optional_current_user)
+):
+    """
+    Directly uploads and processes files (Excel, Photos/Images with OCR, PDF, Word, CSV)
+    from the Gemini/ChatGPT-style chat bar.
+    Indexes them into vector memory and returns structured summaries and table/OCR previews.
+    """
+    store = VectorMemoryStore()
+    processed_results = []
+    
+    os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
+    os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
+
+    for file in files:
+        if not file.filename:
+            continue
+
+        safe_filename = Path(file.filename).name
+        doc_id = f"chat_{uuid.uuid4().hex[:10]}"
+        target_path = os.path.join(settings.UPLOADS_DIR, f"{doc_id}_{safe_filename}")
+        doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+
+        # Save to uploads and documents directory
+        try:
+            with open(target_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            if target_path != doc_path:
+                shutil.copyfile(target_path, doc_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"ফাইল সংরক্ষণ করতে সমস্যা: {str(e)}")
+
+        # Process and index chunks into vector memory
+        stored_count = 0
+        try:
+            chunks = DocumentProcessor.process_file_into_chunks(
+                file_path=target_path,
+                doc_id=doc_id,
+                original_filename=safe_filename
+            )
+            stored_count = store.add_chunks(chunks)
+        except Exception as chunk_err:
+            pass
+
+        # Generate rich instant summary, markdown table, or OCR extraction
+        file_summary = DocumentProcessor.generate_file_quick_summary(
+            file_path=target_path,
+            filename=safe_filename
+        )
+        file_summary["doc_id"] = doc_id
+        file_summary["chunks_indexed"] = stored_count
+        processed_results.append(file_summary)
+
+    return {
+        "success": True,
+        "message": f"সফলভাবে {len(processed_results)}টি ফাইল প্রসেস ও সংযুক্ত করা হয়েছে।",
+        "files": processed_results
+    }
+
 @router.post("/stream")
 async def stream_chat_endpoint(
     request: ChatRequest,
@@ -25,7 +95,8 @@ async def stream_chat_endpoint(
 ):
     """
     Streams the AI Agent response in real-time using Server-Sent Events (SSE)
-    enforcing prompt firewall, DLP sanitization, and Document-Level Security (DLS).
+    enforcing prompt firewall, DLP sanitization, Document-Level Security (DLS),
+    and direct context injection for chat-attached files.
     """
     session_id = request.session_id
     username = current_user.get("sub", "guest")
@@ -46,7 +117,8 @@ async def stream_chat_endpoint(
                 temperature=request.temperature,
                 model=request.model,
                 username=username,
-                user_role=user_role
+                user_role=user_role,
+                attached_files=request.attached_files
             )
 
             async for chunk in generator:
@@ -102,7 +174,8 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
             history=request.history,
             use_memory=request.use_memory,
             temperature=request.temperature,
-            model=request.model
+            model=request.model,
+            attached_files=request.attached_files
         )
 
         if session_id:

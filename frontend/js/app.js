@@ -11,6 +11,7 @@ let conversationHistory = [];
 let useMemory = true;
 let isGenerating = false;
 let isStreaming = false;
+let attachedChatFiles = [];
 
 // Original Send Button SVG Icon
 const SEND_ICON_SVG = `
@@ -40,6 +41,7 @@ async function initApp() {
   await loadServerStatus();
   await loadChatSessions();
   attachChatEventListeners();
+  setupChatDragDropAndPaste();
 }
 
 /**
@@ -86,6 +88,196 @@ function attachChatEventListeners() {
     chatInput.oninput = function() {
       autoResizeTextarea(this);
     };
+  }
+}
+
+// ==============================================================================
+// Gemini / ChatGPT Style Chat File Attachment & Drag-Drop System
+// ==============================================================================
+
+function openChatFilePicker() {
+  const fileInput = document.getElementById('chat-file-input');
+  if (fileInput) {
+    fileInput.click();
+  }
+}
+
+function getFileBadgeIcon(filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  if (['xlsx', 'xls', 'csv', 'tsv'].includes(ext)) return '📊';
+  if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) return '📷';
+  if (['pdf'].includes(ext)) return '📕';
+  if (['docx', 'doc'].includes(ext)) return '📑';
+  if (['txt', 'md', 'json', 'yaml', 'yml'].includes(ext)) return '📝';
+  return '📎';
+}
+
+function getFileTypeClass(filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  if (['xlsx', 'xls', 'csv', 'tsv'].includes(ext)) return 'type-excel';
+  if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) return 'type-photo';
+  if (['pdf'].includes(ext)) return 'type-pdf';
+  if (['docx', 'doc'].includes(ext)) return 'type-word';
+  return 'type-file';
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function handleChatFilesSelected(files) {
+  if (!files || files.length === 0) return;
+  const newFiles = Array.from(files);
+
+  for (const file of newFiles) {
+    if (attachedChatFiles.some(f => f.name === file.name && f.size === file.size)) {
+      continue;
+    }
+    const isImage = file.type.startsWith('image/');
+    const previewUrl = isImage ? URL.createObjectURL(file) : null;
+    attachedChatFiles.push({
+      id: 'att_' + Math.random().toString(36).substring(2, 9),
+      file: file,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      previewUrl: previewUrl,
+      isImage: isImage
+    });
+  }
+
+  renderAttachmentShelf();
+  const fileInput = document.getElementById('chat-file-input');
+  if (fileInput) fileInput.value = '';
+}
+
+function removeAttachedFile(fileId) {
+  const index = attachedChatFiles.findIndex(f => f.id === fileId);
+  if (index !== -1) {
+    const item = attachedChatFiles[index];
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+    attachedChatFiles.splice(index, 1);
+    renderAttachmentShelf();
+  }
+}
+
+function renderAttachmentShelf() {
+  const shelf = document.getElementById('chat-attachment-shelf');
+  if (!shelf) return;
+
+  if (attachedChatFiles.length === 0) {
+    shelf.style.display = 'none';
+    shelf.innerHTML = '';
+    return;
+  }
+
+  shelf.style.display = 'flex';
+  shelf.innerHTML = attachedChatFiles.map(item => {
+    const typeClass = getFileTypeClass(item.name);
+    const icon = getFileBadgeIcon(item.name);
+    
+    let visualEl = '';
+    if (item.isImage && item.previewUrl) {
+      visualEl = `<img src="${item.previewUrl}" alt="${escapeHtml(item.name)}" class="attachment-thumbnail">`;
+    } else {
+      visualEl = `<div class="attachment-icon-badge ${typeClass}">${icon}</div>`;
+    }
+
+    return `
+      <div class="attachment-chip" id="chip-${item.id}">
+        ${visualEl}
+        <div class="attachment-details">
+          <span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+          <span class="attachment-size">${formatFileSize(item.size)}</span>
+        </div>
+        <button type="button" class="attachment-remove-btn" title="মুছে ফেলুন" onclick="removeAttachedFile('${item.id}')">&times;</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function setupChatDragDropAndPaste() {
+  const chatArea = document.querySelector('.chat-section') || document.body;
+  const overlay = document.getElementById('chat-drag-drop-overlay');
+
+  let dragCounter = 0;
+
+  window.addEventListener('dragenter', (e) => {
+    // Only activate drag overlay if dragging files
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      e.preventDefault();
+      dragCounter++;
+      if (overlay) overlay.style.display = 'flex';
+    }
+  });
+
+  window.addEventListener('dragleave', (e) => {
+    dragCounter--;
+    if (dragCounter <= 0 && overlay) {
+      dragCounter = 0;
+      overlay.style.display = 'none';
+    }
+  });
+
+  window.addEventListener('dragover', (e) => {
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      e.preventDefault();
+    }
+  });
+
+  window.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      e.preventDefault();
+      dragCounter = 0;
+      if (overlay) overlay.style.display = 'none';
+      handleChatFilesSelected(e.dataTransfer.files);
+    }
+  });
+
+  // Paste handler for screenshots or copied images/files
+  window.addEventListener('paste', (e) => {
+    if (!e.clipboardData || !e.clipboardData.items) return;
+    const items = e.clipboardData.items;
+    const filesToUpload = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) {
+          let fileName = file.name;
+          if (fileName === 'image.png' || !fileName) {
+            fileName = `screenshot_${Date.now()}.png`;
+          }
+          const renamedFile = new File([file], fileName, { type: file.type });
+          filesToUpload.push(renamedFile);
+        }
+      }
+    }
+
+    if (filesToUpload.length > 0) {
+      handleChatFilesSelected(filesToUpload);
+      showToast(`${filesToUpload.length}টি ফাইল ক্লিপবোর্ড থেকে সংযুক্ত করা হয়েছে`, 'info');
+    }
+  });
+}
+
+function toggleMemoryUsage() {
+  const chk = document.getElementById('chk-use-memory');
+  const text = document.getElementById('memory-toggle-text');
+  if (chk) {
+    chk.checked = !chk.checked;
+    useMemory = chk.checked;
+    if (text) {
+      text.innerText = useMemory ? 'মেমোরি অন' : 'মেমোরি অফ';
+    }
+    showToast(useMemory ? 'কোম্পানি মেমোরি সার্চ সক্রিয়' : 'মেমোরি সার্চ বন্ধ', 'info');
   }
 }
 
@@ -412,10 +604,17 @@ async function sendMessage() {
   const input = document.getElementById('chat-input');
   if (!input) return;
 
-  const prompt = input.value.trim();
-  if (!prompt) {
+  let prompt = input.value.trim();
+  const hasAttachments = attachedChatFiles && attachedChatFiles.length > 0;
+
+  if (!prompt && !hasAttachments) {
     input.focus();
     return;
+  }
+
+  // Default prompt if user only attached files without typing
+  if (!prompt && hasAttachments) {
+    prompt = 'অনুগ্রহ করে সংযুক্ত ফাইলগুলো বিশ্লেষণ করে বিস্তারিত সারসংক্ষেপ ও অন্তর্দৃষ্টি তুলে ধরুন।';
   }
 
   const sendBtn = document.getElementById('btn-send-message');
@@ -428,21 +627,75 @@ async function sendMessage() {
   const hero = document.getElementById('empty-hero');
   if (hero) hero.style.display = 'none';
 
-  // 1. Render user message
-  renderMessage('user', prompt);
-  conversationHistory.push({ role: 'user', content: prompt });
-  input.value = '';
-  input.style.height = 'auto';
-
-  // 2. Render empty assistant bubble with streaming cursor
-  const assistantBubble = renderMessage('assistant', '', true);
-  isGenerating = true;
-  isStreaming = true;
-
   if (sendBtn) {
     sendBtn.disabled = true;
     sendBtn.innerHTML = SPINNER_SVG;
   }
+
+  let serverAttachedFiles = [];
+  let attachedFilesForDisplay = [];
+
+  // Step 1: Upload attached files to backend if any
+  if (hasAttachments) {
+    try {
+      const formData = new FormData();
+      for (const item of attachedChatFiles) {
+        formData.append('files', item.file, item.name);
+      }
+
+      const uploadHeaders = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
+      // Delete Content-Type so browser sets multipart boundary automatically
+      delete uploadHeaders['Content-Type'];
+
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        headers: uploadHeaders,
+        body: formData
+      });
+
+      if (!uploadRes.ok) {
+        const errJson = await uploadRes.json().catch(() => ({}));
+        throw new Error(errJson.detail || 'ফাইল আপলোড ব্যর্থ হয়েছে');
+      }
+
+      const uploadData = await uploadRes.json();
+      serverAttachedFiles = uploadData.files || [];
+
+      attachedFilesForDisplay = serverAttachedFiles.map(f => ({
+        name: f.filename,
+        size: f.size,
+        extension: f.extension
+      }));
+
+      // Free local object URLs and clear shelf
+      attachedChatFiles.forEach(item => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+      attachedChatFiles = [];
+      renderAttachmentShelf();
+
+      showToast(`${serverAttachedFiles.length}টি ফাইল সফলভাবে যুক্ত ও প্রসেস করা হয়েছে`, 'success');
+
+    } catch (uploadErr) {
+      showToast(`ফাইল প্রসেসিং ত্রুটি: ${uploadErr.message}`, 'error');
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = SEND_ICON_SVG;
+      }
+      return;
+    }
+  }
+
+  // 2. Render user message with attached file chips
+  renderMessage('user', prompt, false, attachedFilesForDisplay);
+  conversationHistory.push({ role: 'user', content: prompt });
+  input.value = '';
+  input.style.height = 'auto';
+
+  // 3. Render empty assistant bubble with streaming cursor
+  const assistantBubble = renderMessage('assistant', '', true);
+  isGenerating = true;
+  isStreaming = true;
 
   let assistantContent = '';
   let citations = [];
@@ -456,7 +709,8 @@ async function sendMessage() {
         session_id: currentSessionId,
         prompt: prompt,
         history: conversationHistory.slice(-8),
-        use_memory: useMemory
+        use_memory: useMemory,
+        attached_files: serverAttachedFiles
       })
     });
 
@@ -524,7 +778,7 @@ async function sendMessage() {
   }
 }
 
-function renderMessage(role, text, isStreaming = false) {
+function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
   const feed = document.getElementById('chat-feed');
   if (!feed) return null;
 
@@ -537,11 +791,27 @@ function renderMessage(role, text, isStreaming = false) {
     ? 'background: linear-gradient(135deg, #4285f4, #9b72cb); color: #ffffff; box-shadow: 0 0 12px rgba(155, 114, 203, 0.45);' 
     : '';
 
+  let attachmentHtml = '';
+  if (attachedFiles && attachedFiles.length > 0) {
+    attachmentHtml = `
+      <div class="user-attached-files-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+        ${attachedFiles.map(f => `
+          <div class="user-attached-file-chip">
+            <span>${getFileBadgeIcon(f.name || f.filename)}</span>
+            <span>${escapeHtml(f.name || f.filename)}</span>
+            <span style="opacity: 0.8; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   messageEl.innerHTML = `
     <div class="chat-avatar" style="${avatarStyle}">${avatar}</div>
     <div class="message-content-wrapper">
       <div class="message-sender-name">${senderTitle}</div>
       <div class="message-bubble">
+        ${attachmentHtml}
         <div class="message-text">${renderMarkdown(text)}</div>
         ${isStreaming ? '<span class="streaming-cursor"></span>' : ''}
         <div class="sources-slot"></div>
@@ -636,6 +906,38 @@ function renderMarkdown(md) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+  // Markdown Tables (| Header | Header |\n|---|---|\n| Cell | Cell |)
+  html = html.replace(/((?:\|[^\n]+\|\r?\n)+)/g, (tableMatch) => {
+    const lines = tableMatch.trim().split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) return tableMatch;
+    if (!lines[1].match(/^\|?\s*[-:]+\s*\|[-:|\s]*$/)) return tableMatch;
+
+    const parseRow = (line) => {
+      let cells = line.split('|').map(c => c.trim());
+      if (line.startsWith('|')) cells.shift();
+      if (line.endsWith('|')) cells.pop();
+      return cells;
+    };
+
+    const headers = parseRow(lines[0]);
+    let tableHtml = '<div class="table-responsive"><table class="markdown-table"><thead><tr>';
+    headers.forEach(h => {
+      tableHtml += `<th>${h}</th>`;
+    });
+    tableHtml += '</tr></thead><tbody>';
+
+    for (let i = 2; i < lines.length; i++) {
+      const row = parseRow(lines[i]);
+      tableHtml += '<tr>';
+      row.forEach(cell => {
+        tableHtml += `<td>${cell}</td>`;
+      });
+      tableHtml += '</tr>';
+    }
+    tableHtml += '</tbody></table></div>';
+    return tableHtml;
+  });
+
   // ChatGPT-style Code blocks with header and Copy Code button
   html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     const codeId = 'code_' + Math.random().toString(36).substring(2, 9);
@@ -664,12 +966,13 @@ function renderMarkdown(md) {
 
   const paragraphs = html.split(/\n\n+/);
   return paragraphs.map(p => {
-    if (p.startsWith('<div class="chatgpt-code-box"') || p.startsWith('<pre>') || p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<h4>') || p.startsWith('<ul>') || p.startsWith('<blockquote>')) {
+    if (p.startsWith('<div class="chatgpt-code-box"') || p.startsWith('<div class="table-responsive"') || p.startsWith('<pre>') || p.startsWith('<h2>') || p.startsWith('<h3>') || p.startsWith('<h4>') || p.startsWith('<ul>') || p.startsWith('<blockquote>')) {
       return p;
     }
     return `<p>${p.replace(/\n/g, '<br>')}</p>`;
   }).join('');
 }
+
 
 function escapeHtml(str) {
   if (!str) return '';

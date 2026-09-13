@@ -2920,5 +2920,284 @@ body.light-theme .theme-card-option.active,
   border-color: #4f46e5;
 }
 
+/* ==============================================================================
+ * Gemini & ChatGPT Style Chat Bar File Upload System
+ * Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
+ * ============================================================================== */
 
+.chat-attachment-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+}
 
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 5px 8px 5px 6px;
+  font-size: 0.8rem;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.attachment-chip:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.attachment-thumbnail {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.attachment-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.attachment-icon-badge.excel {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.attachment-icon-badge.pdf {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.attachment-icon-badge.word {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.attachment-icon-badge.photo {
+  background: rgba(168, 85, 247, 0.16);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.attachment-icon-badge.file {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.attachment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 140px;
+  overflow: hidden;
+}
+
+.attachment-name {
+  font-weight: 600;
+  font-size: 0.77rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.attachment-remove-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.attachment-remove-btn:hover {
+  background: rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+  transform: scale(1.1);
+}
+
+/* User Message Attached File Chips */
+.user-attached-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  margin-right: 6px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* Drag and Drop Glass Overlay */
+.chat-drag-drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  animation: fadeIn 0.2s ease;
+}
+
+.drag-drop-card {
+  background: var(--bg-card);
+  border: 2px dashed var(--accent-primary);
+  border-radius: 20px;
+  padding: 36px 30px;
+  text-align: center;
+  box-shadow: 0 0 35px rgba(99, 102, 241, 0.35);
+  max-width: 480px;
+  pointer-events: none;
+}
+
+.drag-drop-icon {
+  font-size: 2.8rem;
+  margin-bottom: 12px;
+  animation: bounce 1.5s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Light Mode Overrides for Attachment System */
+body.light-theme .chat-attachment-shelf,
+[data-theme="light"] .chat-attachment-shelf {
+  border-bottom-color: #e2e8f0;
+}
+
+body.light-theme .attachment-chip,
+[data-theme="light"] .attachment-chip {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+body.light-theme .attachment-chip:hover,
+[data-theme="light"] .attachment-chip:hover {
+  background: #f1f5f9;
+  border-color: #6366f1;
+}
+
+body.light-theme .attachment-remove-btn,
+[data-theme="light"] .attachment-remove-btn {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+body.light-theme .user-attached-file-chip,
+[data-theme="light"] .user-attached-file-chip {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #4f46e5;
+}
+
+body.light-theme .chat-drag-drop-overlay,
+[data-theme="light"] .chat-drag-drop-overlay {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+/* ==============================================================================
+   Markdown Table Styles (Excel Previews, Data Summaries, Reports)
+   ============================================================================== */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin: 14px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.markdown-table th {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.markdown-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.markdown-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.light-theme .table-responsive,
+[data-theme="light"] .table-responsive {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+body.light-theme .markdown-table th,
+[data-theme="light"] .markdown-table th {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-bottom-color: #cbd5e1;
+}
+
+body.light-theme .markdown-table td,
+[data-theme="light"] .markdown-table td {
+  border-bottom-color: #e2e8f0;
+  color: #334155;
+}
+
+body.light-theme .markdown-table tr:hover,
+[data-theme="light"] .markdown-table tr:hover {
+  background: #f8fafc;
+}

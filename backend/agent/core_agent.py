@@ -173,42 +173,45 @@ class CompanyAIAgent:
         temperature: Optional[float] = None,
         model: Optional[str] = None,
         username: str = "admin",
-        user_role: str = "admin"
+        user_role: str = "admin",
+        attached_files: Optional[List[Dict[str, Any]]] = None
     ) -> AsyncGenerator[str, None]:
         """
         Executes agent reasoning with dynamic tool calling (local tools & MCP)
         enforcing Prompt Injection Firewall, DLP PII sanitization, and DLS.
+        Directly injects rich context for files, Excel tables, and OCR photos attached from chat.
         """
         audit_store = SecurityAuditStore()
 
-        # 1. Prompt Firewall Check
-        firewall_check = PromptFirewall.inspect_prompt(prompt)
-        if firewall_check["blocked"]:
-            await audit_store.log_event(
-                action="PROMPT_INJECTION_BLOCKED",
-                username=username,
-                user_role=user_role,
-                resource="chat",
-                severity="CRITICAL",
-                details={"threat_types": firewall_check["threat_types"], "reason": firewall_check["reason"]}
-            )
-            blocked_msg = "🛡️ [সিকিউরিটি সিস্টেম অ্যালার্ট]: আপনার ইনপুটে সম্ভাব্য প্রম্পট ইনজেকশন বা অননুমোদিত নির্দেশিকা সনাক্ত হওয়ায় ফায়ারওয়াল দ্বারা অনুরোধটি ব্লক করা হয়েছে।"
-            yield f"data: {json.dumps({'type': 'token', 'token': blocked_msg})}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-            return
+        # 1. Prompt Firewall Check (if prompt provided)
+        if prompt.strip():
+            firewall_check = PromptFirewall.inspect_prompt(prompt)
+            if firewall_check["blocked"]:
+                await audit_store.log_event(
+                    action="PROMPT_INJECTION_BLOCKED",
+                    username=username,
+                    user_role=user_role,
+                    resource="chat",
+                    severity="CRITICAL",
+                    details={"threat_types": firewall_check["threat_types"], "reason": firewall_check["reason"]}
+                )
+                blocked_msg = "🛡️ [সিকিউরিটি সিস্টেম অ্যালার্ট]: আপনার ইনপুটে সম্ভাব্য প্রম্পট ইনজেকশন বা অননুমোদিত নির্দেশিকা সনাক্ত হওয়ায় ফায়ারওয়াল দ্বারা অনুরোধটি ব্লক করা হয়েছে।"
+                yield f"data: {json.dumps({'type': 'token', 'token': blocked_msg})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                return
 
-        # 2. Inbound DLP Sanitization
-        dlp_res = DLPEngine.inspect_text(prompt)
-        if dlp_res["redacted_count"] > 0:
-            await audit_store.log_event(
-                action="DLP_TRIGGERED",
-                username=username,
-                user_role=user_role,
-                resource="chat_prompt",
-                severity="WARNING",
-                details={"redacted_count": dlp_res["redacted_count"], "types": [f["type"] for f in dlp_res["findings"]]}
-            )
-            prompt = dlp_res["sanitized_text"]
+            # 2. Inbound DLP Sanitization
+            dlp_res = DLPEngine.inspect_text(prompt)
+            if dlp_res["redacted_count"] > 0:
+                await audit_store.log_event(
+                    action="DLP_TRIGGERED",
+                    username=username,
+                    user_role=user_role,
+                    resource="chat_prompt",
+                    severity="WARNING",
+                    details={"redacted_count": dlp_res["redacted_count"], "types": [f["type"] for f in dlp_res["findings"]]}
+                )
+                prompt = dlp_res["sanitized_text"]
 
         target_model = model or settings.LLM_MODEL
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE
@@ -216,14 +219,40 @@ class CompanyAIAgent:
         sources: List[SourceCitation] = []
         user_content = prompt
 
-        if use_memory:
+        if use_memory and prompt.strip():
             user_content, sources = self._prepare_rag_context(prompt, user_role=user_role)
 
-        # 3. Send sources metadata first
+        # 3. Incorporate Chat-Attached Files (Excel, Photo OCR, Documents) directly into context
+        if attached_files and len(attached_files) > 0:
+            attachment_blocks = []
+            for af in attached_files:
+                fname = af.get("filename", "File")
+                ftype = af.get("file_type", "document")
+                summary = af.get("summary", "")
+                preview = af.get("preview_text", "")
+                table_md = af.get("table_markdown", "")
+                ocr_txt = af.get("ocr_text", "")
+
+                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n"
+                if table_md:
+                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n"
+                if ocr_txt:
+                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n"
+                if preview and not table_md and not ocr_txt:
+                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n"
+                attachment_blocks.append(block_content)
+
+            merged_attachments = "\n\n---\n\n".join(attachment_blocks)
+            if not prompt.strip() or self.is_conversational_greeting(prompt):
+                user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান, প্রধান কলাম/ডাটা পয়েন্ট এবং কার্যোপযোগী ইনসাইটস পরিষ্কার ও প্রাঞ্জল বাংলায় উপস্থাপন করুন।"
+            else:
+                user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
+
+        # 4. Send sources metadata first
         sources_payload = [s.model_dump() for s in sources]
         yield f"data: {json.dumps({'type': 'sources', 'sources': sources_payload})}\n\n"
 
-        # 2. Build conversation payload
+        # 5. Build conversation payload
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
         # Add tool usage instructions into system prompt for models without native function calling
         system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, web_search, web_scrape, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. You may call them using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
@@ -234,7 +263,7 @@ class CompanyAIAgent:
         for msg in history[-8:]:
             messages.append({"role": msg.role, "content": msg.content})
 
-        # Add current user prompt (with RAG context if applicable)
+        # Add current user prompt (with RAG context & attached files if applicable)
         messages.append({"role": "user", "content": user_content})
 
         tools_schema = await AgentTools.get_all_tools_schema()
@@ -413,7 +442,8 @@ class CompanyAIAgent:
         history: List[ChatMessage],
         use_memory: bool = True,
         temperature: Optional[float] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        attached_files: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """Non-streaming generation for API consumers."""
         target_model = model or settings.LLM_MODEL
@@ -422,8 +452,34 @@ class CompanyAIAgent:
         sources: List[SourceCitation] = []
         user_content = prompt
 
-        if use_memory:
+        if use_memory and prompt.strip():
             user_content, sources = self._prepare_rag_context(prompt)
+
+        # Incorporate attached files into user_content
+        if attached_files and len(attached_files) > 0:
+            attachment_blocks = []
+            for af in attached_files:
+                fname = af.get("filename", "File")
+                ftype = af.get("file_type", "document")
+                summary = af.get("summary", "")
+                preview = af.get("preview_text", "")
+                table_md = af.get("table_markdown", "")
+                ocr_txt = af.get("ocr_text", "")
+
+                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n"
+                if table_md:
+                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n"
+                if ocr_txt:
+                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n"
+                if preview and not table_md and not ocr_txt:
+                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n"
+                attachment_blocks.append(block_content)
+
+            merged_attachments = "\n\n---\n\n".join(attachment_blocks)
+            if not prompt.strip():
+                user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান ও ইনসাইটস বাংলায় উপস্থাপন করুন।"
+            else:
+                user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
 
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
         messages = [{"role": "system", "content": system_content}]
