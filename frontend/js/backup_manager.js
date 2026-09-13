@@ -6,11 +6,15 @@
 
 let selectedRestoreFilename = null;
 
+function getBackupAuthToken() {
+  return localStorage.getItem("myagent_access_token") || getBackupAuthToken() || "";
+}
+
 /**
  * Initializes and loads the backup dashboard data.
  */
 async function loadBackupDashboard() {
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   try {
@@ -143,7 +147,7 @@ function renderBackupsTable(backups) {
  * Triggers full backup creation with chosen modules.
  */
 async function createFullBackup() {
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   const btn = document.getElementById("btn-create-backup");
@@ -201,7 +205,7 @@ async function createFullBackup() {
  * Downloads a backup file directly from the server.
  */
 async function downloadBackup(filename) {
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   showToast("info", `${filename} ডাউনলোড শুরু হচ্ছে...`);
@@ -236,7 +240,7 @@ async function downloadBackup(filename) {
  * Permanently deletes a backup file.
  */
 async function deleteBackup(filename) {
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   if (!confirm(`আপনি কি নিশ্চিত যে ব্যাকআপ ফাইল "${filename}" স্থায়ীভাবে মুছে ফেলতে চান?`)) {
@@ -277,7 +281,7 @@ async function openRestoreModal(filename) {
   if (modal) modal.classList.add("active");
 
   // Inspect the backup file
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (token) {
     try {
       const res = await fetch(`/api/backup/inspect?filename=${encodeURIComponent(filename)}`, {
@@ -318,7 +322,7 @@ function closeRestoreModal() {
  */
 async function executeRestore() {
   if (!selectedRestoreFilename) return;
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   const btn = document.getElementById("btn-confirm-restore");
@@ -380,7 +384,7 @@ async function handleBackupUpload(event) {
     return;
   }
 
-  const token = localStorage.getItem("myagent_token");
+  const token = getBackupAuthToken();
   if (!token) return;
 
   const dropzoneText = document.getElementById("backup-upload-label");

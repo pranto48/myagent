@@ -206,8 +206,37 @@ class CompanyAIAgent:
                     )
                 except Exception as plain_err:
                     logger.error(f"Error during LLM chat streaming: {plain_err}")
-                    yield f"data: {json.dumps({'type': 'error', 'error': f'LLM Server Error: {str(plain_err)}'})}\n\n"
-                    return
+                    err_str = str(plain_err)
+                    if "Connection error" in err_str or "ConnectError" in err_str or "connection refused" in err_str.lower() or "Failed to connect" in err_str:
+                        if sources:
+                            fallback_reply = (
+                                f"⚠️ **[এলএলএম সার্ভার অফলাইন - মেমোরি নলেজ রেসপন্স]**\n\n"
+                                f"আপনার বাহ্যিক এআই মডেল সার্ভারটি (`{target_model}` @ `{settings.LLM_BASE_URL}`) বর্তমানে সংযুক্ত নয়। "
+                                f"তবে আপনার প্রশ্নের সাথে প্রাসঙ্গিক কোম্পানির নলেজবেস ও ভেক্টর মেমোরির তথ্য নিচে প্রদান করা হলো:\n\n"
+                            )
+                            for s in sources:
+                                fallback_reply += f"> **📄 {s.source} (পৃষ্ঠা {s.page}):**\n> {s.content}\n\n"
+                            fallback_reply += f"💡 *এআই মডেলের মাধ্যমে আরও বিশদ উত্তরের জন্য অনুগ্রহ করে LM Studio সার্ভারটি চালু করুন (`192.168.20.10:1234`) অথবা সিস্টেম সেটিংস (⚙️) থেকে সক্রিয় কোনো সার্ভার সেট করুন।*"
+                        else:
+                            fallback_reply = (
+                                f"⚠️ **[এলএলএম মডেল সার্ভার অফলাইন (Connection Error)]**\n\n"
+                                f"আপনার কনফিগার করা এলএলএম সার্ভারের সাথে ব্যাকএন্ড সংযোগ স্থাপন করতে পারছে না:\n"
+                                f"- **সার্ভার ইউআরএল:** `{settings.LLM_BASE_URL}`\n"
+                                f"- **টার্গেট মডেল:** `{target_model}`\n\n"
+                                f"**সহজ সমাধান নির্দেশিকা:**\n"
+                                f"1. আপনার LM Studio অ্যাপে **Start Server** চালু আছে কিনা পরীক্ষা করুন।\n"
+                                f"2. LM Studio-তে **'Serve on Local Network'** অন রাখুন যাতে অন্য ডিভাইস বা ডকার সার্ভার (`192.168.9.9`) থেকে সংযোগ গ্রহণ করতে পারে।\n"
+                                f"3. অথবা অ্যাডমিন প্যানেলের **সিস্টেম সেটিংস (⚙️)** থেকে সক্রিয় কোনো সার্ভার URL সেট করুন।"
+                            )
+                        # Stream fallback reply smoothly
+                        for word in fallback_reply.split(" "):
+                            yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
+                            await asyncio.sleep(0.015)
+                        yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                        return
+                    else:
+                        yield f"data: {json.dumps({'type': 'error', 'error': f'LLM Server Error: {err_str}'})}\n\n"
+                        return
 
             tool_calls_detected = []
             current_tool_call = {"id": "", "name": "", "arguments": ""}

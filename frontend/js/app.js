@@ -9,7 +9,19 @@
 let currentSessionId = null;
 let conversationHistory = [];
 let useMemory = true;
+let isGenerating = false;
 let isStreaming = false;
+
+// Original Send Button SVG Icon
+const SEND_ICON_SVG = `
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="pointer-events:none;">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+  </svg>
+`;
+
+const SPINNER_SVG = `
+  <span class="spinner-inline" style="width:16px; height:16px; margin:0; border-width:2px; pointer-events:none;"></span>
+`;
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,10 +29,64 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
-  checkAuthStatus();
+  try {
+    if (typeof checkAuthentication === 'function') {
+      checkAuthentication();
+    }
+  } catch (e) {
+    console.warn('Auth check notice:', e);
+  }
+
   await loadServerStatus();
-  await loadSessionHistory();
-  if (typeof initDashboard === 'function') initDashboard();
+  await loadChatSessions();
+  attachChatEventListeners();
+}
+
+/**
+ * Loads server status, model name and updates status badge.
+ */
+async function loadServerStatus() {
+  try {
+    const res = await fetch('/api/status');
+    if (res.ok) {
+      const data = await res.json();
+      const statusDot = document.getElementById('system-status-dot');
+      const statusText = document.getElementById('agent-online-status');
+      const sideModel = document.getElementById('sidebar-model-name');
+      const topModelSelect = document.getElementById('topbar-model-select');
+
+      if (statusDot) statusDot.style.background = '#10b981';
+      if (statusText) statusText.innerText = 'অনলাইন';
+      if (sideModel && data.llm_model) sideModel.innerText = data.llm_model;
+      if (topModelSelect && data.llm_model) topModelSelect.value = data.llm_model;
+    }
+  } catch (e) {
+    console.warn('Server status check notice:', e);
+  }
+}
+
+/**
+ * Ensures event listeners are actively attached to chat controls.
+ */
+function attachChatEventListeners() {
+  const sendBtn = document.getElementById('btn-send-message');
+  const chatInput = document.getElementById('chat-input');
+
+  if (sendBtn) {
+    sendBtn.onclick = function(e) {
+      if (e) e.preventDefault();
+      sendMessage();
+    };
+  }
+
+  if (chatInput) {
+    chatInput.onkeydown = function(e) {
+      handleTextareaKey(e);
+    };
+    chatInput.oninput = function() {
+      autoResizeTextarea(this);
+    };
+  }
 }
 
 // Mobile Sidebar Drawer Toggle
@@ -56,37 +122,37 @@ function switchTab(tabName) {
   }
 
   if (tabName === 'chat') {
-    topbarTitle.innerText = 'কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট';
-    topbarDesc.innerText = 'ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই';
+    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট';
+    if (topbarDesc) topbarDesc.innerText = 'ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই';
   } else if (tabName === 'dashboard') {
-    topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
-    topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
+    if (topbarTitle) topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
+    if (topbarDesc) topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
     if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
   } else if (tabName === 'users') {
-    topbarTitle.innerText = 'কোম্পানি ইউজার ও এক্সেস কন্ট্রোল';
-    topbarDesc.innerText = 'অভ্যন্তরীণ কর্মকর্তা ও কর্মচারীদের রোল ম্যানেজমেন্ট';
+    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ইউজার ও এক্সেস কন্ট্রোল';
+    if (topbarDesc) topbarDesc.innerText = 'অভ্যন্তরীণ কর্মকর্তা ও কর্মচারীদের রোল ম্যানেজমেন্ট';
     if (typeof loadUsersList === 'function') loadUsersList();
   } else if (tabName === 'knowledge') {
-    topbarTitle.innerText = 'কোম্পানি ডেটা লাইব্রেরি ও মেমোরি ইনজেস্ট';
-    topbarDesc.innerText = 'PDF, Word, Excel, CSV ও ফটো/ছবি OCR প্রসেসিং';
+    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ডেটা লাইব্রেরি ও মেমোরি ইনজেস্ট';
+    if (topbarDesc) topbarDesc.innerText = 'PDF, Word, Excel, CSV ও ফটো/ছবি OCR প্রসেসিং';
     if (typeof loadDocumentList === 'function') loadDocumentList();
     if (typeof loadMemoryStats === 'function') loadMemoryStats();
     if (typeof loadChunksList === 'function') loadChunksList();
   } else if (tabName === 'models') {
-    topbarTitle.innerText = 'এআই মডেল হাব ও রিয়েলটাইম পিং টেস্ট';
-    topbarDesc.innerText = 'বাহ্যিক এলএলএম সার্ভারের সংযোগ ও রেসপন্স টাইম (ms)';
+    if (topbarTitle) topbarTitle.innerText = 'এআই মডেল হাব ও রিয়েলটাইম পিং টেস্ট';
+    if (topbarDesc) topbarDesc.innerText = 'বাহ্যিক এলএলএম সার্ভারের সংযোগ ও রেসপন্স টাইম (ms)';
     if (typeof loadModelsOverview === 'function') loadModelsOverview();
   } else if (tabName === 'mcp') {
-    topbarTitle.innerText = 'টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব';
-    topbarDesc.innerText = 'ওপেন-সোর্স টুলস স্যুট ও ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা';
+    if (topbarTitle) topbarTitle.innerText = 'টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব';
+    if (topbarDesc) topbarDesc.innerText = 'ওপেন-সোর্স টুলস স্যুট ও ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা';
     if (typeof loadMcpDashboard === 'function') loadMcpDashboard();
   } else if (tabName === 'security') {
-    topbarTitle.innerText = 'এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স';
-    topbarDesc.innerText = 'AES-256 এনক্রিপশন, PII/DLP রিডাকশন, ফায়ারওয়াল ও অডিট ট্রেইল';
+    if (topbarTitle) topbarTitle.innerText = 'এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স';
+    if (topbarDesc) topbarDesc.innerText = 'AES-256 এনক্রিপশন, PII/DLP রিডাকশন, ফায়ারওয়াল ও অডিট ট্রেইল';
     if (typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
   } else if (tabName === 'backup') {
-    topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
-    topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
+    if (topbarTitle) topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
+    if (topbarDesc) topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
     if (typeof loadBackupDashboard === 'function') loadBackupDashboard();
   }
 }
@@ -94,23 +160,27 @@ function switchTab(tabName) {
 // Memory Toggle
 function toggleMemoryUsage() {
   const chk = document.getElementById('chk-use-memory');
-  chk.checked = !chk.checked;
-  useMemory = chk.checked;
+  if (chk) chk.checked = !chk.checked;
+  useMemory = chk ? chk.checked : true;
   
   const icon = document.getElementById('memory-toggle-icon');
   const label = document.getElementById('memory-toggle-text');
   const btn = document.getElementById('memory-toggle-btn');
 
   if (useMemory) {
-    icon.innerText = '🧠';
-    label.innerText = 'মেমোরি: সক্রিয়';
-    btn.style.borderColor = 'rgba(6, 182, 212, 0.4)';
-    btn.style.color = 'var(--cyan-glow)';
+    if (icon) icon.innerText = '🧠';
+    if (label) label.innerText = 'মেমোরি: সক্রিয়';
+    if (btn) {
+      btn.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+      btn.style.color = 'var(--cyan-glow)';
+    }
   } else {
-    icon.innerText = '⚡';
-    label.innerText = 'মেমোরি: নিষ্ক্রিয়';
-    btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-    btn.style.color = 'var(--text-muted)';
+    if (icon) icon.innerText = '⚡';
+    if (label) label.innerText = 'মেমোরি: নিষ্ক্রিয়';
+    if (btn) {
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+      btn.style.color = 'var(--text-muted)';
+    }
   }
 }
 
@@ -161,6 +231,7 @@ function useProductivityAction(actionType) {
 
 // Textarea Auto-resize
 function autoResizeTextarea(textarea) {
+  if (!textarea) return;
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
 }
@@ -174,6 +245,7 @@ function handleTextareaKey(e) {
 
 function usePrompt(text) {
   const input = document.getElementById('chat-input');
+  if (!input) return;
   input.value = text;
   autoResizeTextarea(input);
   sendMessage();
@@ -185,11 +257,14 @@ async function loadChatSessions() {
   if (!listEl) return;
 
   try {
-    const res = await fetch('/api/sessions', { headers: getAuthHeaders() });
+    const res = await fetch('/api/sessions', { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {} });
     if (res.ok) {
       const sessions = await res.json();
       if (!sessions || sessions.length === 0) {
         listEl.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">কোনো পূর্ববর্তী চ্যাট নেই।</div>';
+        if (!currentSessionId) {
+          await createNewChatSession();
+        }
         return;
       }
 
@@ -201,6 +276,11 @@ async function loadChatSessions() {
           </div>
         </div>
       `).join('');
+
+      // Auto-select first session if none is currently active
+      if (!currentSessionId && sessions.length > 0) {
+        await switchSession(sessions[0].id);
+      }
     }
   } catch (err) {
     console.warn('Error loading chat sessions:', err);
@@ -211,7 +291,7 @@ async function createNewChatSession() {
   try {
     const res = await fetch('/api/sessions', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'নতুন চ্যাট' })
     });
     if (res.ok) {
@@ -220,24 +300,28 @@ async function createNewChatSession() {
       conversationHistory = [];
       
       const feed = document.getElementById('chat-feed');
-      feed.innerHTML = '';
-      
-      const hero = document.getElementById('empty-hero');
-      if (hero) {
-        hero.style.display = 'flex';
-        feed.appendChild(hero);
+      if (feed) {
+        feed.querySelectorAll('.chat-message').forEach(m => m.remove());
+        const hero = document.getElementById('empty-hero');
+        if (hero) hero.style.display = 'flex';
       }
       
-      loadChatSessions();
+      await loadChatSessions();
       showToast('নতুন চ্যাট সেশন শুরু হয়েছে।', 'info');
+      return currentSessionId;
     }
   } catch (err) {
     showToast(`সেশন তৈরিতে সমস্যা: ${err.message}`, 'error');
   }
+
+  if (!currentSessionId) {
+    currentSessionId = 'session_' + Date.now();
+  }
+  return currentSessionId;
 }
 
 async function switchSession(sessionId) {
-  if (currentSessionId === sessionId) return;
+  if (currentSessionId === sessionId && conversationHistory.length > 0) return;
   currentSessionId = sessionId;
   
   document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
@@ -245,34 +329,32 @@ async function switchSession(sessionId) {
   if (activeEl) activeEl.classList.add('active');
 
   const feed = document.getElementById('chat-feed');
-  feed.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">মেসেজ লোড হচ্ছে...</div>';
+  if (!feed) return;
+
+  feed.querySelectorAll('.chat-message').forEach(m => m.remove());
+  const hero = document.getElementById('empty-hero');
 
   try {
-    const res = await fetch(`/api/sessions/${sessionId}`, { headers: getAuthHeaders() });
+    const res = await fetch(`/api/sessions/${sessionId}`, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+
     if (res.ok) {
       const data = await res.json();
-      feed.innerHTML = '';
       conversationHistory = [];
 
       if (!data.messages || data.messages.length === 0) {
-        const hero = document.getElementById('empty-hero');
-        if (hero) {
-          hero.style.display = 'flex';
-          feed.appendChild(hero);
-        }
-        return;
-      }
-
-      for (const m of data.messages) {
-        conversationHistory.push({ role: m.role, content: m.content });
-        const bubble = renderMessage(m.role, m.content, false);
-        if (m.role === 'assistant' && m.sources && m.sources.length > 0) {
-          updateAssistantMessage(bubble, m.content, false, m.sources);
-        }
+        if (hero) hero.style.display = 'flex';
+      } else {
+        if (hero) hero.style.display = 'none';
+        data.messages.forEach(m => {
+          renderMessage(m.role, m.content, false);
+          conversationHistory.push({ role: m.role, content: m.content });
+        });
       }
     }
   } catch (err) {
-    feed.innerHTML = `<div style="color:var(--rose-red); padding:20px;">লোড ব্যর্থ: ${err.message}</div>`;
+    console.warn('Error loading session messages:', err);
   }
 }
 
@@ -283,15 +365,15 @@ async function deleteChatSession(sessionId, event) {
   try {
     const res = await fetch(`/api/sessions/${sessionId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders()
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
     if (res.ok) {
       showToast('চ্যাট সেশন মুছে ফেলা হয়েছে।', 'info');
       if (currentSessionId === sessionId) {
         currentSessionId = null;
-        createNewChatSession();
+        await createNewChatSession();
       } else {
-        loadChatSessions();
+        await loadChatSessions();
       }
     }
   } catch (err) {
@@ -303,7 +385,7 @@ async function deleteChatSession(sessionId, event) {
 function onModelSelectChange(newModel) {
   fetch('/api/settings', {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
     body: JSON.stringify({ llm_model: newModel })
   }).then(res => {
     if (res.ok) {
@@ -319,9 +401,17 @@ async function sendMessage() {
   if (isGenerating) return;
 
   const input = document.getElementById('chat-input');
-  const prompt = input.value.trim();
-  if (!prompt) return;
+  if (!input) return;
 
+  const prompt = input.value.trim();
+  if (!prompt) {
+    input.focus();
+    return;
+  }
+
+  const sendBtn = document.getElementById('btn-send-message');
+
+  // Ensure active session exists
   if (!currentSessionId) {
     await createNewChatSession();
   }
@@ -329,22 +419,30 @@ async function sendMessage() {
   const hero = document.getElementById('empty-hero');
   if (hero) hero.style.display = 'none';
 
+  // 1. Render user message
   renderMessage('user', prompt);
   conversationHistory.push({ role: 'user', content: prompt });
   input.value = '';
   input.style.height = 'auto';
 
+  // 2. Render empty assistant bubble with streaming cursor
   const assistantBubble = renderMessage('assistant', '', true);
   isGenerating = true;
-  document.getElementById('btn-send-message').disabled = true;
+  isStreaming = true;
+
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = SPINNER_SVG;
+  }
 
   let assistantContent = '';
   let citations = [];
 
   try {
+    const headers = typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' };
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: headers,
       body: JSON.stringify({
         session_id: currentSessionId,
         prompt: prompt,
@@ -353,7 +451,9 @@ async function sendMessage() {
       })
     });
 
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -380,7 +480,7 @@ async function sendMessage() {
               assistantContent += `\n\n⚙️ *[টুল কল করা হচ্ছে: **${data.name}**...]*\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'tool_result') {
-              assistantContent += `\n> 💡 **[${data.name} রেজাল্ট]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
+              assistantContent += `\n> 💡 **[${data.name} ফলাফল]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'token') {
               assistantContent += data.token;
@@ -390,27 +490,35 @@ async function sendMessage() {
               updateAssistantMessage(assistantBubble, assistantContent, false);
             }
           } catch (parseErr) {
-            console.warn('SSE Parse error:', parseErr);
+            console.warn('SSE Parse notice:', parseErr);
           }
         }
       }
     }
 
-    updateAssistantMessage(assistantBubble, assistantContent, false, citations);
+    // Finalize assistant message
+    updateAssistantMessage(assistantBubble, assistantContent || 'উত্তর প্রক্রিয়া সম্পন্ন হয়েছে।', false, citations);
     conversationHistory.push({ role: 'assistant', content: assistantContent });
     loadChatSessions();
 
   } catch (err) {
-    assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}. নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিস চালু আছে।`;
+    assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}। অনুগ্রহ করে নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিসটি সক্রিয় রয়েছে।`;
     updateAssistantMessage(assistantBubble, assistantContent, false);
   } finally {
     isGenerating = false;
-    document.getElementById('btn-send-message').disabled = false;
+    isStreaming = false;
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = SEND_ICON_SVG;
+    }
+    input.focus();
   }
 }
 
 function renderMessage(role, text, isStreaming = false) {
   const feed = document.getElementById('chat-feed');
+  if (!feed) return null;
+
   const messageEl = document.createElement('div');
   messageEl.className = `chat-message ${role}-message`;
 
@@ -435,6 +543,8 @@ function renderMessage(role, text, isStreaming = false) {
 }
 
 function updateAssistantMessage(messageEl, content, isStreaming, citations = []) {
+  if (!messageEl) return;
+
   const textContainer = messageEl.querySelector('.message-text');
   const cursor = messageEl.querySelector('.streaming-cursor');
   const sourcesSlot = messageEl.querySelector('.sources-slot');
@@ -465,7 +575,7 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
   }
 
   const feed = document.getElementById('chat-feed');
-  feed.scrollTop = feed.scrollHeight;
+  if (feed) feed.scrollTop = feed.scrollHeight;
 }
 
 function renderMarkdown(md) {
@@ -476,6 +586,7 @@ function renderMarkdown(md) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+  // Code blocks
   html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     return `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`;
   });
@@ -499,6 +610,12 @@ function renderMarkdown(md) {
   }).join('');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadChatSessions();
-});
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
