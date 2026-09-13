@@ -89,13 +89,24 @@ async def add_memory_note(req: AddMemoryNoteRequest):
     """
     Adds a custom manual knowledge note or verified company policy directly to memory.
     """
+    title_str = str(req.title or "").strip()
+    content_str = str(req.content or "").strip()
+    if not title_str or not content_str:
+        raise HTTPException(status_code=400, detail="শিরোনাম এবং বিবরণ উভয়ই প্রদান করা আবশ্যক।")
+
+    if "????" in title_str or "????" in content_str or (content_str.count("?") > 5 and content_str.count("?") / max(len(content_str), 1) > 0.15):
+        raise HTTPException(status_code=400, detail="নোটের শিরোনাম বা তথ্যে ত্রুটিপূর্ণ অক্ষরের প্রশ্নচিহ্ন ('????') সনাক্ত হয়েছে। অনুগ্রহ করে সঠিক UTF-8 টেক্সট প্রদান করুন।")
+
     store = VectorMemoryStore()
-    note_id = store.add_note(title=req.title, content=req.content, tags=req.tags)
-    return {
-        "success": True,
-        "note_id": note_id,
-        "message": f"সফলভাবে কোম্পানি তথ্য নোট '{req.title}' মেমোরিতে সংরক্ষিত হয়েছে।"
-    }
+    try:
+        note_id = store.add_note(title=title_str, content=content_str, tags=req.tags)
+        return {
+            "success": True,
+            "note_id": note_id,
+            "message": f"সফলভাবে কোম্পানি তথ্য নোট '{title_str}' মেমোরিতে সংরক্ষিত হয়েছে।"
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
 
 @router.get("/stats")
 async def get_memory_stats():

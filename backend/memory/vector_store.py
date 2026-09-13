@@ -95,6 +95,46 @@ class VectorMemoryStore:
                 embedding_function=self.embed_fn
             )
 
+        # Autonomously purge any legacy corrupt placeholder chunks
+        self.clean_corrupt_entries()
+
+    def clean_corrupt_entries(self) -> int:
+        """Purges any corrupted memory chunks or placeholder entries containing excessive question marks."""
+        deleted_count = 0
+        try:
+            # 1. Purge FTS5
+            with sqlite3.connect(self.fts_db_path) as conn:
+                rows = conn.execute("SELECT chunk_id, filename, content FROM fts_chunks").fetchall()
+                bad_cids = []
+                for cid, fname, cnt in rows:
+                    if "????" in str(fname) or "????" in str(cnt) or (str(cnt).count("?") > 5 and str(cnt).count("?") / max(len(str(cnt)), 1) > 0.15):
+                        bad_cids.append(cid)
+                for cid in bad_cids:
+                    conn.execute("DELETE FROM fts_chunks WHERE chunk_id = ?", (cid,))
+                conn.commit()
+                deleted_count += len(bad_cids)
+
+            # 2. Purge ChromaDB
+            data = self.collection.get()
+            if data and data.get("ids"):
+                bad_chroma_ids = []
+                for i, cid in enumerate(data["ids"]):
+                    doc = data["documents"][i] if data.get("documents") else ""
+                    meta = data["metadatas"][i] if data.get("metadatas") else {}
+                    fname = meta.get("filename", "")
+                    if "????" in str(fname) or "????" in str(doc) or (str(doc).count("?") > 5 and str(doc).count("?") / max(len(str(doc)), 1) > 0.15):
+                        bad_chroma_ids.append(cid)
+                if bad_chroma_ids:
+                    self.collection.delete(ids=bad_chroma_ids)
+                    deleted_count += len(bad_chroma_ids)
+
+            if deleted_count > 0:
+                self.cache.clear()
+                logger.info(f"Cleaned {deleted_count} corrupted placeholder memory entries.")
+        except Exception as e:
+            logger.debug(f"Corrupt entries cleanup notice: {e}")
+        return deleted_count
+
     def _init_fts5(self):
         """Creates SQLite FTS5 virtual table for lightning-fast keyword search."""
         try:
@@ -121,6 +161,22 @@ class VectorMemoryStore:
         if not chunks:
             return 0
 
+        # Filter out corrupted or placeholder chunks with ????
+        valid_chunks = []
+        for c in chunks:
+            cnt = str(c.get("content", ""))
+            fname = str(c.get("filename", ""))
+            if "????" in fname or "????" in cnt:
+                continue
+            if cnt.count("?") > 5 and cnt.count("?") / max(len(cnt), 1) > 0.15:
+                continue
+            valid_chunks.append(c)
+
+        if not valid_chunks:
+            logger.warning("All provided chunks were filtered out due to invalid content or corrupt question-marks.")
+            return 0
+
+        chunks = valid_chunks
         self.cache.clear()
 
         ids = [c["id"] for c in chunks]
@@ -208,13 +264,26 @@ class VectorMemoryStore:
 
                 for doc_id, text, meta, dist in zip(ids, docs, metas, dists):
                     sim_score = max(0.0, 1.0 - (dist / 2.0))
+                    text_str = str(text or "")
+                    fname = str(meta.get("filename", "") if meta else "")
+
+                    # Quality filter: skip corrupt or placeholder entries with ????
+                    if "????" in text_str or "????" in fname:
+                        continue
+                    if text_str.count("?") > 5 and (text_str.count("?") / max(len(text_str), 1)) > 0.15:
+                        continue
+                    # Relevance threshold: discard low semantic matches (similarity < 0.65)
+                    if sim_score < 0.65:
+                        continue
+
                     semantic_hits.append({
                         "id": doc_id,
-                        "content": text,
-                        "source": meta.get("filename", "unknown"),
-                        "page": meta.get("page", 1),
+                        "content": text_str,
+                        "source": fname or "Document",
+                        "page": meta.get("page", 1) if meta else 1,
                         "score": round(sim_score, 4),
-                        "metadata": meta
+                        "metadata": meta,
+                        "is_keyword_match": False
                     })
         except Exception as e:
             logger.error(f"Semantic search error: {e}")
@@ -237,18 +306,25 @@ class VectorMemoryStore:
                     """, (fts_query, k * 2))
                     rows = cursor.fetchall()
                     for r in rows:
+                        cnt = str(r["content"] or "")
+                        fname = str(r["filename"] or "")
+                        if "????" in cnt or "????" in fname:
+                            continue
+                        if cnt.count("?") > 5 and (cnt.count("?") / max(len(cnt), 1)) > 0.15:
+                            continue
                         keyword_hits.append({
                             "id": r["chunk_id"],
-                            "content": r["content"],
-                            "source": r["filename"],
+                            "content": cnt,
+                            "source": fname,
                             "page": r["page"],
                             "score": 0.95,
                             "metadata": {
                                 "doc_id": r["doc_id"],
-                                "filename": r["filename"],
+                                "filename": fname,
                                 "page": r["page"],
                                 "category": r["category"]
-                            }
+                            },
+                            "is_keyword_match": True
                         })
         except Exception as e:
             logger.debug(f"FTS5 search notice: {e}")
@@ -479,17 +555,24 @@ class VectorMemoryStore:
     def add_note(self, title: str, content: str, tags: List[str] = None) -> str:
         """Adds a direct corporate memory note without file upload."""
         import uuid
+        title_str = str(title or "").strip()
+        content_str = str(content or "").strip()
+
+        # Reject corrupted question-mark placeholder notes
+        if "????" in title_str or "????" in content_str or (content_str.count("?") > 5 and content_str.count("?") / max(len(content_str), 1) > 0.15):
+            raise ValueError("নোটের শিরোনাম বা তথ্যে অতিরিক্ত প্রশ্নচিহ্ন ('????') বা ত্রুটিপূর্ণ টেক্সট পাওয়া গেছে। অনুগ্রহ করে সঠিক ইউনিকোড টেক্সট লিখুন।")
+
         self.cache.clear()
         note_id = f"note_{uuid.uuid4().hex[:8]}"
         metadata = {
             "doc_id": note_id,
-            "filename": f"Note: {title}",
+            "filename": f"Note: {title_str}",
             "page": 1,
             "chunk_index": 1,
             "tags": ",".join(tags) if tags else "manual_note",
             "category": "direct_note"
         }
-        full_content = f"TITLE: {title}\nNOTE:\n{content}"
+        full_content = f"TITLE: {title_str}\nNOTE:\n{content_str}"
 
         self.collection.upsert(
             ids=[note_id],

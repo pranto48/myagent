@@ -73,8 +73,50 @@ class CompanyAIAgent:
                 "active_model": settings.LLM_MODEL
             }
 
+    @staticmethod
+    def is_conversational_greeting(text: str) -> bool:
+        """
+        Detects greetings, pleasantries, small talk, and introductory inquiries
+        to avoid pulling unrelated corporate RAG document context.
+        """
+        if not text:
+            return False
+        clean = text.strip().lower()
+        clean_no_punct = "".join([c if c.isalnum() or c.isspace() else " " for c in clean]).strip()
+        tokens = clean_no_punct.split()
+        if not tokens:
+            return False
+
+        exact_greetings = {
+            "hi", "hello", "hey", "hlo", "hola", "yo", "sup", "heya", "greetings",
+            "good morning", "good afternoon", "good evening", "good night", "good day",
+            "how are you", "how are you doing", "what's up", "whats up",
+            "who are you", "what can you do", "what are you", "help", "who made you",
+            "thanks", "thank you", "thx", "bye", "goodbye",
+            "হাই", "হ্যালো", "হ্যাল্লো", "হে", "সালাম", "আসসালামু আলাইকুম", "আসসালামুআলাইকুম",
+            "নমস্কার", "শুভ সকাল", "শুভ দুপুর", "শুভ সন্ধ্যা", "শুভ রাত্রি",
+            "কেমন আছেন", "কেমন আছো", "কেমন আছেন?", "কেমন আছো?", "কেমন চলতেছে",
+            "আপনি কে", "তুমি কে", "তোমার কাজ কি", "আপনার কাজ কি", "কী করতে পারেন",
+            "কি করতে পারেন", "কী করতে পারো", "কি করতে পারো", "সাহায্য", "সাহায্য করুন",
+            "ধন্যবাদ", "অনেক ধন্যবাদ", "থ্যাংকস", "থ্যাংক ইউ", "কেমন আছিস"
+        }
+
+        if clean in exact_greetings or clean_no_punct in exact_greetings:
+            return True
+
+        if len(tokens) <= 3:
+            if tokens[0] in {"hi", "hello", "hey", "hlo", "হাই", "হ্যালো", "হ্যাল্লো", "সালাম"}:
+                return True
+
+        return False
+
     def _prepare_rag_context(self, prompt: str, user_role: str = "admin") -> tuple[str, List[SourceCitation]]:
         """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list with DLS."""
+        # 1. Skip RAG completely for greetings and casual pleasantries
+        if self.is_conversational_greeting(prompt):
+            logger.info(f"Conversational greeting detected for '{prompt}', skipping RAG retrieval.")
+            return prompt, []
+
         hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS, user_role=user_role)
         sources: List[SourceCitation] = []
 
@@ -82,23 +124,39 @@ class CompanyAIAgent:
             return prompt, []
 
         context_blocks = []
-        for i, hit in enumerate(hits, 1):
-            source_file = hit.get("source", "Document")
+        for hit in hits:
+            source_file = str(hit.get("source", "Document"))
             page_num = hit.get("page", 1)
-            chunk_content = hit.get("content", "").strip()
+            chunk_content = str(hit.get("content", "")).strip()
+            score = float(hit.get("score", 0.0))
 
+            # Quality filter: skip corrupt or placeholder entries
+            if "????" in source_file or "????" in chunk_content:
+                continue
+            if chunk_content.count("?") > 5 and (chunk_content.count("?") / max(len(chunk_content), 1)) > 0.15:
+                continue
+
+            # Minimum relevance threshold for semantic-only matches
+            if score < 0.65 and not hit.get("is_keyword_match", False):
+                continue
+
+            idx = len(context_blocks) + 1
             context_blocks.append(
-                f"[Source #{i}: {source_file} (Page {page_num})]\n{chunk_content}"
+                f"[Source #{idx}: {source_file} (Page {page_num})]\n{chunk_content}"
             )
             sources.append(
                 SourceCitation(
                     source=source_file,
                     chunk_id=hit.get("id", ""),
                     content=chunk_content[:200] + "..." if len(chunk_content) > 200 else chunk_content,
-                    score=hit.get("score", 0.0),
+                    score=score,
                     page=page_num
                 )
             )
+
+        # If no quality hits survived filtering, don't force RAG wrapper
+        if not context_blocks:
+            return prompt, []
 
         merged_context = "\n\n".join(context_blocks)
         augmented_prompt = RAG_CONTEXT_WRAPPER.format(
@@ -208,7 +266,17 @@ class CompanyAIAgent:
                     logger.error(f"Error during LLM chat streaming: {plain_err}")
                     err_str = str(plain_err)
                     if "Connection error" in err_str or "ConnectError" in err_str or "connection refused" in err_str.lower() or "Failed to connect" in err_str:
-                        if sources:
+                        if self.is_conversational_greeting(prompt):
+                            fallback_reply = (
+                                "👋 **হ্যালো! আমি MyAgent AI** — আপনার এন্টারপ্রাইজ ইন্টেলিজেন্স ও প্রোডাক্টিভিটি অ্যাসিস্ট্যান্ট।\n\n"
+                                "আমি আপনাকে কীভাবে সাহায্য করতে পারি? আমার প্রধান ক্ষমতা ও সুবিধাগুলো:\n\n"
+                                "- 📁 **মাল্টি-ফরম্যাট ফাইল বিশ্লেষণ:** PDF, Word (DOCX), Excel স্প্রেডশিট ও ইমেজ OCR পাঠ।\n"
+                                "- 📊 **বিগ ডেটা ও টেবিল সামারি:** ব্যবসায়িক ডেটাসেট পরিসংখ্যান ও ট্রেন্ড বিশ্লেষণ।\n"
+                                "- 🔍 **কোম্পানি নলেজবেস অনুসন্ধান:** অভ্যন্তরীণ পলিসি, ডকুমেন্ট ও ফাইল তাৎক্ষণিক খুঁজে বের করা।\n"
+                                "- ⚡ **অটোমেটেড এক্সিকিউটিভ রিপোর্ট:** এক ক্লিকে গভীর পর্যালোচনা ও অ্যাকশন প্ল্যান তৈরি।\n\n"
+                                "আপনার প্রয়োজনীয় প্রশ্নটি লিখুন অথবা ফাইল আপলোড করে বিশ্লেষণ শুরু করুন!"
+                            )
+                        elif sources:
                             fallback_reply = (
                                 f"⚠️ **[এলএলএম সার্ভার অফলাইন - মেমোরি নলেজ রেসপন্স]**\n\n"
                                 f"আপনার বাহ্যিক এআই মডেল সার্ভারটি (`{target_model}` @ `{settings.LLM_BASE_URL}`) বর্তমানে সংযুক্ত নয়। "

@@ -558,20 +558,33 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
   }
 
   if (!isStreaming && citations && citations.length > 0 && sourcesSlot) {
-    sourcesSlot.innerHTML = `
-      <div class="sources-container">
-        <div class="sources-header">
-          <span>📑 মেমোরি রেফারেন্স ও সোর্স (${citations.length}টি)</span>
+    const validCitations = citations.filter(c => {
+      const src = String(c.source || '').trim();
+      const cnt = String(c.content || '').trim();
+      const score = Number(c.score || 0);
+      return !src.includes('????') && !cnt.includes('????') && score >= 0.55;
+    });
+
+    if (validCitations.length > 0) {
+      sourcesSlot.innerHTML = `
+        <div class="sources-container">
+          <div class="sources-header">
+            <span>📑 মেমোরি রেফারেন্স ও সোর্স (${validCitations.length}টি)</span>
+          </div>
+          <div class="sources-list">
+            ${validCitations.map(c => `
+              <span class="citation-chip" title="${escapeHtml(c.content)}">
+                📄 ${escapeHtml(c.source)} (পৃষ্ঠা ${c.page || 1}) • ${(c.score * 100).toFixed(0)}% মিল
+              </span>
+            `).join('')}
+          </div>
         </div>
-        <div class="sources-list">
-          ${citations.map(c => `
-            <span class="citation-chip" title="${escapeHtml(c.content)}">
-              📄 ${escapeHtml(c.source)} (পৃষ্ঠা ${c.page || 1}) • ${(c.score * 100).toFixed(0)}% মিল
-            </span>
-          `).join('')}
-        </div>
-      </div>
-    `;
+      `;
+    } else {
+      sourcesSlot.innerHTML = '';
+    }
+  } else if (!isStreaming && sourcesSlot) {
+    sourcesSlot.innerHTML = '';
   }
 
   const feed = document.getElementById('chat-feed');
