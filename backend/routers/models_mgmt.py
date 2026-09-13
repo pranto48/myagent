@@ -52,9 +52,14 @@ async def ping_llm_server(req: Optional[TestConnectionReq] = None):
         endpoint = f"{target_url}/models"
 
     start = time.time()
+    headers = {}
+    api_key = (req.key if req and req.key else settings.LLM_API_KEY) or ""
+    if api_key and api_key != "not-needed":
+        headers["Authorization"] = f"Bearer {api_key}"
+
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:
-            res = await client.get(endpoint)
+            res = await client.get(endpoint, headers=headers)
             latency = round((time.time() - start) * 1000, 1)
             models = []
             if res.status_code == 200:
