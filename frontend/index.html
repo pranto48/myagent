@@ -159,6 +159,13 @@
           <span>সিকিউরিটি ও কমপ্লায়েন্স</span>
         </button>
 
+        <button class="nav-btn" id="nav-reports-btn" onclick="switchTab('reports')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>AI রিপোর্ট জেনারেটর</span>
+        </button>
+
         <button class="nav-btn" id="nav-backup-btn" onclick="switchTab('backup')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -203,7 +210,7 @@
       <!-- Official Brand Copyright Footer -->
       <div class="sidebar-brand-footer">
         <div>© 2026 <a href="https://itsupport.com.bd" target="_blank">IT support BD</a></div>
-        <div>Made By <a href="https://arifmahmud.com/" target="_blank">Arif</a> • v2.2.0</div>
+        <div>Made By <a href="https://arifmahmud.com/" target="_blank">Arif</a> • v3.0.0</div>
       </div>
 
     </aside>
@@ -412,9 +419,15 @@
       <!-- View 2: Analytics Dashboard View -->
       <section class="tab-view" id="view-dashboard">
         <div class="admin-view-container">
-          <div class="view-header-title">
-            <h3 class="animated-gradient-text">📊 এন্টারপ্রাইজ অ্যানালিটিক্স ড্যাশবোর্ড</h3>
-            <p>রিয়েলটাইম মেমোরি গ্রোথ, স্টোরেজ ব্যবহার এবং সার্ভার কর্মক্ষমতা পর্যবেক্ষণ করুন।</p>
+          <div class="view-header-row">
+            <div>
+              <h3 class="animated-gradient-text">📊 এন্টারপ্রাইজ অ্যানালিটিক্স ড্যাশবোর্ড</h3>
+              <p>রিয়েলটাইম মেমোরি গ্রোথ, স্টোরেজ ব্যবহার এবং সার্ভার কর্মক্ষমতা পর্যবেক্ষণ করুন।</p>
+            </div>
+            <button class="btn-secondary" onclick="loadDashboardFull()" style="gap:6px;">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              রিফ্রেশ
+            </button>
           </div>
 
           <!-- KPI Metric Cards Grid -->
@@ -460,38 +473,152 @@
             </div>
           </div>
 
-          <!-- Dashboard Analytics Row -->
-          <div class="dash-details-grid">
-            <!-- Left: Document Distribution -->
+          <!-- Charts Row 1 -->
+          <div class="dash-charts-grid">
+            <!-- Chart: 7-day Activity -->
             <div class="card-panel">
               <div class="panel-header">
-                <h3>ডকুমেন্ট ও ফাইল টাইপ ডিস্ট্রিবিউশন</h3>
-                <p>মেমোরিতে সংরক্ষিত তথ্যের বিন্যাস</p>
+                <h3>📅 ৭ দিনের চ্যাট অ্যাক্টিভিটি</h3>
+                <p>প্রতিদিনের কথোপকথন সেশন সংখ্যা</p>
               </div>
-              <div class="dist-bars-container" id="dash-distribution-bars">
-                <!-- Injected by dashboard.js -->
+              <div class="chart-container" style="height:220px;">
+                <canvas id="chart-activity"></canvas>
               </div>
             </div>
 
-            <!-- Right: Real-time LLM Connection Health -->
+            <!-- Chart: Document Distribution -->
             <div class="card-panel">
               <div class="panel-header">
-                <h3>এআই মডেল সার্ভার লেটেন্সি ও স্ট্যাটাস</h3>
-                <p>রিমোট এলএলএম সার্ভারের সংযোগ অবস্থা</p>
+                <h3>📁 ডকুমেন্ট টাইপ ডিস্ট্রিবিউশন</h3>
+                <p>ফাইল ধরন অনুযায়ী মেমোরি বিন্যাস</p>
               </div>
-              <div style="margin-top: 10px;">
-                <div id="dash-llm-latency-badge" class="status-pill-green" style="display:inline-block; font-size:0.9rem; padding:8px 14px;">
-                  পরীক্ষা করা হচ্ছে...
+              <div class="chart-container" style="height:220px;">
+                <canvas id="chart-doctype"></canvas>
+              </div>
+            </div>
+
+            <!-- Chart: Memory Growth -->
+            <div class="card-panel">
+              <div class="panel-header">
+                <h3>🧠 মেমোরি গ্রোথ ট্রেন্ড</h3>
+                <p>ভেক্টর চাঙ্ক সংখ্যার বৃদ্ধির ধারা</p>
+              </div>
+              <div class="chart-container" style="height:220px;">
+                <canvas id="chart-memory"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Details Row -->
+          <div class="dash-details-grid">
+            <!-- Left: Distribution Bars + LLM Status -->
+            <div class="card-panel">
+              <div class="panel-header">
+                <h3>📊 ডিস্ট্রিবিউশন বার্স</h3>
+                <p>ফাইল টাইপ বিস্তারিত</p>
+              </div>
+              <div class="dist-bars-container" id="dash-distribution-bars"></div>
+              <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+                <div class="panel-header" style="padding:0 0 8px;"><h3>⚡ LLM সার্ভার স্ট্যাটাস</h3></div>
+                <div id="dash-llm-latency-badge" class="status-pill-green" style="display:inline-block;">পরীক্ষা হচ্ছে...</div>
+              </div>
+            </div>
+
+            <!-- Right: Recent Documents -->
+            <div class="card-panel">
+              <div class="panel-header">
+                <h3>📂 সাম্প্রতিক ডকুমেন্টস</h3>
+                <p>সর্বশেষ ইনজেস্ট করা ফাইলসমূহ</p>
+              </div>
+              <div class="table-card" style="margin:0; box-shadow:none; background:transparent;">
+                <table class="data-table" style="font-size:0.82rem;">
+                  <thead><tr><th>ফাইলনাম</th><th>সাইজ</th><th>সংশোধন</th></tr></thead>
+                  <tbody id="dash-recent-docs"><tr><td colspan="3" style="text-align:center; color:var(--text-muted);">লোড হচ্ছে...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity Log -->
+          <div class="card-panel" style="margin-top:0;">
+            <div class="panel-header" style="margin-bottom:8px;">
+              <h3>⚡ রিয়েলটাইম অ্যাক্টিভিটি লগ</h3>
+              <p>সাম্প্রতিক সিস্টেম ইভেন্ট ও ইউজার অ্যাক্টিভিটি</p>
+            </div>
+            <div id="dash-activity-log" class="activity-log-container"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- View: Reports Generator -->
+      <section class="tab-view" id="view-reports">
+        <div class="admin-view-container">
+          <div class="view-header-row">
+            <div>
+              <h3 class="animated-gradient-text">📊 AI রিপোর্ট জেনারেটর</h3>
+              <p>কোম্পানি নলেজবেস থেকে প্রাসঙ্গিক তথ্য রিট্রিভ করে AI-powered পেশাদার রিপোর্ট তৈরি করুন।</p>
+            </div>
+            <button class="btn-secondary" onclick="loadReportsList()">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              রিফ্রেশ
+            </button>
+          </div>
+
+          <div class="reports-layout">
+            <!-- Left Panel: Generator + List -->
+            <div class="reports-left-panel">
+
+              <!-- Generator Form -->
+              <div class="card-panel">
+                <div class="panel-header">
+                  <h3>✨ নতুন রিপোর্ট তৈরি করুন</h3>
+                  <p>বিষয় ও ধরন নির্বাচন করে AI রিপোর্ট জেনারেট করুন</p>
+                </div>
+                <div class="form-group" style="gap:12px;">
+                  <div>
+                    <label style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:6px; display:block;">রিপোর্টের ধরন</label>
+                    <select id="report-type-select" class="text-input">
+                      <option value="executive_summary">📊 এক্সিকিউটিভ সামারি</option>
+                      <option value="data_analysis">📈 ডেটা বিশ্লেষণ রিপোর্ট</option>
+                      <option value="kpi_report">🎯 KPI পারফরম্যান্স রিপোর্ট</option>
+                      <option value="incident_report">🚨 ইনসিডেন্ট রিপোর্ট</option>
+                      <option value="meeting_minutes">📝 মিটিং মিনিটস</option>
+                      <option value="company_policy">📋 কোম্পানি পলিসি ডকুমেন্ট</option>
+                      <option value="custom">✨ কাস্টম রিপোর্ট</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:6px; display:block;">রিপোর্টের বিষয় (Topic) <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="report-topic-input" class="text-input" placeholder="যেমন: Q3 2026 সেলস পারফরম্যান্স, বার্ষিক অডিট, অফিস পলিসি আপডেট" />
+                  </div>
+                  <div>
+                    <label style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:6px; display:block;">অতিরিক্ত প্রেক্ষাপট (ঐচ্ছিক)</label>
+                    <textarea id="report-context-input" class="text-input" rows="3" style="resize:vertical;" placeholder="বিশেষ নির্দেশনা, তারিখ পরিসর, নির্দিষ্ট বিভাগ বা কোনো অতিরিক্ত তথ্য..."></textarea>
+                  </div>
+                  <button id="btn-generate-report" class="btn-primary" style="width:100%; justify-content:center; padding:12px; font-size:1rem;" onclick="generateReport()">
+                    📊 রিপোর্ট তৈরি করুন
+                  </button>
+                </div>
+                <div id="report-gen-status" style="display:none; margin-top:12px;"></div>
+              </div>
+
+              <!-- Reports List -->
+              <div class="card-panel">
+                <div class="panel-header">
+                  <h3>📋 সংরক্ষিত রিপোর্টসমূহ</h3>
+                  <p>পূর্বে তৈরি করা সকল AI রিপোর্ট</p>
+                </div>
+                <div id="reports-list-container">
+                  <div style="text-align:center; padding:30px; color:var(--text-muted);">লোড হচ্ছে...</div>
                 </div>
               </div>
-              <div style="margin-top: 20px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6;">
-                সার্ভার পোর্ট: <code>3399</code> (ওয়েব) / <code>8000</code> (API)<br>
-                ভেক্টর ইঞ্জিন: <code>ChromaDB Persistent Store</code><br>
-                এমবেডিং মডেল: <code>sentence-transformers/all-MiniLM-L6-v2</code>
+            </div>
+
+            <!-- Right Panel: Report Viewer -->
+            <div class="reports-right-panel" id="report-viewer" style="display:none;">
+              <div class="card-panel report-viewer-card" id="report-viewer-content">
               </div>
-              <button class="btn-secondary" style="margin-top: 16px;" onclick="loadDashboardMetrics()">
-                রিফ্রেশ মেট্রিক্স
-              </button>
             </div>
           </div>
 
@@ -1749,6 +1876,7 @@
   <script src="js/backup_manager.js"></script>
   <script src="js/admin_manager.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/reports_manager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

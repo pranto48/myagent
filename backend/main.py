@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 2.2.0
+# Project: MyAgent | Version: 3.0.0
 # ==============================================================================
 
 import logging
@@ -27,7 +27,8 @@ from routers import (
     mcp_router,
     security_router,
     backup_router
-)
+) 
+from routers.reports import router as reports_router
 from models.schemas import SystemStatusResponse
 
 logging.basicConfig(
@@ -68,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",
     description="Enterprise AI Agent with Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
-    version="2.2.0",
+    version="3.0.0",
     lifespan=lifespan
 )
 
@@ -89,6 +90,7 @@ app.include_router(models_mgmt_router)
 app.include_router(mcp_router)
 app.include_router(security_router)
 app.include_router(backup_router)
+app.include_router(reports_router)
 app.include_router(sessions_router)
 app.include_router(chat_router)
 app.include_router(documents_router)

@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 2.2.0
+# Project: MyAgent | Version: 3.0.0
 # ==============================================================================
 
 from .chat import router as chat_router
@@ -16,4 +16,5 @@ from .models_mgmt import router as models_mgmt_router
 from .mcp_router import router as mcp_router
 from .security_router import router as security_router
 from .backup import router as backup_router
+from .reports import router as reports_router
 

@@ -310,7 +310,7 @@ function toggleMobileSidebar() {
 
 // Tab Switching across all views (including Full-Page Admin & Settings)
 function switchTab(tabName) {
-  const tabs = ['chat', 'admin', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup', 'settings'];
+  const tabs = ['chat', 'admin', 'dashboard', 'reports', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup', 'settings'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -342,7 +342,8 @@ function switchTab(tabName) {
   } else if (tabName === 'dashboard') {
     if (topbarTitle) topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
     if (topbarDesc) topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
-    if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+    if (typeof loadDashboardFull === 'function') loadDashboardFull();
+    else if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
   } else if (tabName === 'users') {
     if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ইউজার ও এক্সেস কন্ট্রোল';
     if (topbarDesc) topbarDesc.innerText = 'অভ্যন্তরীণ কর্মকর্তা ও কর্মচারীদের রোল ম্যানেজমেন্ট';
@@ -369,6 +370,10 @@ function switchTab(tabName) {
     if (topbarTitle) topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
     if (topbarDesc) topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
     if (typeof loadBackupDashboard === 'function') loadBackupDashboard();
+  } else if (tabName === 'reports') {
+    if (topbarTitle) topbarTitle.innerText = 'AI রিপোর্ট জেনারেটর — এন্টারপ্রাইজ ইন্টেলিজেন্স রিপোর্টিং';
+    if (topbarDesc) topbarDesc.innerText = 'কোম্পানি নলেজবেস থেকে ডেটা রিট্রিভ করে পেশাদার AI রিপোর্ট তৈরি করুন';
+    if (typeof loadReportsPage === 'function') loadReportsPage();
   } else if (tabName === 'settings') {
     if (topbarTitle) topbarTitle.innerText = 'সিস্টেম সেটিংস ও এআই ইঞ্জিন কনফিগারেশন';
     if (topbarDesc) topbarDesc.innerText = 'থিম সিলেকশন, LM Studio সংযোগ, মডেল প্যারামিটার ও সিকিউরিটি কন্ট্রোল';
