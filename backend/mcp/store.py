@@ -130,7 +130,7 @@ class MCPStore:
     @classmethod
     async def list_servers(cls) -> List[Dict[str, Any]]:
         db = await cls.get_db()
-        async with db:
+        try:
             async with db.execute("SELECT * FROM mcp_servers ORDER BY created_at ASC") as cursor:
                 rows = await cursor.fetchall()
                 result = []
@@ -142,11 +142,13 @@ class MCPStore:
                     item["is_enabled"] = bool(item.get("is_enabled", 1))
                     result.append(item)
                 return result
+        finally:
+            await db.close()
 
     @classmethod
     async def get_server(cls, server_id: str) -> Optional[Dict[str, Any]]:
         db = await cls.get_db()
-        async with db:
+        try:
             async with db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,)) as cursor:
                 row = await cursor.fetchone()
                 if not row:
@@ -157,6 +159,8 @@ class MCPStore:
                 item["tools_cache"] = json.loads(item.get("tools_cache") or "[]")
                 item["is_enabled"] = bool(item.get("is_enabled", 1))
                 return item
+        finally:
+            await db.close()
 
     @classmethod
     async def add_server(
@@ -173,7 +177,7 @@ class MCPStore:
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         server_id = f"mcp_{uuid.uuid4().hex[:8]}"
 
-        async with db:
+        try:
             await db.execute("""
                 INSERT INTO mcp_servers (id, name, transport, command, args, url, env, is_enabled, status, tools_cache, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'configured', '[]', ?, ?)
@@ -190,6 +194,8 @@ class MCPStore:
                 now
             ))
             await db.commit()
+        finally:
+            await db.close()
 
         return await cls.get_server(server_id)
 
@@ -215,7 +221,7 @@ class MCPStore:
         db = await cls.get_db()
         now = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        async with db:
+        try:
             await db.execute("""
                 UPDATE mcp_servers
                 SET name = COALESCE(?, name),
@@ -245,13 +251,17 @@ class MCPStore:
                 server_id
             ))
             await db.commit()
+        finally:
+            await db.close()
 
         return await cls.get_server(server_id)
 
     @classmethod
     async def delete_server(cls, server_id: str) -> bool:
         db = await cls.get_db()
-        async with db:
+        try:
             res = await db.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))
             await db.commit()
             return res.rowcount > 0
+        finally:
+            await db.close()

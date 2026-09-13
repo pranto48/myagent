@@ -137,6 +137,24 @@ function exportChatConversation() {
   showToast('চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!', 'success');
 }
 
+// Quick Productivity Action Prompt Handlers
+function useProductivityAction(actionType) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+
+  const prompts = {
+    'data_analysis': 'অনুগ্রহ করে আমাদের আপলোড করা ডেটাসেট (CSV/Excel) বিশ্লেষণ করো। প্রধান পরিসংখ্যান, শীর্ষ ক্যাটাগরি এবং ব্যবসায়িক ফলাফল টেবিল আকারে দেখাও।',
+    'memory_search': 'কোম্পানির মেমোরি ও নলেজবেসে অনুসন্ধান করে আমাদের প্রধান নীতিমালা, নিয়মাবলী এবং কার্যপ্রণালী সম্পর্কিত তথ্য বিস্তারিত জানাও।',
+    'generate_report': 'আমাদের সাম্প্রতিক ডেটা ও নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ রিপোর্ট তৈরি করো এবং generate_data_report টুলের সাহায্যে reports ফোল্ডারে সংরক্ষণ করো।',
+    'python_sandbox': 'পাইথন স্যান্ডবক্স ব্যবহার করে আমাদের জন্য জটিল গাণিতিক হিসাব বা ডেটা প্রসেসিং সম্পন্ন করো: ',
+    'security_audit': 'আমাদের বর্তমান সিস্টেম সিকিউরিটি স্ট্যাটাস, ফায়ারওয়াল অ্যালার্ট এবং ডেটা প্রোটেকশন পরিস্থিতি বিশ্লেষণ করো।'
+  };
+
+  input.value = prompts[actionType] || '';
+  input.focus();
+  autoResizeTextarea(input);
+}
+
 // Textarea Auto-resize
 function autoResizeTextarea(textarea) {
   textarea.style.height = 'auto';

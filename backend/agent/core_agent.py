@@ -168,7 +168,7 @@ class CompanyAIAgent:
         # 2. Build conversation payload
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
         # Add tool usage instructions into system prompt for models without native function calling
-        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, web_search, web_scrape, python_runner, analyze_big_data, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info). You may call them using tool_calls or structured text: Action: <tool_name>\\nAction Input: <json_arguments>"
+        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, web_search, web_scrape, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. You may call them using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -179,7 +179,7 @@ class CompanyAIAgent:
         # Add current user prompt (with RAG context if applicable)
         messages.append({"role": "user", "content": user_content})
 
-        tools_schema = AgentTools.get_openai_tools_schema()
+        tools_schema = await AgentTools.get_all_tools_schema()
 
         # Tool calling loop (up to 3 tool turns)
         max_tool_turns = 3
