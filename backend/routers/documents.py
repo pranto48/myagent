@@ -179,3 +179,84 @@ async def delete_document(doc_id: str):
         "success": True,
         "message": f"Document {doc_id} and its memory vectors removed successfully."
     }
+
+@router.post("/reindex")
+async def reindex_documents(doc_id: str = None):
+    """
+    Re-chunks and re-indexes stored documents using the upgraded smart, table-aware vector pipeline.
+    Preserves all physical files while rebuilding optimal vector embeddings and FTS indexes.
+    """
+    store = VectorMemoryStore()
+    docs_dir = Path(settings.DOCUMENTS_DIR)
+    
+    if not docs_dir.exists():
+        return {"success": True, "message": "কোনো সংরক্ষিত ফাইল পাওয়া যায়নি।", "reindexed_count": 0}
+
+    files_to_process = []
+    seen_ids = set()
+
+    for file_path in docs_dir.glob("*_*"):
+        if file_path.is_file() and not file_path.name.startswith("."):
+            parts = file_path.name.split("_", 1)
+            if len(parts) == 2 and parts[0].startswith("doc_"):
+                d_id = parts[0]
+                filename = parts[1]
+                if doc_id and d_id != doc_id:
+                    continue
+                if d_id in seen_ids:
+                    continue
+                seen_ids.add(d_id)
+                files_to_process.append((file_path, d_id, filename))
+
+    if not files_to_process:
+        return {"success": True, "message": "রি-ইনডেক্স করার মতো কোনো ফাইল পাওয়া যায়নি।", "reindexed_count": 0}
+
+    total_chunks = 0
+    reindexed_files = []
+    start_time = time.time()
+
+    for file_path, d_id, filename in files_to_process:
+        try:
+            # 1. Clear old chunks for this document
+            store.delete_document(d_id)
+
+            # 2. Process with upgraded table-aware / smart chunker
+            chunks = DocumentProcessor.process_file_into_chunks(
+                file_path=str(file_path),
+                doc_id=d_id,
+                original_filename=filename
+            )
+
+            # 3. Add to vector store
+            stored_count = store.add_chunks(chunks)
+            total_chunks += stored_count
+            reindexed_files.append({
+                "doc_id": d_id,
+                "filename": filename,
+                "chunks": stored_count,
+                "status": "reindexed"
+            })
+        except Exception as e:
+            reindexed_files.append({
+                "doc_id": d_id,
+                "filename": filename,
+                "status": "error",
+                "error": str(e)
+            })
+
+    # Run optimizer after re-indexing
+    try:
+        store.optimize_memory_store()
+    except Exception:
+        pass
+
+    elapsed = round(time.time() - start_time, 2)
+    return {
+        "success": True,
+        "message": f"সফলভাবে {len(reindexed_files)} টি ফাইল পুনরায় প্রসেস ও ইনডেক্স করা হয়েছে (মোট {total_chunks} চাঙ্ক, সময় {elapsed}s)।",
+        "total_files": len(reindexed_files),
+        "total_chunks": total_chunks,
+        "elapsed_seconds": elapsed,
+        "details": reindexed_files
+    }
+

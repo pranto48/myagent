@@ -446,8 +446,82 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
+// Optimize Vector Store & FTS5 Database
+async function optimizeMemoryStore() {
+  const btn = document.getElementById('btn-optimize-store');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.innerHTML = '⚡ অপ্টিমাইজ হচ্ছে...';
+    btn.disabled = true;
+  }
+  showToast('ভেক্টর মেমোরি ডিফ্র্যাগমেন্টেশন ও FTS5 সার্চ ইনডেক্স অপ্টিমাইজেশন চলছে...', 'info');
+
+  try {
+    const res = await fetch('/api/memory/optimize', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      const opt = data.optimization || {};
+      showToast(`মেমোরি সফলভাবে অপ্টিমাইজ হয়েছে! মোট চাঙ্ক: ${opt.total_chunks || 0}, সময়: ${opt.elapsed_seconds || 0}s`, 'success');
+      loadMemoryStats();
+      loadChunksList(0);
+    } else {
+      showToast(`অপ্টিমাইজেশন ব্যর্থ: ${data.detail || 'ত্রুটি'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
+// Re-index all uploaded documents using smart table-aware chunker
+async function reindexAllDocuments() {
+  if (!confirm('আপনি কি সমস্ত সংরক্ষিত ফাইল পুনরায় স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে রি-ইনডেক্স করতে চান? এতে ডাটার কোয়ালিটি ও সার্চ একুরেসি সর্বোচ্চ হবে।')) {
+    return;
+  }
+
+  const btn = document.getElementById('btn-reindex-docs');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.innerHTML = '🔄 রি-ইনডেক্সিং হচ্ছে...';
+    btn.disabled = true;
+  }
+  showToast('সকল ডকুমেন্টের ভেক্টর এমবেডিং ও টেবিল চাঙ্কিং পুনরায় তৈরি হচ্ছে...', 'info');
+
+  try {
+    const res = await fetch('/api/documents/reindex', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast(data.message || 'স্মার্ট রি-ইনডেক্স সম্পন্ন হয়েছে!', 'success');
+      loadDocumentList();
+      loadMemoryStats();
+      loadChunksList(0);
+      if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+    } else {
+      showToast(`রি-ইনডেক্সিং ব্যর্থ: ${data.detail || 'ত্রুটি'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadDocumentList();
   loadMemoryStats();
   loadChunksList();
 });
+

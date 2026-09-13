@@ -773,8 +773,10 @@
                 <h3>🧠 সংরক্ষিত মেমোরি চাঙ্কস এক্সপ্লোরার ও ভুল তথ্য সংশোধন (CRUD)</h3>
                 <p>ক্রোমাডিবি ও হাইব্রিড সার্চে সংরক্ষিত সমস্ত চাঙ্ক ব্রাউজ করুন এবং ভুল তথ্য সরাসরি এডিট বা ডিলিট করুন।</p>
               </div>
-              <div style="display:flex; gap:10px; align-items:center;">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <span class="badge-tag" id="chunks-total-count-badge" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow); font-size:0.82rem; padding:4px 10px;">০টি চাঙ্ক</span>
+                <button class="btn-sm-action" id="btn-optimize-store" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4); background:rgba(6,182,212,0.1);" onclick="optimizeMemoryStore()" title="FTS5 ইনডেক্স মার্জ, ডিফ্র্যাগমেন্টেশন ও SQLite VACUUM">⚡ মেমোরি অপ্টিমাইজ</button>
+                <button class="btn-sm-action" id="btn-reindex-docs" style="color:var(--amber-warning); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1);" onclick="reindexAllDocuments()" title="স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে সকল ফাইল পুনরায় ইনডেক্স করুন">🔄 স্মার্ট রি-ইনডেক্স</button>
                 <button class="btn-sm-action" style="color:var(--emerald-green); border-color:rgba(16,185,129,0.3);" onclick="loadChunksList(currentChunksPage)">🔄 রিফ্রেশ</button>
               </div>
             </div>

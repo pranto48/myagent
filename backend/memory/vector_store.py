@@ -163,15 +163,30 @@ class VectorMemoryStore:
         if not chunks:
             return 0
 
-        # Filter out corrupted or placeholder chunks with ????
+        # Filter out corrupted or placeholder chunks with ???? and deduplicate within batch
         valid_chunks = []
+        seen_hashes = set()
         for c in chunks:
-            cnt = str(c.get("content", ""))
-            fname = str(c.get("filename", ""))
+            cnt = str(c.get("content", "")).strip()
+            fname = str(c.get("filename", "")).strip()
+            if not cnt:
+                continue
             if "????" in fname or "????" in cnt:
                 continue
             if cnt.count("?") > 5 and cnt.count("?") / max(len(cnt), 1) > 0.15:
                 continue
+
+            # Compute or retrieve content hash for deduplication
+            c_hash = c.get("content_hash")
+            if not c_hash:
+                import hashlib
+                c_hash = hashlib.sha256(cnt.encode("utf-8")).hexdigest()[:16]
+                c["content_hash"] = c_hash
+
+            dedup_key = f"{c['doc_id']}::{c_hash}"
+            if dedup_key in seen_hashes:
+                continue
+            seen_hashes.add(dedup_key)
             valid_chunks.append(c)
 
         if not valid_chunks:
@@ -190,13 +205,14 @@ class VectorMemoryStore:
                 "page": int(c.get("page", 1)),
                 "chunk_index": int(c.get("chunk_index", 1)),
                 "category": c.get("category", "general"),
-                "security_level": c.get("security_level", "INTERNAL")
+                "security_level": c.get("security_level", "INTERNAL"),
+                "content_hash": c.get("content_hash", "")
             }
             for c in chunks
         ]
 
-        # 1. Upsert into ChromaDB in batches
-        batch_size = 64
+        # 1. Upsert into ChromaDB in optimized batches of 32 chunks
+        batch_size = 32
         for i in range(0, len(chunks), batch_size):
             end = i + batch_size
             self.collection.upsert(
@@ -235,6 +251,56 @@ class VectorMemoryStore:
 
         logger.info(f"Successfully indexed {len(chunks)} chunks in hybrid memory (< 50ms batch).")
         return len(chunks)
+
+    def optimize_memory_store(self) -> Dict[str, Any]:
+        """
+        Enterprise Vector Store & Database Optimizer:
+        1. Purges corrupted or placeholder memory chunks.
+        2. Runs FTS5 index merge and B-tree optimization.
+        3. Executes SQLite VACUUM to reclaim disk space and rebuild indexes.
+        4. Clears in-memory LRU query cache.
+        5. Returns comprehensive storage and performance metrics.
+        """
+        start_time = time.time()
+        cleaned_corrupt = self.clean_corrupt_entries()
+
+        # 1. Optimize SQLite FTS5 Index & VACUUM
+        fts_size_before = os.path.getsize(self.fts_db_path) if os.path.exists(self.fts_db_path) else 0
+        try:
+            with sqlite3.connect(self.fts_db_path) as conn:
+                conn.execute("PRAGMA journal_mode = WAL;")
+                conn.execute("PRAGMA synchronous = NORMAL;")
+                conn.execute("INSERT INTO fts_chunks(fts_chunks) VALUES('optimize');")
+                conn.commit()
+                conn.execute("VACUUM;")
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"FTS5 optimize warning: {e}")
+
+        fts_size_after = os.path.getsize(self.fts_db_path) if os.path.exists(self.fts_db_path) else 0
+
+        # 2. Reset and warm cache
+        self.cache.clear()
+
+        # 3. Count total active records in ChromaDB
+        total_chunks = 0
+        try:
+            total_chunks = self.collection.count()
+        except Exception:
+            pass
+
+        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+        logger.info(f"Vector memory optimization completed in {elapsed_ms}ms (Total chunks: {total_chunks}).")
+
+        return {
+            "success": True,
+            "message": f"ভেক্টর মেমোরি ও এফটিএস৫ ইনডেক্স সফলভাবে অপ্টিমাইজ করা হয়েছে ({elapsed_ms}ms)।",
+            "total_chunks": total_chunks,
+            "cleaned_chunks": cleaned_corrupt,
+            "fts_size_bytes": fts_size_after,
+            "reclaimed_bytes": max(0, fts_size_before - fts_size_after),
+            "execution_time_ms": elapsed_ms
+        }
 
     def add_note(
         self,

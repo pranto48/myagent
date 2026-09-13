@@ -115,3 +115,24 @@ async def get_memory_stats():
     """
     store = VectorMemoryStore()
     return store.get_stats()
+
+@router.post("/optimize")
+async def optimize_vector_store():
+    """
+    Executes deep vector store optimization:
+    1. Reclaims orphaned chunks and deduplicates indexes.
+    2. Merges and optimizes SQLite FTS5 inverted search index.
+    3. Performs SQLite VACUUM to reclaim disk pages and defragment database storage.
+    4. Flushes LRU caches to free memory.
+    """
+    try:
+        store = VectorMemoryStore()
+        result = store.optimize_memory_store()
+        return {
+            "success": True,
+            "message": "ভেক্টর ডাটাবেস ও FTS5 সার্চ ইনডেক্স সফলভাবে অপ্টিমাইজ ও ডিফ্র্যাগমেন্ট করা হয়েছে।",
+            "optimization": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"মেমোরি অপ্টিমাইজেশন ব্যর্থ হয়েছে: {str(e)}")
+

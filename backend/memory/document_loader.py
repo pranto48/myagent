@@ -7,8 +7,10 @@
 import os
 import uuid
 import re
+import hashlib
+import unicodedata
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from pathlib import Path
 from pypdf import PdfReader
 from docx import Document as DocxDocument
@@ -200,6 +202,140 @@ class DocumentProcessor:
         return extracted_pages
 
     @staticmethod
+    def normalize_text(text: str) -> str:
+        """Normalizes Unicode (NFKC), cleans zero-width characters, and normalizes whitespaces."""
+        if not text:
+            return ""
+        norm = unicodedata.normalize("NFKC", text)
+        norm = norm.replace("\ufeff", "").replace("\u200b", "").replace("\xa0", " ")
+        norm = re.sub(r'\n{3,}', '\n\n', norm)
+        norm = re.sub(r'[ \t]{2,}', ' ', norm)
+        return norm.strip()
+
+    @staticmethod
+    def detect_category(filename: str, sample_text: str = "") -> str:
+        """Intelligently detects business category from filename and content keywords."""
+        lower = (str(filename) + " " + str(sample_text)[:600]).lower()
+        if any(w in lower for w in ["finance", "financial", "sales", "revenue", "budget", "invoice", "cost", "salary", "expense", "বাজেট", "বিক্রয়", "হিসাব", "অডিট", "খরচ", "টাকা", "বেতন", "বিল"]):
+            return "financial"
+        elif any(w in lower for w in ["hr", "employee", "leave", "policy", "attendance", "recruitment", "staff", "কর্মী", "পলিসি", "ছুটি", "চাকরি", "নিয়োগ", "বিধিমালা", "নিয়ম"]):
+            return "hr_policy"
+        elif any(w in lower for w in ["it", "network", "server", "security", "hardening", "ksc", "kaspersky", "guideline", "আইটি", "সার্ভার", "নিরাপত্তা", "গাইডলাইন"]):
+            return "it_security"
+        elif any(w in lower for w in ["marketing", "campaign", "customer", "client", "market", "মার্কেটিং", "গ্রাহক", "প্রচার"]):
+            return "marketing"
+        elif any(w in lower for w in ["report", "minutes", "meeting", "summary", "analysis", "রিপোর্ট", "মিটিং", "সারসংক্ষেপ"]):
+            return "reports"
+        return "general"
+
+    @classmethod
+    def process_tabular_file(cls, file_path: str, doc_id: str, original_filename: str, category: str) -> List[Dict[str, Any]]:
+        """
+        High-Efficiency Table-Aware Chunking for Spreadsheets (Excel, CSV, TSV):
+        1. Generates an executive dataset overview chunk with row/column counts and schema.
+        2. Chunks data in cohesive row blocks (15-20 rows), never slicing a row in half.
+        3. Prepends full column headers to EVERY chunk so retrieval retains 100% semantic grounding.
+        """
+        import pandas as pd
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        chunks = []
+        chunk_idx = 0
+
+        tables = {}
+        if ext in [".xlsx", ".xls"]:
+            try:
+                excel_file = pd.ExcelFile(file_path)
+                for sheet in excel_file.sheet_names:
+                    try:
+                        df = pd.read_excel(file_path, sheet_name=sheet)
+                        if not df.empty:
+                            tables[sheet] = df
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(f"Failed to parse Excel with pandas: {e}")
+        elif ext in [".csv", ".tsv"]:
+            try:
+                sep = "\t" if ext == ".tsv" else ","
+                df = pd.read_csv(file_path, sep=sep, nrows=5000)
+                if not df.empty:
+                    tables["Data"] = df
+            except Exception as e:
+                logger.warning(f"Failed to parse CSV with pandas: {e}")
+
+        if not tables:
+            return []
+
+        for sheet_name, df in tables.items():
+            total_rows, total_cols = df.shape
+            col_names = [str(c).strip() for c in df.columns]
+            cols_str = ", ".join(col_names)
+
+            # 1. Dataset Overview Chunk
+            chunk_idx += 1
+            desc_str = ""
+            try:
+                desc = df.describe()
+                if not desc.empty:
+                    desc_str = f"\n[সাংখ্যিক পরিসংখ্যান (Statistical Summary)]:\n{desc.to_string()}\n"
+            except Exception:
+                pass
+
+            overview_content = (
+                f"[উৎস: {original_filename} | শিট: {sheet_name} | ক্যাটাগরি: {category}]\n"
+                f"### [স্প্রেডশিট ডেটাসেট ওভারভিউ: {original_filename} - {sheet_name}]\n"
+                f"- মোট রেকর্ড: {total_rows}টি সারি, {total_cols}টি কলাম\n"
+                f"- কলামসমূহ: {cols_str}\n"
+                f"{desc_str}"
+            )
+            overview_hash = hashlib.sha256(overview_content.encode("utf-8")).hexdigest()[:16]
+            chunks.append({
+                "id": f"{doc_id}_chunk_{chunk_idx}",
+                "doc_id": doc_id,
+                "filename": original_filename,
+                "page": 1,
+                "chunk_index": chunk_idx,
+                "content": overview_content,
+                "category": category,
+                "content_hash": overview_hash
+            })
+
+            # 2. Cohesive Row-Group Chunks (15 rows per chunk with header preserved)
+            rows_per_chunk = 15
+            for start_row in range(0, min(total_rows, 350), rows_per_chunk):
+                end_row = min(start_row + rows_per_chunk, total_rows)
+                sub_df = df.iloc[start_row:end_row]
+
+                row_lines = []
+                for r_idx, row in sub_df.iterrows():
+                    pairs = [f"{c}={row[c]}" for c in df.columns if pd.notna(row[c])]
+                    if pairs:
+                        row_lines.append(f"[সারি {r_idx + 1}]: " + " | ".join(pairs))
+
+                if row_lines:
+                    chunk_idx += 1
+                    table_content = (
+                        f"[উৎস: {original_filename} | শিট: {sheet_name} | ক্যাটাগরি: {category}]\n"
+                        f"### [ওয়ার্কশিট: {sheet_name} (রেকর্ড {start_row + 1} থেকে {end_row})]\n"
+                        f"[কলাম তালিকা: {cols_str}]\n\n"
+                        + "\n".join(row_lines)
+                    )
+                    t_hash = hashlib.sha256(table_content.encode("utf-8")).hexdigest()[:16]
+                    chunks.append({
+                        "id": f"{doc_id}_chunk_{chunk_idx}",
+                        "doc_id": doc_id,
+                        "filename": original_filename,
+                        "page": 1,
+                        "chunk_index": chunk_idx,
+                        "content": table_content,
+                        "category": category,
+                        "content_hash": t_hash
+                    })
+
+        return chunks
+
+    @staticmethod
     def chunk_text(text: str, chunk_size: int = 800, overlap: int = 150) -> List[str]:
         """Splits long text into overlapping chunks respecting sentence boundaries."""
         if not text:
@@ -242,28 +378,105 @@ class DocumentProcessor:
         return chunks
 
     @classmethod
-    def process_file_into_chunks(cls, file_path: str, doc_id: str, original_filename: str) -> List[Dict[str, Any]]:
-        """Processes a file and returns a list of chunk dictionaries ready for vector embedding."""
+    def chunk_structured_text(cls, text: str, chunk_size: int = 800, overlap: int = 150) -> List[str]:
+        """
+        Structure-aware text chunker:
+        Splits by markdown section headers and double newlines, preserving semantic integrity.
+        """
+        clean_text = cls.normalize_text(text)
+        if not clean_text:
+            return []
+        if len(clean_text) <= chunk_size:
+            return [clean_text]
+
+        sections = re.split(r'(\n(?=#{1,4}\s)|\n\n)', clean_text)
+        merged_sections = []
+        curr = ""
+        for s in sections:
+            if not s:
+                continue
+            if len(curr) + len(s) <= chunk_size:
+                curr += s
+            else:
+                if curr.strip():
+                    merged_sections.append(curr.strip())
+                curr = s
+        if curr.strip():
+            merged_sections.append(curr.strip())
+
+        final_chunks = []
+        for sec in merged_sections:
+            if len(sec) <= chunk_size:
+                final_chunks.append(sec)
+            else:
+                sub_chunks = cls.chunk_text(sec, chunk_size=chunk_size, overlap=overlap)
+                final_chunks.extend(sub_chunks)
+
+        return [c for c in final_chunks if c.strip()]
+
+    @classmethod
+    def process_file_into_chunks(
+        cls,
+        file_path: str,
+        doc_id: str,
+        original_filename: str,
+        category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Enterprise high-efficiency document chunker.
+        Selects table-aware chunking for tabular files (Excel/CSV) or structure-aware chunking for text/PDF.
+        Enriches each chunk with metadata context and content hashing.
+        """
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        detected_category = category or cls.detect_category(original_filename)
+
+        # 1. Specialized tabular chunking for Excel and CSV
+        if ext in [".xlsx", ".xls", ".csv", ".tsv"]:
+            tabular_chunks = cls.process_tabular_file(
+                file_path=file_path,
+                doc_id=doc_id,
+                original_filename=original_filename,
+                category=detected_category
+            )
+            if tabular_chunks:
+                return tabular_chunks
+
+        # 2. General multi-format text extraction (PDF, DOCX, OCR, TXT, MD)
         pages = cls.extract_text(file_path)
         processed_chunks = []
         chunk_idx = 0
 
         for page_text, page_num in pages:
-            chunks = cls.chunk_text(
-                page_text,
+            clean_page_text = cls.normalize_text(page_text)
+            if not clean_page_text:
+                continue
+
+            chunks = cls.chunk_structured_text(
+                clean_page_text,
                 chunk_size=settings.CHUNKING_SIZE,
                 overlap=settings.CHUNKING_OVERLAP
             )
             for chunk in chunks:
+                if not chunk.strip():
+                    continue
+
                 chunk_idx += 1
                 chunk_id = f"{doc_id}_chunk_{chunk_idx}"
+
+                # Contextual Enrichment Header
+                contextual_content = f"[উৎস: {original_filename} | পৃষ্ঠা: {page_num} | ক্যাটাগরি: {detected_category}]\n{chunk}"
+                chash = hashlib.sha256(contextual_content.encode("utf-8")).hexdigest()[:16]
+
                 processed_chunks.append({
                     "id": chunk_id,
                     "doc_id": doc_id,
                     "filename": original_filename,
                     "page": page_num,
                     "chunk_index": chunk_idx,
-                    "content": chunk
+                    "content": contextual_content,
+                    "category": detected_category,
+                    "content_hash": chash
                 })
 
         return processed_chunks
