@@ -152,6 +152,13 @@
           <span>সিকিউরিটি ও কমপ্লায়েন্স</span>
         </button>
 
+        <button class="nav-btn" id="nav-backup-btn" onclick="switchTab('backup')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          <span>ব্যাকআপ ও রিস্টোর</span>
+        </button>
+
         <button class="nav-btn" id="nav-settings-btn" onclick="openSettingsModal()">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -826,6 +833,145 @@
         </div>
       </section>
 
+      <!-- View 8: Full Data, Settings, Chat & Files Backup & Restore -->
+      <section class="tab-view" id="view-backup">
+        <div class="content-scrollable">
+          
+          <div class="view-header">
+            <div>
+              <h2 class="animated-gradient-text">💾 ডেটা, চ্যাট ও সেটিংস সম্পূর্ণ ব্যাকআপ এবং রিস্টোর</h2>
+              <p>সংযুক্ত ফাইল, ডকুমেন্ট, ভেক্টর মেমোরি, চ্যাট হিস্ট্রি, অডিট লগ এবং সিস্টেম সেটিংসের সার্বিক ব্যাকআপ ও পুনরুদ্ধার ব্যবস্থাপনা</p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button class="btn-secondary" onclick="loadBackupDashboard()">🔄 রিফ্রেশ</button>
+            </div>
+          </div>
+
+          <!-- Backup Overview KPI Cards -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-archive" style="color:var(--cyan-glow);"></i> সংরক্ষিত ব্যাকআপ</div>
+              <div class="metric-val" id="backup-kpi-count">0</div>
+              <div class="metric-sub">সার্ভারে মোট স্ন্যাপশট সংখ্যা</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-hdd" style="color:var(--primary-color);"></i> মোট ব্যাকআপ আকার</div>
+              <div class="metric-val" id="backup-kpi-size">0 B</div>
+              <div class="metric-sub">সংকুচিত ZIP স্টোরেজ সাইজ</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-clock" style="color:#f59e0b);"></i> সর্বশেষ ব্যাকআপ</div>
+              <div class="metric-val" id="backup-kpi-last" style="font-size:1.05rem;">-</div>
+              <div class="metric-sub">সফল ব্যাকআপের সময়কাল</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-shield-check" style="color:var(--success-color);"></i> ব্যাকআপ স্ট্যাটাস</div>
+              <div class="metric-val" id="backup-kpi-status" style="font-size:0.95rem;"><span class="status-dot green"></span> প্রস্তুত</div>
+              <div class="metric-sub">সার্ভার রিস্টোর ও রিট্রিভাল সক্রিয়</div>
+            </div>
+          </div>
+
+          <!-- Two-Column Actions: Create Backup & Upload Restore -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top:20px;">
+            
+            <!-- Card 1: Create Full / Modular Backup -->
+            <div class="card-panel">
+              <div class="panel-header">
+                <h3>📦 নতুন সম্পূর্ণ ব্যাকআপ তৈরি করুন</h3>
+                <span class="badge-pill">ZIP Snapshot</span>
+              </div>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+                সার্ভারের বর্তমান ডেটা, সমস্ত চ্যাট হিস্ট্রি, ভেক্টর ডাটাবেস ও সিস্টেম কনফিগারেশন একত্রিত করে একটি একক আর্কাইভে সংরক্ষণ করুন।
+              </p>
+
+              <div class="form-group" style="margin-bottom:12px;">
+                <label>ব্যাকআপ নোট বা বিবরণ (ঐচ্ছিক)</label>
+                <input type="text" id="backup-note-input" class="text-input" placeholder="যেমন: আপগ্রেডের পূর্বের ব্যাকআপ অথবা মাসিক আর্কাইভ">
+              </div>
+
+              <div style="background:var(--bg-main); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); margin-bottom:16px;">
+                <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:8px;">অন্তর্ভুক্ত করার মডিউল নির্বাচন করুন:</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.82rem;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="chk-backup-docs" checked> ডকুমেন্টস ও এটাচড ফাইল
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="chk-backup-chats" checked> চ্যাট হিস্ট্রি ও সেশন ডাটাবেস
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="chk-backup-vector" checked> ক্রোমাডিবি ভেক্টর মেমোরি
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="chk-backup-settings" checked> সিস্টেম ও মডেল সেটিংস
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer; grid-column:span 2;">
+                    <input type="checkbox" id="chk-backup-audit" checked> সিকিউরিটি অডিট ও কমপ্লায়েন্স লগ
+                  </label>
+                </div>
+              </div>
+
+              <button class="btn-primary" id="btn-create-backup" onclick="createFullBackup()" style="width:100%; justify-content:center;">
+                📦 এখনই ব্যাকআপ তৈরি করুন
+              </button>
+            </div>
+
+            <!-- Card 2: Upload Backup & Restore -->
+            <div class="card-panel">
+              <div class="panel-header">
+                <h3>📤 পিসি থেকে ব্যাকআপ আপলোড ও রিস্টোর</h3>
+                <span class="badge-pill" style="border-color:var(--cyan-glow); color:var(--cyan-glow);">External Restore</span>
+              </div>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+                আপনার কম্পিউটার থেকে পূর্বে ডাউনলোড করা যে কোনো <code>.zip</code> ব্যাকআপ ফাইল আপলোড করে সিস্টেমের ডাটা ও সেটিংস পুনরুদ্ধার করুন।
+              </p>
+
+              <div class="backup-dropzone" onclick="document.getElementById('backup-upload-input').click()">
+                <div style="font-size:2.4rem; margin-bottom:8px;">📥</div>
+                <div style="font-weight:600; color:var(--text-primary); font-size:0.9rem;" id="backup-upload-label">
+                  এখানে ব্যাকআপ (.zip) ফাইল ড্র্যাগ করুন অথবা ক্লিক করে নির্বাচন করুন
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                  সর্বোচ্চ অনুমোদিত ব্যাকআপ সাইজ: ১ জিবি
+                </div>
+                <input type="file" id="backup-upload-input" accept=".zip" style="display:none;" onchange="handleBackupUpload(event)">
+              </div>
+
+              <div style="margin-top:14px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;">
+                ⚠️ <strong>সতর্কতা:</strong> রিস্টোর প্রক্রিয়া চলাকালে ভেক্টর মেমোরি ও চ্যাট ডাটাবেস পুনঃসংযোগ পাবে। কোনো ঝুঁকি এড়াতে রিস্টোরের আগে স্বয়ংক্রিয় সেফটি স্ন্যাপশট সংরক্ষিত হবে।
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Server Backups List Table -->
+          <div class="card-panel" style="margin-top:20px;">
+            <div class="panel-header">
+              <h3>📦 সার্ভারে সংরক্ষিত ব্যাকআপ তালিকা (Server Snapshots)</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">ডাউনলোড, রিস্টোর বা অপসারণ করুন</span>
+            </div>
+
+            <div class="table-responsive" style="margin-top:12px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ব্যাকআপ ফাইল ও বিবরণ</th>
+                    <th>ফাইলের আকার</th>
+                    <th>তৈরির তারিখ ও সময়</th>
+                    <th>অন্তর্ভুক্ত মডিউল</th>
+                    <th>ভার্সন</th>
+                    <th style="text-align:right;">অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody id="backups-table-tbody">
+                  <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </main>
 
     <!-- Document Chunk Inspector Modal -->
@@ -931,12 +1077,48 @@
 
         <div id="test-connection-badge" class="test-res-badge"></div>
 
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-          <button class="btn-secondary" id="btn-test-conn" onclick="testConnection()">
-            সার্ভার টেস্ট
+        <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
+          <button type="button" class="btn-secondary" style="border-color:var(--cyan-glow); color:var(--cyan-glow); font-size:0.82rem;" onclick="closeSettingsModal(); switchTab('backup');">
+            💾 সম্পূর্ণ ব্যাকআপ ও রিস্টোর
           </button>
-          <button class="btn-primary" onclick="saveSettings()">
-            সেটিংস সেভ করুন
+          <div style="display:flex; gap:10px;">
+            <button class="btn-secondary" id="btn-test-conn" onclick="testConnection()">
+              সার্ভার টেস্ট
+            </button>
+            <button class="btn-primary" onclick="saveSettings()">
+              সেটিংস সেভ করুন
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restore Confirmation Modal -->
+    <div class="modal-backdrop" id="restore-modal">
+      <div class="modal-window" style="max-width: 540px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">⚠️</span>
+            <h3>সিস্টেম রিস্টোর নিশ্চিতকরণ</h3>
+          </div>
+          <button class="close-modal-btn" onclick="closeRestoreModal()">&times;</button>
+        </div>
+        <div style="margin-top:12px;">
+          <p style="font-size:0.88rem; color:var(--text-primary); line-height:1.5;">
+            আপনি কি নিশ্চিত যে নিচের ব্যাকআপ থেকে পুরো সিস্টেমটি রিস্টোর করতে চান? এটি বর্তমান চ্যাট, সেটিংস এবং ফাইলগুলো আপডেট করবে।
+          </p>
+          <div style="margin:12px 0; padding:12px 14px; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.3); border-radius:var(--radius-sm);">
+            <div style="font-weight:700; color:#ef4444; font-size:0.85rem;" id="restore-target-name">-</div>
+            <div id="restore-target-meta" style="margin-top:8px;"></div>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+            💡 <em>দুর্ঘটনা রোধে বর্তমান ডাটার একটি স্বয়ংক্রিয় সেফটি স্ন্যাপশট (Pre-restore Safety Snapshot) তৈরি করে রাখা হবে।</em>
+          </p>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn-secondary" onclick="closeRestoreModal()">বাতিল</button>
+          <button class="btn-primary" id="btn-confirm-restore" style="background:#ef4444; border-color:#dc2626;" onclick="executeRestore()">
+            ⚠️ নিশ্চিত রিস্টোর করুন
           </button>
         </div>
       </div>
@@ -1029,6 +1211,7 @@
   <script src="js/memory_manager.js"></script>
   <script src="js/mcp_manager.js"></script>
   <script src="js/security_manager.js"></script>
+  <script src="js/backup_manager.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/app.js"></script>
 </body>

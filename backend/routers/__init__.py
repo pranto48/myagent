@@ -15,4 +15,5 @@ from .dashboard import router as dashboard_router
 from .models_mgmt import router as models_mgmt_router
 from .mcp_router import router as mcp_router
 from .security_router import router as security_router
+from .backup import router as backup_router
 

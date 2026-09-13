@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     DOCUMENTS_DIR: str = "/app/data/documents"
     CHROMA_DIR: str = "/app/data/chroma_db"
     UPLOADS_DIR: str = "/app/data/uploads"
+    BACKUPS_DIR: str = "/app/data/backups"
     SESSION_DB_PATH: str = "/app/data/chat_history.db"
     AUDIT_DB_PATH: str = "/app/data/security_audit.db"
 
@@ -63,12 +64,14 @@ class Settings(BaseSettings):
             self.DOCUMENTS_DIR = "./data/documents"
             self.CHROMA_DIR = "./data/chroma_db"
             self.UPLOADS_DIR = "./data/uploads"
+            self.BACKUPS_DIR = "./data/backups"
             self.SESSION_DB_PATH = "./data/chat_history.db"
             self.AUDIT_DB_PATH = "./data/security_audit.db"
 
         os.makedirs(self.DOCUMENTS_DIR, exist_ok=True)
         os.makedirs(self.CHROMA_DIR, exist_ok=True)
         os.makedirs(self.UPLOADS_DIR, exist_ok=True)
+        os.makedirs(self.BACKUPS_DIR, exist_ok=True)
 
 settings = Settings()
 

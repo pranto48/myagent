@@ -25,7 +25,8 @@ from routers import (
     dashboard_router,
     models_mgmt_router,
     mcp_router,
-    security_router
+    security_router,
+    backup_router
 )
 from models.schemas import SystemStatusResponse
 
@@ -87,6 +88,7 @@ app.include_router(dashboard_router)
 app.include_router(models_mgmt_router)
 app.include_router(mcp_router)
 app.include_router(security_router)
+app.include_router(backup_router)
 app.include_router(sessions_router)
 app.include_router(chat_router)
 app.include_router(documents_router)

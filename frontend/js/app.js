@@ -31,9 +31,9 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all 7 views
+// Tab Switching across all 8 views
 function switchTab(tabName) {
-  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security'];
+  const tabs = ['chat', 'dashboard', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -84,6 +84,10 @@ function switchTab(tabName) {
     topbarTitle.innerText = 'এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স';
     topbarDesc.innerText = 'AES-256 এনক্রিপশন, PII/DLP রিডাকশন, ফায়ারওয়াল ও অডিট ট্রেইল';
     if (typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
+  } else if (tabName === 'backup') {
+    topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
+    topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
+    if (typeof loadBackupDashboard === 'function') loadBackupDashboard();
   }
 }
 
