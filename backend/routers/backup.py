@@ -177,8 +177,8 @@ async def create_backup(req: BackupCreateRequest, admin_user: dict = Depends(get
             action="BACKUP_CREATED",
             resource="SystemBackup",
             username=admin_user.get("sub", "admin"),
-            role=admin_user.get("role", "admin"),
-            details=f"Backup created: {zip_filename} ({format_bytes(file_size)}) in {duration}s",
+            user_role=admin_user.get("role", "admin"),
+            details={"message": f"Backup created: {zip_filename} ({format_bytes(file_size)}) in {duration}s"},
             severity="INFO"
         )
 
@@ -285,8 +285,8 @@ async def delete_backup(filename: str, admin_user: dict = Depends(get_current_ad
             action="BACKUP_DELETED",
             resource="SystemBackup",
             username=admin_user.get("sub", "admin"),
-            role=admin_user.get("role", "admin"),
-            details=f"Backup deleted: {filename}",
+            user_role=admin_user.get("role", "admin"),
+            details={"message": f"Backup deleted: {filename}"},
             severity="WARNING"
         )
         return {"success": True, "message": f"ব্যাকআপ ফাইল '{filename}' সফলভাবে মুছে ফেলা হয়েছে।"}
@@ -458,8 +458,8 @@ async def restore_from_server(req: RestoreRequest, admin_user: dict = Depends(ge
         action="BACKUP_RESTORED",
         resource="SystemBackup",
         username=admin_user.get("sub", "admin"),
-        role=admin_user.get("role", "admin"),
-        details=f"Backup restored: {req.filename} in {result.get('duration_seconds')}s",
+        user_role=admin_user.get("role", "admin"),
+        details={"message": f"Backup restored: {req.filename} in {result.get('duration_seconds')}s"},
         severity="WARNING"
     )
 
@@ -493,8 +493,8 @@ async def upload_and_restore(file: UploadFile = File(...), admin_user: dict = De
             action="BACKUP_UPLOAD_RESTORED",
             resource="SystemBackup",
             username=admin_user.get("sub", "admin"),
-            role=admin_user.get("role", "admin"),
-            details=f"Client uploaded and restored backup: {file.filename}",
+            user_role=admin_user.get("role", "admin"),
+            details={"message": f"Client uploaded and restored backup: {file.filename}"},
             severity="WARNING"
         )
 
