@@ -196,29 +196,52 @@ function renderAttachmentShelf() {
     return;
   }
 
-  shelf.style.display = 'flex';
-  shelf.innerHTML = attachedChatFiles.map(item => {
-    const typeClass = getFileTypeClass(item.name);
-    const icon = getFileBadgeIcon(item.name);
-    
-    let visualEl = '';
-    if (item.isImage && item.previewUrl) {
-      visualEl = `<img src="${item.previewUrl}" alt="${escapeHtml(item.name)}" class="attachment-thumbnail">`;
-    } else {
-      visualEl = `<div class="attachment-icon-badge ${typeClass}">${icon}</div>`;
-    }
+  // Preserve user toggle state if already checked
+  const prevChecked = document.getElementById('chat-save-memory-checkbox')?.checked || false;
 
-    return `
-      <div class="attachment-chip" id="chip-${item.id}">
-        ${visualEl}
-        <div class="attachment-details">
-          <span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
-          <span class="attachment-size">${formatFileSize(item.size)}</span>
-        </div>
-        <button type="button" class="attachment-remove-btn" title="মুছে ফেলুন" onclick="removeAttachedFile('${item.id}')">&times;</button>
-      </div>
-    `;
-  }).join('');
+  shelf.style.display = 'flex';
+  shelf.style.flexDirection = 'column';
+
+  const headerHtml = `
+    <div class="attachment-shelf-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+      <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary, #e2e8f0); display: flex; align-items: center; gap: 6px;">
+        📎 সংযুক্ত ফাইল (${attachedChatFiles.length}টি)
+      </span>
+      <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; cursor: pointer; color: #c7d2fe; background: rgba(99, 102, 241, 0.15); padding: 4px 10px; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.35); transition: all 0.2s ease;" title="ইউজার/অ্যাডমিন সিদ্ধান্ত: চেক করলে এই ফাইলগুলো স্থায়ীভাবে কোম্পানির ভেক্টর মেমোরিতে সেভ হবে">
+        <input type="checkbox" id="chat-save-memory-checkbox" ${prevChecked ? 'checked' : ''} style="cursor: pointer; accent-color: #6366f1;">
+        <span style="font-weight: 600;">💾 স্থায়ী মেমোরিতে সংরক্ষণ করুন</span>
+      </label>
+    </div>
+  `;
+
+  const chipsHtml = `
+    <div class="attachment-chips-row" style="display: flex; flex-wrap: wrap; gap: 8px; width: 100%;">
+      ${attachedChatFiles.map(item => {
+        const typeClass = getFileTypeClass(item.name);
+        const icon = getFileBadgeIcon(item.name);
+        
+        let visualEl = '';
+        if (item.isImage && item.previewUrl) {
+          visualEl = `<img src="${item.previewUrl}" alt="${escapeHtml(item.name)}" class="attachment-thumbnail">`;
+        } else {
+          visualEl = `<div class="attachment-icon-badge ${typeClass}">${icon}</div>`;
+        }
+
+        return `
+          <div class="attachment-chip" id="chip-${item.id}">
+            ${visualEl}
+            <div class="attachment-details">
+              <span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+              <span class="attachment-size">${formatFileSize(item.size)}</span>
+            </div>
+            <button type="button" class="attachment-remove-btn" title="মুছে ফেলুন" onclick="removeAttachedFile('${item.id}')">&times;</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  shelf.innerHTML = headerHtml + chipsHtml;
 }
 
 function setupChatDragDropAndPaste() {
@@ -661,12 +684,17 @@ async function sendMessage() {
 
   // Step 1: Upload attached files to backend if any
   if (hasAttachments) {
-    showUploadProgress(`${attachedChatFiles.length}টি ফাইল আপলোড ও মেমোরি ইনডেক্সিং হচ্ছে...`);
+    const saveToMemoryCheckbox = document.getElementById('chat-save-memory-checkbox');
+    const shouldSaveToMemory = saveToMemoryCheckbox ? saveToMemoryCheckbox.checked : false;
+
+    const actionText = shouldSaveToMemory ? 'আপলোড ও স্থায়ী মেমোরিতে ইনডেক্সিং হচ্ছে...' : 'আপলোড ও চ্যাট বিশ্লেষণের জন্য প্রস্তুত হচ্ছে...';
+    showUploadProgress(`${attachedChatFiles.length}টি ফাইল ${actionText}`);
     try {
       const formData = new FormData();
       for (const item of attachedChatFiles) {
         formData.append('files', item.file, item.name);
       }
+      formData.append('save_to_memory', shouldSaveToMemory ? 'true' : 'false');
 
       const uploadHeaders = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
       delete uploadHeaders['Content-Type'];
@@ -687,8 +715,11 @@ async function sendMessage() {
 
       attachedFilesForDisplay = serverAttachedFiles.map(f => ({
         name: f.filename,
+        filename: f.filename,
         size: f.size_bytes || f.size || 0,
-        extension: f.extension || f.filename.split('.').pop()
+        extension: f.extension || f.filename.split('.').pop(),
+        doc_id: f.doc_id,
+        saved_to_memory: f.saved_to_memory === true
       }));
 
       // Free local object URLs and clear shelf
@@ -698,7 +729,10 @@ async function sendMessage() {
       attachedChatFiles = [];
       renderAttachmentShelf();
 
-      showToast(`${serverAttachedFiles.length}টি ফাইল সফলভাবে যুক্ত ও প্রসেস করা হয়েছে`, 'success');
+      const successToast = shouldSaveToMemory 
+        ? `${serverAttachedFiles.length}টি ফাইল সফলভাবে যুক্ত ও স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে`
+        : `${serverAttachedFiles.length}টি ফাইল চ্যাট বিশ্লেষণের জন্য প্রস্তুত করা হয়েছে`;
+      showToast(successToast, 'success');
 
     } catch (uploadErr) {
       showToast(`ফাইল প্রসেসিং ত্রুটি: ${uploadErr.message}`, 'error');
@@ -847,13 +881,22 @@ function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
   if (attachedFiles && attachedFiles.length > 0) {
     attachmentHtml = `
       <div class="user-attached-files-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
-        ${attachedFiles.map(f => `
-          <div class="user-attached-file-chip">
-            <span>${getFileBadgeIcon(f.name || f.filename)}</span>
-            <span>${escapeHtml(f.name || f.filename)}</span>
-            <span style="opacity: 0.8; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
-          </div>
-        `).join('')}
+        ${attachedFiles.map(f => {
+          const docId = f.doc_id || '';
+          const fname = f.name || f.filename || '';
+          const isSaved = f.saved_to_memory === true;
+          return `
+            <div class="user-attached-file-chip" data-doc-id="${escapeHtml(docId)}">
+              <span>${getFileBadgeIcon(fname)}</span>
+              <span>${escapeHtml(fname)}</span>
+              <span style="opacity: 0.75; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
+              ${isSaved 
+                ? `<span class="chip-memory-badge saved" title="এই ফাইলটি কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত">✅ মেমোরিতে সংরক্ষিত</span>`
+                : `<button type="button" class="chip-save-memory-btn" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)" title="ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে">💾 মেমোরিতে সেভ করুন</button>`
+              }
+            </div>
+          `;
+        }).join('')}
       </div>
     `;
   }
@@ -1219,6 +1262,38 @@ async function saveMsgToAgentMemory(btn) {
     btn.innerHTML = originalHtml;
     btn.disabled = false;
     showToast('মেমোরিতে সেভ ব্যর্থ হয়েছে', 'error');
+  }
+}
+
+async function saveAttachedFileToMemory(docId, filename, btnEl) {
+  if (!docId || !filename) return;
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerText = 'সংরক্ষণ হচ্ছে...';
+  }
+  try {
+    const res = await fetch('/api/chat/save-attachment-to-memory', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doc_id: docId, filename: filename })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'মেমোরিতে সংরক্ষণ ব্যর্থ হয়েছে');
+
+    showToast(data.message || `'${filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!`, 'success');
+    if (btnEl) {
+      const badge = document.createElement('span');
+      badge.className = 'chip-memory-badge saved';
+      badge.title = 'কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত';
+      badge.innerText = '✅ মেমোরিতে সংরক্ষিত';
+      btnEl.replaceWith(badge);
+    }
+  } catch (err) {
+    showToast(`মেমোরি সংরক্ষণ ত্রুটি: ${err.message}`, 'error');
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerText = '💾 মেমোরিতে সেভ করুন';
+    }
   }
 }
 

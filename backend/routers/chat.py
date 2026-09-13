@@ -5,6 +5,7 @@ import uuid
 import shutil
 from pathlib import Path
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
@@ -25,22 +26,70 @@ def get_agent() -> CompanyAIAgent:
         _agent_instance = CompanyAIAgent()
     return _agent_instance
 
+class SaveAttachmentRequest(BaseModel):
+    doc_id: str
+    filename: str
+
+@router.post("/save-attachment-to-memory")
+async def save_attachment_to_memory(
+    request: SaveAttachmentRequest,
+    current_user: dict = Depends(get_optional_current_user)
+):
+    """
+    Explicitly indexes and saves an attached chat file into the permanent company vector memory
+    when approved by user or admin.
+    """
+    store = VectorMemoryStore()
+    doc_id = request.doc_id
+    safe_filename = Path(request.filename).name
+
+    candidate_path = os.path.join(settings.UPLOADS_DIR, f"{doc_id}_{safe_filename}")
+    if not os.path.exists(candidate_path):
+        candidate_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+
+    if not os.path.exists(candidate_path):
+        raise HTTPException(status_code=404, detail="সংযুক্ত ফাইলটি সিস্টেমে খুঁজে পাওয়া যায়নি।")
+
+    # Ensure document is copied into documents directory for permanence
+    target_doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+    if candidate_path != target_doc_path:
+        shutil.copyfile(candidate_path, target_doc_path)
+
+    try:
+        chunks = DocumentProcessor.process_file_into_chunks(
+            file_path=candidate_path,
+            doc_id=doc_id,
+            original_filename=safe_filename
+        )
+        stored_count = store.add_chunks(chunks)
+        return {
+            "success": True,
+            "message": f"ফাইল '{safe_filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে ({stored_count}টি চাঙ্ক ইনডেক্সড)।",
+            "doc_id": doc_id,
+            "chunks_indexed": stored_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"মেমোরিতে সংরক্ষণ করতে সমস্যা: {str(e)}")
+
 @router.post("/upload")
 async def upload_chat_files(
     files: List[UploadFile] = File(...),
     session_id: Optional[str] = Form(None),
+    save_to_memory: bool = Form(False),
     current_user: dict = Depends(get_optional_current_user)
 ):
     """
     Directly uploads and processes files (Excel, Photos/Images with OCR, PDF, Word, CSV)
     from the Gemini/ChatGPT-style chat bar.
-    Indexes them into vector memory and returns structured summaries and table/OCR previews.
+    Only saves to permanent company memory if user or admin explicitly requests it (save_to_memory=True).
+    Otherwise, processes for immediate session context and chat analysis.
     """
     store = VectorMemoryStore()
     processed_results = []
-    
+
     os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
-    os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
+    if save_to_memory:
+        os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
 
     for file in files:
         if not file.filename:
@@ -49,41 +98,43 @@ async def upload_chat_files(
         safe_filename = Path(file.filename).name
         doc_id = f"chat_{uuid.uuid4().hex[:10]}"
         target_path = os.path.join(settings.UPLOADS_DIR, f"{doc_id}_{safe_filename}")
-        doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
 
-        # Save to uploads and documents directory
+        # Save to uploads directory
         try:
             with open(target_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
-            if target_path != doc_path:
-                shutil.copyfile(target_path, doc_path)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"ফাইল সংরক্ষণ করতে সমস্যা: {str(e)}")
 
-        # Process and index chunks into vector memory
         stored_count = 0
-        try:
-            chunks = DocumentProcessor.process_file_into_chunks(
-                file_path=target_path,
-                doc_id=doc_id,
-                original_filename=safe_filename
-            )
-            stored_count = store.add_chunks(chunks)
-        except Exception as chunk_err:
-            pass
+        # Only save to permanent vector memory if user/admin explicitly decided so
+        if save_to_memory:
+            doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+            try:
+                shutil.copyfile(target_path, doc_path)
+                chunks = DocumentProcessor.process_file_into_chunks(
+                    file_path=target_path,
+                    doc_id=doc_id,
+                    original_filename=safe_filename
+                )
+                stored_count = store.add_chunks(chunks)
+            except Exception as chunk_err:
+                pass
 
-        # Generate rich instant summary, markdown table, or OCR extraction
+        # Generate rich instant summary, markdown table, or OCR extraction for chat analysis
         file_summary = DocumentProcessor.generate_file_quick_summary(
             file_path=target_path,
             filename=safe_filename
         )
         file_summary["doc_id"] = doc_id
+        file_summary["saved_to_memory"] = save_to_memory
         file_summary["chunks_indexed"] = stored_count
         processed_results.append(file_summary)
 
+    action_msg = "এবং কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে" if save_to_memory else "এবং চ্যাট বিশ্লেষণের জন্য প্রস্তুত করা হয়েছে"
     return {
         "success": True,
-        "message": f"সফলভাবে {len(processed_results)}টি ফাইল প্রসেস ও সংযুক্ত করা হয়েছে।",
+        "message": f"সফলভাবে {len(processed_results)}টি ফাইল প্রসেস {action_msg}।",
         "files": processed_results
     }
 
