@@ -37,10 +37,10 @@ async function runLiveLatencyTest() {
   const customUrl = document.getElementById('hub-server-url').value.trim();
 
   btn.disabled = true;
-  btn.innerText = 'পিং টেস্ট চলছে...';
+  btn.innerText = typeof t === 'function' ? t('models_pinging', 'পিং টেস্ট চলছে...') : 'পিং টেস্ট চলছে...';
   resultBox.style.display = 'block';
   resultBox.className = 'ping-indicator-box loading';
-  resultBox.innerHTML = '⚡ এলএলএম সার্ভারের রেসপন্স টাইম পরিমাপ করা হচ্ছে...';
+  resultBox.innerHTML = typeof t === 'function' ? t('models_measuring', '⚡ এলএলএম সার্ভারের রেসপন্স টাইম পরিমাপ করা হচ্ছে...') : '⚡ এলএলএম সার্ভারের রেসপন্স টাইম পরিমাপ করা হচ্ছে...';
 
   try {
     const res = await fetch('/api/models/ping', {
@@ -53,10 +53,11 @@ async function runLiveLatencyTest() {
     if (data.success) {
       const speedClass = data.latency_ms < 100 ? 'fast' : (data.latency_ms < 500 ? 'normal' : 'slow');
       resultBox.className = `ping-indicator-box ${speedClass}`;
+      const latLabel = typeof t === 'function' ? t('models_latency_label', 'রেসপন্স লেটেন্সি') : 'রেসপন্স লেটেন্সি';
       resultBox.innerHTML = `
-        <div style="font-size: 1.1rem; font-weight: 700;">⚡ রেসপন্স লেটেন্সি: ${data.latency_ms} ms</div>
+        <div style="font-size: 1.1rem; font-weight: 700;">⚡ ${latLabel}: ${data.latency_ms} ms</div>
         <div style="font-size: 0.76rem; opacity: 0.9; margin-top: 4px;">
-          স্ট্যাটাস কোড: ${data.status_code} • উপলব্ধ মডেলের সংখ্যা: ${data.models_count}টি (${(data.models || []).slice(0, 4).join(', ')})
+          HTTP ${data.status_code} • ${(data.models || []).slice(0, 4).join(', ')}
         </div>
       `;
       showToast(`সার্ভার পিং সফল: ${data.latency_ms} ms`, 'success');
@@ -75,7 +76,7 @@ async function runLiveLatencyTest() {
     resultBox.innerHTML = `❌ নেটওয়ার্ক ত্রুটি: ${err.message}`;
   } finally {
     btn.disabled = false;
-    btn.innerText = 'লাইভ পিং টেস্ট চালান';
+    btn.innerText = typeof t === 'function' ? t('models_btn_run_ping', 'লাইভ পিং টেস্ট চালান') : 'লাইভ পিং টেস্ট চালান';
   }
 }
 

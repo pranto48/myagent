@@ -47,11 +47,11 @@ function renderMcpServers(servers) {
     container.innerHTML = `
       <div style="grid-column: 1/-1; padding: 40px 20px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed var(--border-color);">
         <div style="font-size: 2rem; margin-bottom: 8px;">🔌</div>
-        <div style="font-weight: 600; color: white; margin-bottom: 4px;">কোনো MCP সার্ভার নিবন্ধিত নেই</div>
+        <div style="font-weight: 600; color: white; margin-bottom: 4px;">${typeof t === 'function' ? t('mcp_no_servers', 'কোনো MCP সার্ভার নিবন্ধিত নেই') : 'কোনো MCP সার্ভার নিবন্ধিত নেই'}</div>
         <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-          নিচের ১-ক্লিক ওপেন সোর্স টেমপ্লেট ব্যবহার করে অথবা নতুন সার্ভার যুক্ত করুন।
+          ${typeof t === 'function' ? t('mcp_servers_desc', 'নিচের ১-ক্লিক ওপেন সোর্স টেমপ্লেট ব্যবহার করে অথবা নতুন সার্ভার যুক্ত করুন।') : 'নিচের ১-ক্লিক ওপেন সোর্স টেমপ্লেট ব্যবহার করে অথবা নতুন সার্ভার যুক্ত করুন।'}
         </div>
-        <button class="btn-primary" onclick="openAddMcpModal()">+ নতুন MCP সার্ভার যোগ করুন</button>
+        <button class="btn-primary" onclick="openAddMcpModal()">+ ${typeof t === 'function' ? t('mcp_btn_add_custom', 'নতুন MCP সার্ভার যোগ করুন') : 'নতুন MCP সার্ভার যোগ করুন'}</button>
       </div>
     `;
     return;
@@ -61,8 +61,12 @@ function renderMcpServers(servers) {
     const isConn = s.status === 'connected';
     const isErr = s.status === 'error';
     const statusColor = isConn ? 'var(--emerald-green)' : (isErr ? 'var(--rose-red)' : 'var(--amber-yellow)');
-    const statusText = isConn ? 'সংযুক্ত (Connected)' : (isErr ? 'সংযোগ বিচ্ছিন্ন' : 'প্রস্তুত (Ready)');
-    const pingBadge = s.last_ping_ms >= 0 ? `${s.last_ping_ms} ms` : 'টেস্ট হয়নি';
+    const statusText = isConn 
+      ? (typeof t === 'function' ? t('mcp_status_connected', 'সংযুক্ত (Connected)') : 'সংযুক্ত (Connected)') 
+      : (isErr 
+        ? (typeof t === 'function' ? t('mcp_status_disconnected', 'সংযোগ বিচ্ছিন্ন') : 'সংযোগ বিচ্ছিন্ন') 
+        : (typeof t === 'function' ? t('mcp_status_ready', 'প্রস্তুত (Ready)') : 'প্রস্তুত (Ready)'));
+    const pingBadge = s.last_ping_ms >= 0 ? `${s.last_ping_ms} ms` : 'N/A';
     const toolCount = (s.tools_cache || []).length;
 
     return `
@@ -93,9 +97,9 @@ function renderMcpServers(servers) {
             : `<div class="mcp-code-preview">CMD: ${escapeHtml(s.command)} ${(s.args || []).join(' ')}</div>`
           }
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:0.8rem;">
-            <span style="color:var(--text-muted);">ডিসকভার্ড টুলস:</span>
+            <span style="color:var(--text-muted);">${typeof t === 'function' ? t('mcp_discovered_tools', 'ডিসকভার্ড টুলস:') : 'ডিসকভার্ড টুলস:'}</span>
             <span style="color:var(--cyan-glow); font-weight:600; cursor:pointer;" onclick="viewMcpTools('${s.id}')">
-              🛠️ ${toolCount}টি টুলস দেখুন
+              🛠️ ${toolCount}${typeof t === 'function' ? t('mcp_view_tools_btn', 'টি টুলস দেখুন') : 'টি টুলস দেখুন'}
             </span>
           </div>
         </div>
@@ -107,8 +111,8 @@ function renderMcpServers(servers) {
           <button class="btn-sm-action" onclick="viewMcpTools('${s.id}')" title="টুলস স্কিমা দেখুন">
             🔍 টুলস
           </button>
-          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteMcpServer('${s.id}')" title="মুছে ফেলুন">
-            🗑️ ডিলিট
+          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteMcpServer('${s.id}')" title="${typeof t === 'function' ? t('btn_delete', 'মুছে ফেলুন') : 'মুছে ফেলুন'}">
+            🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}
           </button>
         </div>
       </div>
@@ -349,7 +353,7 @@ async function loadAllToolsRegistry() {
             <div style="font-weight:700; font-family:monospace; color:var(--cyan-glow); font-size:0.92rem;">
               ${escapeHtml(t.name)}
             </div>
-            <span class="badge-tag" style="background:rgba(16,185,129,0.15); color:#6ee7b7;">সক্রিয়</span>
+            <span class="badge-tag" style="background:rgba(16,185,129,0.15); color:#6ee7b7;">${typeof t === 'function' ? t('status_online', 'সক্রিয়') : 'সক্রিয়'}</span>
           </div>
           <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.5;">
             ${escapeHtml(t.description)}

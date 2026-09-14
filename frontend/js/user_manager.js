@@ -17,7 +17,7 @@ async function loadUsersList() {
     if (res.ok) {
       const users = await res.json();
       if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">কোনো ইউজার পাওয়া যায়নি।</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">${typeof t === 'function' ? t('users_no_data', 'কোনো ইউজার পাওয়া যায়নি।') : 'কোনো ইউজার পাওয়া যায়নি।'}</td></tr>`;
         return;
       }
 
@@ -29,8 +29,8 @@ async function loadUsersList() {
           <td style="color: var(--text-muted); font-size: 0.75rem;">${u.created_at}</td>
           <td>
             ${u.username === 'admin' 
-              ? '<span style="font-size:0.75rem; color:var(--text-muted);">সিস্টেম অ্যাডমিন</span>' 
-              : `<button class="btn-sm-danger" onclick="deleteCompanyUser('${u.id}', '${escapeHtml(u.username)}')">মুছে ফেলুন</button>`
+              ? `<span style="font-size:0.75rem; color:var(--text-muted);">${typeof t === 'function' ? t('users_sys_admin', 'সিস্টেম অ্যাডমিন') : 'সিস্টেম অ্যাডমিন'}</span>` 
+              : `<button class="btn-sm-danger" onclick="deleteCompanyUser('${u.id}', '${escapeHtml(u.username)}')">${typeof t === 'function' ? t('btn_delete', 'মুছে ফেলুন') : 'মুছে ফেলুন'}</button>`
             }
           </td>
         </tr>

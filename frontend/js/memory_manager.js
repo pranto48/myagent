@@ -121,7 +121,7 @@ function renderFilteredDocs() {
   }
 
   if (filtered.length === 0) {
-    listElem.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:30px;">কোনো ফাইল পাওয়া যায়নি।</td></tr>`;
+    listElem.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:30px;">${typeof t === 'function' ? t('kb_no_docs', 'কোনো ফাইল পাওয়া যায়নি।') : 'কোনো ফাইল পাওয়া যায়নি।'}</td></tr>`;
     return;
   }
 
@@ -141,15 +141,15 @@ function renderFilteredDocs() {
             <span>${escapeHtml(doc.filename)}</span>
           </div>
         </td>
-        <td>${doc.total_chunks || 1} চাঙ্কস</td>
+        <td>${doc.total_chunks || 1} ${typeof t === 'function' ? t('chunks_count_suffix', 'চাঙ্কস') : 'চাঙ্কস'}</td>
         <td>${formatBytes(doc.size_bytes || 0)}</td>
         <td style="color:var(--text-muted); font-size:0.8rem;">${doc.uploaded_at || 'সম্প্রতি'}</td>
         <td style="text-align:right;">
           <button class="btn-sm-action" onclick="inspectDocumentChunks('${doc.id}', '${escapeHtml(doc.filename)}')">
-            চাঙ্কস
+            ${typeof t === 'function' ? t('th_chunks', 'চাঙ্কস') : 'চাঙ্কস'}
           </button>
           <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteDocument('${doc.id}', '${escapeHtml(doc.filename)}')">
-            🗑️ ডিলিট
+            🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}
           </button>
         </td>
       </tr>
@@ -212,10 +212,14 @@ async function loadChunksList(page = 0) {
     const chunks = data.chunks || [];
     const total = data.total || 0;
 
-    if (countBadge) countBadge.innerText = `${total}টি চাঙ্ক`;
+    if (countBadge) {
+      const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+      const suffix = typeof t === 'function' ? t('chunks_count_suffix', 'টি চাঙ্ক') : 'টি চাঙ্ক';
+      countBadge.innerText = `${total.toLocaleString(isEn ? 'en-US' : 'bn-BD')}${suffix.startsWith(' ') ? '' : ' '}${suffix}`;
+    }
 
     if (chunks.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">কোনো মেমোরি চাঙ্ক পাওয়া যায়নি।</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">${typeof t === 'function' ? t('kb_no_chunks', 'কোনো মেমোরি চাঙ্ক পাওয়া যায়নি।') : 'কোনো মেমোরি চাঙ্ক পাওয়া যায়নি।'}</td></tr>`;
       return;
     }
 
@@ -223,18 +227,18 @@ async function loadChunksList(page = 0) {
       <tr>
         <td style="font-family:monospace; font-size:0.75rem; color:var(--cyan-glow);">${escapeHtml(c.id)}</td>
         <td style="font-weight:600; font-size:0.85rem; color:white;">${escapeHtml(c.source)}</td>
-        <td><span class="badge-tag">পৃষ্ঠা ${c.page || 1}</span></td>
+        <td><span class="badge-tag">${typeof t === 'function' ? t('th_page', 'পৃষ্ঠা') : 'পৃষ্ঠা'} ${c.page || 1}</span></td>
         <td style="font-size:0.82rem; color:var(--text-muted); max-width:420px;">
           <div style="max-height:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
             ${escapeHtml(c.content)}
           </div>
         </td>
         <td style="text-align:right; white-space:nowrap;">
-          <button class="btn-sm-action" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4);" onclick="openEditChunkModal('${c.id}')" title="ভুল তথ্য সংশোধন / এডিট">
-            ✏️ এডিট
+          <button class="btn-sm-action" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4);" onclick="openEditChunkModal('${c.id}')" title="${typeof t === 'function' ? t('btn_edit', 'এডিট') : 'এডিট'}">
+            ✏️ ${typeof t === 'function' ? t('btn_edit', 'এডিট') : 'এডিট'}
           </button>
-          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteChunk('${c.id}')" title="চাঙ্ক মুছে ফেলুন">
-            🗑️ ডিলিট
+          <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteChunk('${c.id}')" title="${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}">
+            🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}
           </button>
         </td>
       </tr>
@@ -359,10 +363,10 @@ async function inspectDocumentChunks(docId, filename) {
       body.innerHTML = chunks.map((c, idx) => `
         <div class="chunk-card">
           <div class="chunk-header">
-            <span>চাঙ্ক #${idx + 1} (${escapeHtml(c.chunk_id)})</span>
+            <span>${typeof t === 'function' ? t('th_chunk_id', 'চাঙ্ক') : 'চাঙ্ক'} #${idx + 1} (${escapeHtml(c.chunk_id)})</span>
             <div>
-              <button class="btn-sm-action" style="color:var(--cyan-glow);" onclick="closeChunkModal(); openEditChunkModal('${c.chunk_id}')">✏️ এডিট</button>
-              <button class="btn-sm-action" style="color:var(--rose-red);" onclick="deleteChunk('${c.chunk_id}')">🗑️ ডিলিট</button>
+              <button class="btn-sm-action" style="color:var(--cyan-glow);" onclick="closeChunkModal(); openEditChunkModal('${c.chunk_id}')">✏️ ${typeof t === 'function' ? t('btn_edit', 'এডিট') : 'এডিট'}</button>
+              <button class="btn-sm-action" style="color:var(--rose-red);" onclick="deleteChunk('${c.chunk_id}')">🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}</button>
             </div>
           </div>
           <div class="chunk-content">${escapeHtml(c.content)}</div>

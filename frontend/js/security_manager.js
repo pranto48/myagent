@@ -39,10 +39,10 @@ async function loadSecurityDashboard() {
         if (postureEl) {
             if (data.overall_status === 'SECURE') {
                 postureEl.className = 'status-badge online';
-                postureEl.innerHTML = '<span class="status-dot green"></span> সুরক্ষিত (SECURE)';
+                postureEl.innerHTML = `<span class="status-dot green"></span> ${typeof t === 'function' ? t('sec_posture_secure', 'সুরক্ষিত (SECURE)') : 'সুরক্ষিত (SECURE)'}`;
             } else {
                 postureEl.className = 'status-badge offline';
-                postureEl.innerHTML = '<span class="status-dot red"></span> মনোযোগ প্রয়োজন (ATTENTION)';
+                postureEl.innerHTML = `<span class="status-dot red"></span> ${typeof t === 'function' ? t('sec_posture_attention', 'মনোযোগ প্রয়োজন (ATTENTION)') : 'মনোযোগ প্রয়োজন (ATTENTION)'}`;
             }
         }
 
@@ -81,7 +81,7 @@ async function loadAuditLogs(offset = 0) {
         currentAuditPage = offset;
 
         if (logs.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);">কোনো সিকিউরিটি অডিট রেকর্ড পাওয়া যায়নি।</td></tr>';
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);">${typeof t === 'function' ? t('sec_no_audit', 'কোনো সিকিউরিটি অডিট রেকর্ড পাওয়া যায়নি।') : 'কোনো সিকিউরিটি অডিট রেকর্ড পাওয়া যায়নি।'}</td></tr>`;
             return;
         }
 
@@ -111,9 +111,10 @@ async function loadAuditLogs(offset = 0) {
         // Update pagination counter
         const pageIndicator = document.getElementById('audit-page-indicator');
         if (pageIndicator) {
+            const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
             const current = Math.floor(offset / AUDIT_PAGE_SIZE) + 1;
             const totalPages = Math.max(1, Math.ceil((data.total || 1) / AUDIT_PAGE_SIZE));
-            pageIndicator.innerText = `পৃষ্ঠা ${current} / ${totalPages} (মোট: ${data.total || 0})`;
+            pageIndicator.innerText = `${typeof t === 'function' ? t('th_page', 'পৃষ্ঠা') : 'পৃষ্ঠা'} ${current.toLocaleString(isEn ? 'en-US' : 'bn-BD')} / ${totalPages.toLocaleString(isEn ? 'en-US' : 'bn-BD')} (মোট: ${(data.total || 0).toLocaleString(isEn ? 'en-US' : 'bn-BD')})`;
         }
     } catch (e) {
         console.error('Error fetching audit logs:', e);

@@ -57,11 +57,11 @@ function applyTheme(theme, notify = true) {
 
   if (notify && typeof showToast === 'function') {
     if (theme === 'light') {
-      showToast('☀️ লাইট মোড (Light Mode) সক্রিয় করা হয়েছে।', 'success');
+      showToast(typeof t === 'function' ? t('toast_theme_light', '☀️ লাইট মোড (Light Mode) সক্রিয় করা হয়েছে।') : '☀️ লাইট মোড (Light Mode) সক্রিয় করা হয়েছে।', 'success');
     } else if (theme === 'dark') {
-      showToast('🌙 ডার্ক মোড (Dark Mode) সক্রিয় করা হয়েছে।', 'success');
+      showToast(typeof t === 'function' ? t('toast_theme_dark', '🌙 ডার্ক মোড (Dark Mode) সক্রিয় করা হয়েছে।') : '🌙 ডার্ক মোড (Dark Mode) সক্রিয় করা হয়েছে।', 'success');
     } else {
-      showToast('💻 সিস্টেম প্রেফারেন্স অনুযায়ী থিম স্বয়ংক্রিয়ভাবে সেট করা হয়েছে।', 'info');
+      showToast(typeof t === 'function' ? t('toast_theme_system', '💻 সিস্টেম প্রেফারেন্স অনুযায়ী থিম সেট করা হয়েছে।') : '💻 সিস্টেম প্রেফারেন্স অনুযায়ী থিম সেট করা হয়েছে।', 'info');
     }
   }
 }
@@ -146,7 +146,7 @@ async function testConnection() {
   const btn = document.getElementById('btn-test-conn');
   const badge = document.getElementById('test-connection-badge');
   btn.disabled = true;
-  btn.innerText = 'সংযোগ পরীক্ষা করা হচ্ছে...';
+  btn.innerText = typeof t === 'function' ? t('btn_testing_conn', 'সংযোগ পরীক্ষা করা হচ্ছে...') : 'সংযোগ পরীক্ষা করা হচ্ছে...';
   badge.style.display = 'none';
 
   try {
@@ -176,7 +176,7 @@ async function testConnection() {
     badge.innerText = `❌ নেটওয়ার্ক ত্রুটি: ${err.message}`;
   } finally {
     btn.disabled = false;
-    btn.innerText = 'সার্ভার সংযোগ টেস্ট করুন';
+    btn.innerText = typeof t === 'function' ? t('btn_test_conn', 'সার্ভার সংযোগ টেস্ট করুন') : 'সার্ভার সংযোগ টেস্ট করুন';
   }
 }
 

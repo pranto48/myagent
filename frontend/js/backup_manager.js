@@ -50,24 +50,25 @@ function renderBackupMetrics(data) {
 
   if (lastEl) {
     if (data.backups && data.backups.length > 0) {
+      const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
       const lastDate = new Date(data.backups[0].created_at || data.backups[0].modified_at);
-      lastEl.innerText = lastDate.toLocaleDateString("bn-BD", {
+      lastEl.innerText = lastDate.toLocaleDateString(isEn ? "en-US" : "bn-BD", {
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit"
       });
     } else {
-      lastEl.innerText = "কোনো ব্যাকআপ নেই";
+      lastEl.innerText = typeof t === 'function' ? t('backup_none', 'কোনো ব্যাকআপ নেই') : 'কোনো ব্যাকআপ নেই';
     }
   }
 
   if (statusEl) {
     if (data.total_backups > 0) {
-      statusEl.innerHTML = `<span class="status-dot green"></span> সুরক্ষিত (Protected)`;
+      statusEl.innerHTML = `<span class="status-dot green"></span> ${typeof t === 'function' ? t('backup_status_protected', 'সুরক্ষিত (Protected)') : 'সুরক্ষিত (Protected)'}`;
       statusEl.className = "status-badge online";
     } else {
-      statusEl.innerHTML = `<span class="status-dot orange"></span> ব্যাকআপ আবশ্যক`;
+      statusEl.innerHTML = `<span class="status-dot orange"></span> ${typeof t === 'function' ? t('backup_status_needed', 'ব্যাকআপ আবশ্যক') : 'ব্যাকআপ আবশ্যক'}`;
       statusEl.className = "status-badge warning";
     }
   }
@@ -85,7 +86,7 @@ function renderBackupsTable(backups) {
       <tr>
         <td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">
           <div style="font-size:1.8rem; margin-bottom:8px;">📦</div>
-          সার্ভারে এখনও কোনো ব্যাকআপ ফাইল তৈরি করা হয়নি। উপরের "নতুন ব্যাকআপ তৈরি করুন" বাটনে ক্লিক করুন।
+          ${typeof t === 'function' ? t('backup_empty_state', 'সার্ভারে এখনও কোনো ব্যাকআপ ফাইল তৈরি করা হয়নি। উপরের "নতুন ব্যাকআপ তৈরি করুন" বাটনে ক্লিক করুন।') : 'সার্ভারে এখনও কোনো ব্যাকআপ ফাইল তৈরি করা হয়নি।'}
         </td>
       </tr>
     `;
@@ -93,8 +94,9 @@ function renderBackupsTable(backups) {
   }
 
   tbody.innerHTML = backups.map(b => {
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
     const d = new Date(b.created_at || b.modified_at);
-    const dateStr = d.toLocaleString("bn-BD", {
+    const dateStr = d.toLocaleString(isEn ? "en-US" : "bn-BD", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -104,12 +106,12 @@ function renderBackupsTable(backups) {
 
     const modules = b.modules || {};
     const tags = [];
-    if (modules.documents) tags.push('<span class="chip-sm blue">ডকুমেন্টস</span>');
-    if (modules.chats) tags.push('<span class="chip-sm purple">চ্যাট</span>');
-    if (modules.vector_db) tags.push('<span class="chip-sm cyan">ভেক্টর</span>');
-    if (modules.settings) tags.push('<span class="chip-sm green">সেটিংস</span>');
+    if (modules.documents) tags.push('<span class="chip-sm blue">' + (typeof t === 'function' ? t('backup_mod_docs', 'ডকুমেন্টস') : 'ডকুমেন্টস') + '</span>');
+    if (modules.chats) tags.push('<span class="chip-sm purple">' + (typeof t === 'function' ? t('backup_mod_chats', 'চ্যাট') : 'চ্যাট') + '</span>');
+    if (modules.vector_db) tags.push('<span class="chip-sm cyan">' + (typeof t === 'function' ? t('backup_mod_vector', 'ভেক্টর') : 'ভেক্টর') + '</span>');
+    if (modules.settings) tags.push('<span class="chip-sm green">' + (typeof t === 'function' ? t('backup_mod_settings', 'সেটিংস') : 'সেটিংস') + '</span>');
 
-    const modulesHtml = tags.length > 0 ? tags.join(" ") : '<span class="chip-sm">ফুল ব্যাকআপ</span>';
+    const modulesHtml = tags.length > 0 ? tags.join(" ") : '<span class="chip-sm">Full</span>';
 
     return `
       <tr>
@@ -118,7 +120,7 @@ function renderBackupsTable(backups) {
             ${escapeHtml(b.filename)}
           </div>
           <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">
-            ${escapeHtml(b.note || "সিস্টেম স্ন্যাপশট")} • বাই: <code>${escapeHtml(b.created_by || "admin")}</code>
+            ${escapeHtml(b.note || "Snapshot")} • By: <code>${escapeHtml(b.created_by || "admin")}</code>
           </div>
         </td>
         <td><span class="badge-pill">${escapeHtml(b.size_formatted)}</span></td>
@@ -127,13 +129,13 @@ function renderBackupsTable(backups) {
         <td><span class="badge-ver">v${escapeHtml(b.version || "2.2.0")}</span></td>
         <td style="text-align:right; white-space:nowrap;">
           <div style="display:inline-flex; gap:6px;">
-            <button class="btn-table-action download" title="ডাউনলোড করুন" onclick="downloadBackup('${escapeHtml(b.filename)}')">
+            <button class="btn-table-action download" title="${typeof t === 'function' ? t('reports_btn_download', 'ডাউনলোড করুন') : 'ডাউনলোড করুন'}" onclick="downloadBackup('${escapeHtml(b.filename)}')">
               📥
             </button>
-            <button class="btn-table-action restore" title="এই ব্যাকআপ থেকে রিস্টোর করুন" onclick="openRestoreModal('${escapeHtml(b.filename)}')">
+            <button class="btn-table-action restore" title="${typeof t === 'function' ? t('backup_btn_restore', 'রিস্টোর করুন') : 'রিস্টোর করুন'}" onclick="openRestoreModal('${escapeHtml(b.filename)}')">
               🔄
             </button>
-            <button class="btn-table-action delete" title="মুছে ফেলুন" onclick="deleteBackup('${escapeHtml(b.filename)}')">
+            <button class="btn-table-action delete" title="${typeof t === 'function' ? t('btn_delete', 'মুছে ফেলুন') : 'মুছে ফেলুন'}" onclick="deleteBackup('${escapeHtml(b.filename)}')">
               🗑️
             </button>
           </div>

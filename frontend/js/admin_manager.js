@@ -17,15 +17,18 @@ async function loadAdminMetrics() {
   try {
     const headers = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
     
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+    const loc = isEn ? 'en-US' : 'bn-BD';
+
     // 1. Dashboard general metrics
     const dashRes = await fetch('/api/dashboard/metrics', { headers });
     if (dashRes.ok) {
       const d = await dashRes.json();
       const chunksEl = document.getElementById('admin-kpi-chunks');
-      if (chunksEl) chunksEl.innerText = d.total_chunks !== undefined ? d.total_chunks.toLocaleString('bn-BD') : '০';
+      if (chunksEl) chunksEl.innerText = d.total_chunks !== undefined ? d.total_chunks.toLocaleString(loc) : '0';
       
       const usersEl = document.getElementById('admin-kpi-users');
-      if (usersEl) usersEl.innerText = d.total_users !== undefined ? d.total_users.toLocaleString('bn-BD') : '১';
+      if (usersEl) usersEl.innerText = d.total_users !== undefined ? d.total_users.toLocaleString(loc) : '1';
     }
 
     // 2. Memory stats
@@ -34,7 +37,7 @@ async function loadAdminMetrics() {
       const m = await memRes.json();
       const chunksEl = document.getElementById('admin-kpi-chunks');
       if (chunksEl && m.total_chunks !== undefined) {
-        chunksEl.innerText = m.total_chunks.toLocaleString('bn-BD');
+        chunksEl.innerText = m.total_chunks.toLocaleString(loc);
       }
     }
 
@@ -44,12 +47,13 @@ async function loadAdminMetrics() {
       const b = await bakRes.json();
       const backupEl = document.getElementById('admin-kpi-backup');
       const backupMeta = document.getElementById('admin-kpi-backup-meta');
+      const backupSuffix = typeof t === 'function' ? t('backups_count_suffix', 'টি ব্যাকআপ') : 'টি ব্যাকআপ';
       if (b.backups && b.backups.length > 0) {
-        if (backupEl) backupEl.innerText = `${b.backups.length.toLocaleString('bn-BD')}টি ব্যাকআপ`;
-        if (backupMeta) backupMeta.innerText = `সর্বশেষ: ${b.backups[0].created_at ? b.backups[0].created_at.slice(0, 16) : 'আজ'}`;
+        if (backupEl) backupEl.innerText = `${b.backups.length.toLocaleString(loc)}${backupSuffix.startsWith(' ') ? '' : ' '}${backupSuffix}`;
+        if (backupMeta) backupMeta.innerText = `${typeof t === 'function' ? t('backup_kpi_last', 'সর্বশেষ') : 'সর্বশেষ'}: ${b.backups[0].created_at ? b.backups[0].created_at.slice(0, 16) : 'Today'}`;
       } else {
-        if (backupEl) backupEl.innerText = '০টি স্ন্যাপশট';
-        if (backupMeta) backupMeta.innerText = 'কোনো ব্যাকআপ নেই';
+        if (backupEl) backupEl.innerText = `0 ${backupSuffix}`;
+        if (backupMeta) backupMeta.innerText = typeof t === 'function' ? t('backup_none', 'কোনো ব্যাকআপ নেই') : 'কোনো ব্যাকআপ নেই';
       }
     }
 
@@ -77,7 +81,7 @@ async function checkAdminAiEngineStatus() {
     if (data.success) {
       if (modelBadge) modelBadge.innerText = data.active_model || 'gemma-4-e2b-it-qat';
       if (pingLatency) pingLatency.innerText = `${latency} ms`;
-      if (kpiModel) kpiModel.innerText = 'অনলাইন 🟢';
+      if (kpiModel) kpiModel.innerText = `${typeof t === 'function' ? t('status_online', 'অনলাইন') : 'অনলাইন'} 🟢`;
       if (kpiModelMeta) kpiModelMeta.innerText = `${data.active_model || 'LLM'} (${latency}ms)`;
       if (lmIndicator) lmIndicator.className = 'service-indicator online';
       if (lmStatusPill) {
@@ -86,9 +90,9 @@ async function checkAdminAiEngineStatus() {
       }
       if (lmInfo) lmInfo.innerText = `${data.active_model || 'gemma-4'} (${latency} ms)`;
     } else {
-      if (pingLatency) pingLatency.innerText = 'অফলাইন';
-      if (kpiModel) kpiModel.innerText = 'অফলাইন ⚠️';
-      if (kpiModelMeta) kpiModelMeta.innerText = 'সার্ভার অফলাইন (LM Studio বন্ধ)';
+      if (pingLatency) pingLatency.innerText = typeof t === 'function' ? t('status_offline', 'অফলাইন') : 'অফলাইন';
+      if (kpiModel) kpiModel.innerText = `${typeof t === 'function' ? t('status_offline', 'অফলাইন') : 'অফলাইন'} ⚠️`;
+      if (kpiModelMeta) kpiModelMeta.innerText = typeof t === 'function' ? t('dash_disconnected', 'সার্ভার অফলাইন') : 'সার্ভার অফলাইন';
       if (lmIndicator) lmIndicator.className = 'service-indicator offline';
       if (lmStatusPill) {
         lmStatusPill.className = 'service-status-pill offline';
@@ -110,7 +114,7 @@ async function loadAdminUsersList() {
     if (res.ok) {
       const users = await res.json();
       if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:14px; color:var(--text-muted);">কোনো ইউজার পাওয়া যায়নি।</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:14px; color:var(--text-muted);">${typeof t === 'function' ? t('users_no_data', 'কোনো ইউজার পাওয়া যায়নি।') : 'কোনো ইউজার পাওয়া যায়নি।'}</td></tr>`;
         return;
       }
 
@@ -128,12 +132,12 @@ async function loadAdminUsersList() {
             </span>
           </td>
           <td style="color:var(--text-muted); font-size:0.8rem;">
-            ${u.created_at ? escapeHtml(u.created_at.slice(0, 10)) : 'সিস্টেম'}
+            ${u.created_at ? escapeHtml(u.created_at.slice(0, 10)) : 'system'}
           </td>
           <td>
             ${u.username === 'admin' 
-              ? '<span style="font-size:0.75rem; color:var(--text-muted);">প্রধান অ্যাডমিন (ডিফল্ট)</span>' 
-              : `<button class="btn-sm-danger" onclick="deleteAdminUser('${escapeHtml(u.username)}')">মুছে ফেলুন</button>`
+              ? `<span style="font-size:0.75rem; color:var(--text-muted);">${typeof t === 'function' ? t('users_sys_admin', 'সিস্টেম অ্যাডমিন') : 'সিস্টেম অ্যাডমিন'}</span>` 
+              : `<button class="btn-sm-danger" onclick="deleteAdminUser('${escapeHtml(u.username)}')">${typeof t === 'function' ? t('btn_delete', 'মুছে ফেলুন') : 'মুছে ফেলুন'}</button>`
             }
           </td>
         </tr>

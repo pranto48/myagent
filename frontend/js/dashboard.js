@@ -55,10 +55,12 @@ async function loadDashboardMetrics() {
       if (latencyBadge) {
         if (llm.connected) {
           latencyBadge.className = 'status-pill-green';
-          latencyBadge.innerHTML = `🟢 সংযুক্ত &nbsp; <strong>${llm.latency_ms} ms</strong> &nbsp; <code style="font-size:0.75rem;">${escapeHtml(llm.active_model)}</code>`;
+          const connText = typeof t === 'function' ? t('dash_connected', '🟢 সংযুক্ত') : '🟢 সংযুক্ত';
+          latencyBadge.innerHTML = `${connText} &nbsp; <strong>${llm.latency_ms} ms</strong> &nbsp; <code style="font-size:0.75rem;">${escapeHtml(llm.active_model)}</code>`;
         } else {
           latencyBadge.className = 'status-pill-red';
-          latencyBadge.innerHTML = `🔴 সংযোগ বিচ্ছিন্ন &nbsp; <code style="font-size:0.75rem;">${escapeHtml(llm.url)}</code>`;
+          const disconnText = typeof t === 'function' ? t('dash_disconnected', '🔴 সংযোগ বিচ্ছিন্ন') : '🔴 সংযোগ বিচ্ছিন্ন';
+          latencyBadge.innerHTML = `${disconnText} &nbsp; <code style="font-size:0.75rem;">${escapeHtml(llm.url)}</code>`;
         }
       }
 
@@ -104,7 +106,8 @@ function animateCounter(id, targetValue) {
   function step(now) {
     const progress = Math.min((now - startTime) / duration, 1);
     const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-    el.innerText = Math.round(start + (targetValue - start) * ease).toLocaleString('bn-BD');
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+    el.innerText = Math.round(start + (targetValue - start) * ease).toLocaleString(isEn ? 'en-US' : 'bn-BD');
     if (progress < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -136,7 +139,7 @@ async function loadAnalyticsCharts() {
         data: {
           labels: data.chat_activity.labels,
           datasets: [{
-            label: 'চ্যাট সেশন',
+            label: typeof t === 'function' ? t('dash_chart_activity_label', 'চ্যাট সেশন') : 'চ্যাট সেশন',
             data: data.chat_activity.data,
             backgroundColor: 'rgba(99,102,241,0.7)',
             borderColor: '#6366f1',
@@ -198,7 +201,7 @@ async function loadAnalyticsCharts() {
         data: {
           labels: data.memory_growth.labels,
           datasets: [{
-            label: 'মেমোরি চাঙ্কস',
+            label: typeof t === 'function' ? t('dash_chart_memory_label', 'মেমোরি চাঙ্কস') : 'মেমোরি চাঙ্কস',
             data: data.memory_growth.data,
             borderColor: '#10b981',
             backgroundColor: 'rgba(16,185,129,0.15)',
@@ -231,7 +234,7 @@ async function loadAnalyticsCharts() {
               <td><code style="font-size:0.72rem;">${doc.modified}</code></td>
             </tr>`
           ).join('')
-        : '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">কোনো ডকুমেন্ট নেই</td></tr>';
+        : `<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">${typeof t === 'function' ? t('dash_no_docs', 'কোনো ডকুমেন্ট নেই') : 'কোনো ডকুমেন্ট নেই'}</td></tr>`;
     }
 
   } catch (err) {
@@ -255,7 +258,7 @@ async function loadActivityLog() {
     const activities = data.activities || [];
 
     if (activities.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">কোনো অ্যাক্টিভিটি লগ পাওয়া যায়নি।</p>';
+      container.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">${typeof t === 'function' ? t('dash_no_activity', 'কোনো অ্যাক্টিভিটি লগ পাওয়া যায়নি।') : 'কোনো অ্যাক্টিভিটি লগ পাওয়া যায়নি।'}</p>`;
       return;
     }
 

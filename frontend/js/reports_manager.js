@@ -52,8 +52,8 @@ async function loadReportsList() {
       container.innerHTML = `
         <div class="empty-state" style="padding:40px; text-align:center;">
           <div style="font-size:3rem; margin-bottom:12px;">📊</div>
-          <h4 style="color:var(--text-secondary); margin:0 0 8px;">এখনো কোনো রিপোর্ট তৈরি হয়নি</h4>
-          <p style="color:var(--text-muted); font-size:0.85rem;">নিচের ফর্মটি ব্যবহার করে আপনার প্রথম AI রিপোর্ট তৈরি করুন।</p>
+          <h4 style="color:var(--text-secondary); margin:0 0 8px;">${typeof t === 'function' ? t('reports_no_data_title', 'এখনো কোনো রিপোর্ট তৈরি হয়নি') : 'এখনো কোনো রিপোর্ট তৈরি হয়নি'}</h4>
+          <p style="color:var(--text-muted); font-size:0.85rem;">${typeof t === 'function' ? t('reports_no_data_desc', 'নিচের ফর্মটি ব্যবহার করে আপনার প্রথম AI রিপোর্ট তৈরি করুন।') : 'নিচের ফর্মটি ব্যবহার করে আপনার প্রথম AI রিপোর্ট তৈরি করুন।'}</p>
         </div>`;
       return;
     }
@@ -70,14 +70,14 @@ async function loadReportsList() {
           <div class="report-card-title">${escapeHtml(r.title)}</div>
           <div class="report-card-meta">
             <span class="report-type-badge">${r.report_type.replace(/_/g,' ')}</span>
-            <span>${r.word_count || 0} শব্দ</span>
+            <span>${r.word_count || 0} ${typeof t === 'function' ? t('reports_word_suffix', 'শব্দ') : 'শব্দ'}</span>
             <span>${formatReportDate(r.created_at)}</span>
             <span>👤 ${escapeHtml(r.created_by)}</span>
           </div>
         </div>
         <div class="report-card-actions" onclick="event.stopPropagation()">
-          <button class="btn-icon-sm" title="ডাউনলোড করুন" onclick="downloadReport('${r.id}')">⬇️</button>
-          <button class="btn-icon-sm" title="মুছুন" onclick="deleteReport('${r.id}')">🗑️</button>
+          <button class="btn-icon-sm" title="${typeof t === 'function' ? t('reports_btn_download', 'ডাউনলোড করুন') : 'ডাউনলোড করুন'}" onclick="downloadReport('${r.id}')">⬇️</button>
+          <button class="btn-icon-sm" title="${typeof t === 'function' ? t('btn_delete', 'মুছুন') : 'মুছুন'}" onclick="deleteReport('${r.id}')">🗑️</button>
         </div>
       </div>`
     ).join('');
@@ -91,7 +91,8 @@ function formatReportDate(isoStr) {
   if (!isoStr) return '';
   try {
     const d = new Date(isoStr);
-    return d.toLocaleDateString('bn-BD', { year:'numeric', month:'short', day:'numeric' }) + ' ' +
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+    return d.toLocaleDateString(isEn ? 'en-US' : 'bn-BD', { year:'numeric', month:'short', day:'numeric' }) + ' ' +
            d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12: false });
   } catch { return isoStr.substring(0,16); }
 }
@@ -151,7 +152,7 @@ async function generateReport() {
     showToast(`❌ ${err.message}`, 'error');
     if (statusEl) statusEl.innerHTML = `<div class="gen-error">❌ ব্যর্থ: ${escapeHtml(err.message)}</div>`;
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '📊 রিপোর্ট তৈরি করুন'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = typeof t === 'function' ? t('reports_btn_generate', '📊 রিপোর্ট তৈরি করুন') : '📊 রিপোর্ট তৈরি করুন'; }
   }
 }
 
@@ -188,9 +189,9 @@ async function viewReport(reportId) {
       <div class="report-view-header">
         <div class="report-view-title">${escapeHtml(report.title)}</div>
         <div class="report-view-actions">
-          <button class="btn-secondary btn-sm" onclick="downloadReport('${report.id}')">⬇️ ডাউনলোড</button>
-          <button class="btn-secondary btn-sm" onclick="copyReportToClipboard()">📋 কপি</button>
-          <button class="btn-icon-sm" onclick="closeReportViewer()" title="বন্ধ করুন">✕</button>
+          <button class="btn-secondary btn-sm" onclick="downloadReport('${report.id}')">⬇️ ${typeof t === 'function' ? t('reports_btn_download', 'ডাউনলোড') : 'ডাউনলোড'}</button>
+          <button class="btn-secondary btn-sm" onclick="copyReportToClipboard()">📋 ${typeof t === 'function' ? t('reports_btn_copy', 'কপি') : 'কপি'}</button>
+          <button class="btn-icon-sm" onclick="closeReportViewer()" title="${typeof t === 'function' ? t('btn_close', 'বন্ধ করুন') : 'বন্ধ করুন'}">✕</button>
         </div>
       </div>
       <div class="report-markdown-body" id="report-md-body">${html}</div>`;
