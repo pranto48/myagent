@@ -110,7 +110,7 @@ class CompanyAIAgent:
 
         return False
 
-    def _prepare_rag_context(self, prompt: str, user_role: str = "admin", has_attachments: bool = False) -> tuple[str, List[SourceCitation]]:
+    def _prepare_rag_context(self, prompt: str, user_role: str = "admin", has_attachments: bool = False, language: str = "bn") -> tuple[str, List[SourceCitation]]:
         """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list with DLS."""
         # 1. Skip RAG completely for greetings and casual pleasantries
         if self.is_conversational_greeting(prompt):
@@ -149,7 +149,7 @@ class CompanyAIAgent:
                 seen_snippets.add(snippet_fp)
 
                 idx = len(context_blocks) + 1
-                cat_tag = f" | বিভাগ: {category}" if category else ""
+                cat_tag = f" | Section: {category}" if language == "en" and category else (f" | বিভাগ: {category}" if category else "")
                 context_blocks.append(
                     f"[Source #{idx}: {source_file} (Page {page_num}{cat_tag})]\n{chunk_content}"
                 )
@@ -172,10 +172,16 @@ class CompanyAIAgent:
                 return prompt, []
 
             # Strict company data mode: inform agent that no records exist in company memory
-            no_context_msg = (
-                "⚠️ [কোম্পানির নলেজবেস ও ভেক্টর মেমোরিতে এই অনুসন্ধানের সাথে সম্পর্কিত কোনো অভ্যন্তরীণ নথি বা তথ্য পাওয়া যায়নি।]\n"
-                "[নির্দেশনা: কাল্পনিক বা অন্য কোনো কোম্পানির তথ্য প্রদান করবেন না। ব্যবহারকারীকে বিনীতভাবে জানান যে এই তথ্যটি কোম্পানির মেমোরিতে সংরক্ষিত নেই এবং প্রয়োজনীয় ফাইল বা তথ্য আপলোড করার পরামর্শ দিন।]"
-            )
+            if language == "en":
+                no_context_msg = (
+                    "⚠️ [No relevant internal documents or records were found in the company knowledge base or vector memory for this query.]\n"
+                    "[Instruction: Do not invent facts or provide external company data. Politely inform the user that this record is not found in the company memory and advise uploading the necessary file or note.]"
+                )
+            else:
+                no_context_msg = (
+                    "⚠️ [কোম্পানির নলেজবেস ও ভেক্টর মেমোরিতে এই অনুসন্ধানের সাথে সম্পর্কিত কোনো অভ্যন্তরীণ নথি বা তথ্য পাওয়া যায়নি।]\n"
+                    "[নির্দেশনা: কাল্পনিক বা অন্য কোনো কোম্পানির তথ্য প্রদান করবেন না। ব্যবহারকারীকে বিনীতভাবে জানান যে এই তথ্যটি কোম্পানির মেমোরিতে সংরক্ষিত নেই এবং প্রয়োজনীয় ফাইল বা তথ্য আপলোড করার পরামর্শ দিন।]"
+                )
             augmented_prompt = RAG_CONTEXT_WRAPPER.format(
                 context_chunks=no_context_msg,
                 query=prompt
@@ -220,7 +226,10 @@ class CompanyAIAgent:
                     severity="CRITICAL",
                     details={"threat_types": firewall_check["threat_types"], "reason": firewall_check["reason"]}
                 )
-                blocked_msg = "🛡️ [সিকিউরিটি সিস্টেম অ্যালার্ট]: আপনার ইনপুটে সম্ভাব্য প্রম্পট ইনজেকশন বা অননুমোদিত নির্দেশিকা সনাক্ত হওয়ায় ফায়ারওয়াল দ্বারা অনুরোধটি ব্লক করা হয়েছে।"
+                if language == "en":
+                    blocked_msg = "🛡️ [Security System Alert]: A potential prompt injection or unauthorized instruction was detected. The request has been blocked by the firewall."
+                else:
+                    blocked_msg = "🛡️ [সিকিউরিটি সিস্টেম অ্যালার্ট]: আপনার ইনপুটে সম্ভাব্য প্রম্পট ইনজেকশন বা অননুমোদিত নির্দেশিকা সনাক্ত হওয়ায় ফায়ারওয়াল দ্বারা অনুরোধটি ব্লক করা হয়েছে।"
                 yield f"data: {json.dumps({'type': 'token', 'token': blocked_msg})}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
@@ -255,7 +264,10 @@ class CompanyAIAgent:
                             category="user_instruction",
                             security_level="INTERNAL"
                         )
-                        reply_text = f"✅ **তথ্যটি সফলভাবে MyAgent-এর স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!**\n\n- **নোট আইডি:** `{save_res['doc_id']}`\n- **সংরক্ষিত বিবরণ:** {clean_instruction}\n\nভবিষ্যতে যেকোনো প্রাসঙ্গিক অনুসন্ধানে আমি এই তথ্যটি স্বয়ংক্রিয়ভাবে রেফারেন্স হিসেবে ব্যবহার করব।"
+                        if language == "en":
+                            reply_text = f"✅ **Information successfully saved to MyAgent persistent memory!**\n\n- **Note ID:** `{save_res['doc_id']}`\n- **Saved Content:** {clean_instruction}\n\nI will autonomously reference this information for relevant future queries."
+                        else:
+                            reply_text = f"✅ **তথ্যটি সফলভাবে MyAgent-এর স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!**\n\n- **নোট আইডি:** `{save_res['doc_id']}`\n- **সংরক্ষিত বিবরণ:** {clean_instruction}\n\nভবিষ্যতে যেকোনো প্রাসঙ্গিক অনুসন্ধানে আমি এই তথ্যটি স্বয়ংক্রিয়ভাবে রেফারেন্স হিসেবে ব্যবহার করব।"
                         yield f"data: {json.dumps({'type': 'token', 'token': reply_text})}\n\n"
                         yield f"data: {json.dumps({'type': 'done'})}\n\n"
                         return
@@ -270,7 +282,7 @@ class CompanyAIAgent:
 
         has_attachments = bool(attached_files and len(attached_files) > 0)
         if use_memory and prompt.strip():
-            user_content, sources = self._prepare_rag_context(prompt, user_role=user_role, has_attachments=has_attachments)
+            user_content, sources = self._prepare_rag_context(prompt, user_role=user_role, has_attachments=has_attachments, language=language)
 
         # 3. Incorporate Chat-Attached Files (Excel, Photo OCR, Documents) directly into context
         if has_attachments:
@@ -283,20 +295,26 @@ class CompanyAIAgent:
                 table_md = af.get("table_markdown", "")
                 ocr_txt = af.get("ocr_text", "")
 
-                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n"
+                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n" if language == "bn" else f"📎 [Attached File: {fname} (Type: {ftype})]\n{summary}\n"
                 if table_md:
-                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n"
+                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n" if language == "bn" else f"\n[Data Table View]:\n{table_md}\n"
                 if ocr_txt:
-                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n"
+                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n" if language == "bn" else f"\n[OCR Extracted Text]:\n{ocr_txt}\n"
                 if preview and not table_md and not ocr_txt:
-                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n"
+                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n" if language == "bn" else f"\n[Content Preview]:\n{preview}\n"
                 attachment_blocks.append(block_content)
 
             merged_attachments = "\n\n---\n\n".join(attachment_blocks)
             if not prompt.strip() or self.is_conversational_greeting(prompt):
-                user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান, প্রধান কলাম/ডাটা পয়েন্ট এবং কার্যোপযোগী ইনসাইটস পরিষ্কার ও প্রাঞ্জল বাংলায় উপস্থাপন করুন।"
+                if language == "en":
+                    user_content = f"### [The user directly attached the following files in chat and requested detailed analysis]:\n\n{merged_attachments}\n\nPlease analyze the attached files and present detailed statistics, key columns/data points, and actionable insights in clear, professional English."
+                else:
+                    user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান, প্রধান কলাম/ডাটা পয়েন্ট এবং কার্যোপযোগী ইনসাইটস পরিষ্কার ও প্রাঞ্জল বাংলায় উপস্থাপন করুন।"
             else:
-                user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
+                if language == "en":
+                    user_content = f"### [Directly Attached Files and Data Context]:\n\n{merged_attachments}\n\n### [User Question / Instructions]:\n{user_content}"
+                else:
+                    user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
 
         # 4. Send sources metadata first
         sources_payload = [s.model_dump() for s in sources]
@@ -352,35 +370,68 @@ class CompanyAIAgent:
                     err_str = str(plain_err)
                     if "Connection error" in err_str or "ConnectError" in err_str or "connection refused" in err_str.lower() or "Failed to connect" in err_str:
                         if self.is_conversational_greeting(prompt):
-                            fallback_reply = (
-                                "👋 **হ্যালো! আমি MyAgent AI** — আপনার এন্টারপ্রাইজ ইন্টেলিজেন্স ও প্রোডাক্টিভিটি অ্যাসিস্ট্যান্ট।\n\n"
-                                "আমি আপনাকে কীভাবে সাহায্য করতে পারি? আমার প্রধান ক্ষমতা ও সুবিধাগুলো:\n\n"
-                                "- 📁 **মাল্টি-ফরম্যাট ফাইল বিশ্লেষণ:** PDF, Word (DOCX), Excel স্প্রেডশিট ও ইমেজ OCR পাঠ।\n"
-                                "- 📊 **বিগ ডেটা ও টেবিল সামারি:** ব্যবসায়িক ডেটাসেট পরিসংখ্যান ও ট্রেন্ড বিশ্লেষণ।\n"
-                                "- 🔍 **কোম্পানি নলেজবেস অনুসন্ধান:** অভ্যন্তরীণ পলিসি, ডকুমেন্ট ও ফাইল তাৎক্ষণিক খুঁজে বের করা।\n"
-                                "- ⚡ **অটোমেটেড এক্সিকিউটিভ রিপোর্ট:** এক ক্লিকে গভীর পর্যালোচনা ও অ্যাকশন প্ল্যান তৈরি।\n\n"
-                                "আপনার প্রয়োজনীয় প্রশ্নটি লিখুন অথবা ফাইল আপলোড করে বিশ্লেষণ শুরু করুন!"
-                            )
+                            if language == "en":
+                                fallback_reply = (
+                                    "👋 **Hello! I am MyAgent AI** — your enterprise intelligence and productivity assistant.\n\n"
+                                    "How can I help you today? Here are my core capabilities:\n\n"
+                                    "- 📁 **Multi-format File Analysis:** PDF, Word (DOCX), Excel spreadsheets, and Image OCR reading.\n"
+                                    "- 📊 **Big Data & Table Summary:** Business dataset statistics and trend analysis.\n"
+                                    "- 🔍 **Company Knowledge Base Search:** Instantly retrieve internal policies, documents, and files.\n"
+                                    "- ⚡ **Automated Executive Reports:** Generate deep reviews and action plans in one click.\n\n"
+                                    "Feel free to ask a question or attach a file to begin analysis!"
+                                )
+                            else:
+                                fallback_reply = (
+                                    "👋 **হ্যালো! আমি MyAgent AI** — আপনার এন্টারপ্রাইজ ইন্টেলিজেন্স ও প্রোডাক্টিভিটি অ্যাসিস্ট্যান্ট।\n\n"
+                                    "আমি আপনাকে কীভাবে সাহায্য করতে পারি? আমার প্রধান ক্ষমতা ও সুবিধাগুলো:\n\n"
+                                    "- 📁 **মাল্টি-ফরম্যাট ফাইল বিশ্লেষণ:** PDF, Word (DOCX), Excel স্প্রেডশিট ও ইমেজ OCR পাঠ।\n"
+                                    "- 📊 **বিগ ডেটা ও টেবিল সামারি:** ব্যবসায়িক ডেটাসেট পরিসংখ্যান ও ট্রেন্ড বিশ্লেষণ।\n"
+                                    "- 🔍 **কোম্পানি নলেজবেস অনুসন্ধান:** অভ্যন্তরীণ পলিসি, ডকুমেন্ট ও ফাইল তাৎক্ষণিক খুঁজে বের করা।\n"
+                                    "- ⚡ **অটোমেটেড এক্সিকিউটিভ রিপোর্ট:** এক ক্লিকে গভীর পর্যালোচনা ও অ্যাকশন প্ল্যান তৈরি।\n\n"
+                                    "আপনার প্রয়োজনীয় প্রশ্নটি লিখুন অথবা ফাইল আপলোড করে বিশ্লেষণ শুরু করুন!"
+                                )
                         elif sources:
-                            fallback_reply = (
-                                f"⚠️ **[এলএলএম সার্ভার অফলাইন - মেমোরি নলেজ রেসপন্স]**\n\n"
-                                f"আপনার বাহ্যিক এআই মডেল সার্ভারটি (`{target_model}` @ `{settings.LLM_BASE_URL}`) বর্তমানে সংযুক্ত নয়। "
-                                f"তবে আপনার প্রশ্নের সাথে প্রাসঙ্গিক কোম্পানির নলেজবেস ও ভেক্টর মেমোরির তথ্য নিচে প্রদান করা হলো:\n\n"
-                            )
-                            for s in sources:
-                                fallback_reply += f"> **📄 {s.source} (পৃষ্ঠা {s.page}):**\n> {s.content}\n\n"
-                            fallback_reply += f"💡 *এআই মডেলের মাধ্যমে আরও বিশদ উত্তরের জন্য অনুগ্রহ করে LM Studio সার্ভারটি চালু করুন (`192.168.20.10:1234`) অথবা সিস্টেম সেটিংস (⚙️) থেকে সক্রিয় কোনো সার্ভার সেট করুন।*"
+                            if language == "en":
+                                fallback_reply = (
+                                    f"⚠️ **[LLM Server Offline - Memory Knowledge Response]**\n\n"
+                                    f"Your external AI model server (`{target_model}` @ `{settings.LLM_BASE_URL}`) is currently disconnected. "
+                                    f"However, here is the relevant company knowledge and vector memory retrieved for your query:\n\n"
+                                )
+                                for s in sources:
+                                    fallback_reply += f"> **📄 {s.source} (Page {s.page}):**\n> {s.content}\n\n"
+                                fallback_reply += f"💡 *For AI-generated synthesis, please ensure the LM Studio / LLM server is running (`{settings.LLM_BASE_URL}`) or configure an active server in System Settings (⚙️).*"
+                            else:
+                                fallback_reply = (
+                                    f"⚠️ **[এলএলএম সার্ভার অফলাইন - মেমোরি নলেজ রেসপন্স]**\n\n"
+                                    f"আপনার বাহ্যিক এআই মডেল সার্ভারটি (`{target_model}` @ `{settings.LLM_BASE_URL}`) বর্তমানে সংযুক্ত নয়। "
+                                    f"তবে আপনার প্রশ্নের সাথে প্রাসঙ্গিক কোম্পানির নলেজবেস ও ভেক্টর মেমোরির তথ্য নিচে প্রদান করা হলো:\n\n"
+                                )
+                                for s in sources:
+                                    fallback_reply += f"> **📄 {s.source} (পৃষ্ঠা {s.page}):**\n> {s.content}\n\n"
+                                fallback_reply += f"💡 *এআই মডেলের মাধ্যমে আরও বিশদ উত্তরের জন্য অনুগ্রহ করে LM Studio সার্ভারটি চালু করুন (`192.168.20.10:1234`) অথবা সিস্টেম সেটিংস (⚙️) থেকে সক্রিয় কোনো সার্ভার সেট করুন।*"
                         else:
-                            fallback_reply = (
-                                f"⚠️ **[এলএলএম মডেল সার্ভার অফলাইন (Connection Error)]**\n\n"
-                                f"আপনার কনফিগার করা এলএলএম সার্ভারের সাথে ব্যাকএন্ড সংযোগ স্থাপন করতে পারছে না:\n"
-                                f"- **সার্ভার ইউআরএল:** `{settings.LLM_BASE_URL}`\n"
-                                f"- **টার্গেট মডেল:** `{target_model}`\n\n"
-                                f"**সহজ সমাধান নির্দেশিকা:**\n"
-                                f"1. আপনার LM Studio অ্যাপে **Start Server** চালু আছে কিনা পরীক্ষা করুন।\n"
-                                f"2. LM Studio-তে **'Serve on Local Network'** অন রাখুন যাতে অন্য ডিভাইস বা ডকার সার্ভার (`192.168.9.9`) থেকে সংযোগ গ্রহণ করতে পারে।\n"
-                                f"3. অথবা অ্যাডমিন প্যানেলের **সিস্টেম সেটিংস (⚙️)** থেকে সক্রিয় কোনো সার্ভার URL সেট করুন।"
-                            )
+                            if language == "en":
+                                fallback_reply = (
+                                    f"⚠️ **[LLM Server Offline (Connection Error)]**\n\n"
+                                    f"The backend could not connect to your configured LLM server:\n"
+                                    f"- **Server URL:** `{settings.LLM_BASE_URL}`\n"
+                                    f"- **Target Model:** `{target_model}`\n\n"
+                                    f"**Troubleshooting Steps:**\n"
+                                    f"1. Check that **Start Server** is active in your LM Studio or Ollama application.\n"
+                                    f"2. Ensure **'Serve on Local Network'** is enabled in LM Studio so external devices or Docker containers (`192.168.9.9`) can reach it.\n"
+                                    f"3. Or select an active server endpoint in **System Settings (⚙️)**."
+                                )
+                            else:
+                                fallback_reply = (
+                                    f"⚠️ **[এলএলএম মডেল সার্ভার অফলাইন (Connection Error)]**\n\n"
+                                    f"আপনার কনফিগার করা এলএলএম সার্ভারের সাথে ব্যাকএন্ড সংযোগ স্থাপন করতে পারছে না:\n"
+                                    f"- **সার্ভার ইউআরএল:** `{settings.LLM_BASE_URL}`\n"
+                                    f"- **টার্গেট মডেল:** `{target_model}`\n\n"
+                                    f"**সহজ সমাধান নির্দেশিকা:**\n"
+                                    f"1. আপনার LM Studio অ্যাপে **Start Server** চালু আছে কিনা পরীক্ষা করুন।\n"
+                                    f"2. LM Studio-তে **'Serve on Local Network'** অন রাখুন যাতে অন্য ডিভাইস বা ডকার সার্ভার (`192.168.9.9`) থেকে সংযোগ গ্রহণ করতে পারে।\n"
+                                    f"3. অথবা অ্যাডমিন প্যানেলের **সিস্টেম সেটিংস (⚙️)** থেকে সক্রিয় কোনো সার্ভার URL সেট করুন।"
+                                )
                         # Stream fallback reply smoothly
                         for word in fallback_reply.split(" "):
                             yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
@@ -510,7 +561,7 @@ class CompanyAIAgent:
         user_content = prompt
 
         if use_memory and prompt.strip():
-            user_content, sources = self._prepare_rag_context(prompt)
+            user_content, sources = self._prepare_rag_context(prompt, language=language)
 
         # Incorporate attached files into user_content
         if attached_files and len(attached_files) > 0:
@@ -523,20 +574,26 @@ class CompanyAIAgent:
                 table_md = af.get("table_markdown", "")
                 ocr_txt = af.get("ocr_text", "")
 
-                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n"
+                block_content = f"📎 [সংযুক্ত ফাইল: {fname} (ধরন: {ftype})]\n{summary}\n" if language == "bn" else f"📎 [Attached File: {fname} (Type: {ftype})]\n{summary}\n"
                 if table_md:
-                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n"
+                    block_content += f"\n[ডাটা টেবিল ভিউ]:\n{table_md}\n" if language == "bn" else f"\n[Data Table View]:\n{table_md}\n"
                 if ocr_txt:
-                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n"
+                    block_content += f"\n[OCR টেক্সট]:\n{ocr_txt}\n" if language == "bn" else f"\n[OCR Extracted Text]:\n{ocr_txt}\n"
                 if preview and not table_md and not ocr_txt:
-                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n"
+                    block_content += f"\n[কনটেন্ট প্রিভিউ]:\n{preview}\n" if language == "bn" else f"\n[Content Preview]:\n{preview}\n"
                 attachment_blocks.append(block_content)
 
             merged_attachments = "\n\n---\n\n".join(attachment_blocks)
             if not prompt.strip():
-                user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান ও ইনসাইটস বাংলায় উপস্থাপন করুন।"
+                if language == "en":
+                    user_content = f"### [The user directly attached the following files in chat and requested detailed analysis]:\n\n{merged_attachments}\n\nPlease provide detailed statistics, findings, and insights in professional English."
+                else:
+                    user_content = f"### [ব্যবহারকারী সরাসরি চ্যাটে নিম্নলিখিত ফাইলগুলো সংযুক্ত করেছেন এবং বিস্তারিত বিশ্লেষণ চেয়েছেন]:\n\n{merged_attachments}\n\nঅনুগ্রহ করে সংযুক্ত ফাইলের বিস্তারিত পরিসংখ্যান ও ইনসাইটস বাংলায় উপস্থাপন করুন।"
             else:
-                user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
+                if language == "en":
+                    user_content = f"### [Directly Attached Files and Data Context]:\n\n{merged_attachments}\n\n### [User Question / Instructions]:\n{user_content}"
+                else:
+                    user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
 
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
         if language == "en":

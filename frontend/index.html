@@ -35,30 +35,36 @@
   <!-- Admin Login Overlay Screen -->
   <div class="login-overlay" id="login-overlay">
     <div class="login-card">
+      <div style="display:flex; justify-content: flex-end; margin-bottom: 6px;">
+        <div class="lang-switcher-pill" id="login-lang-switcher" title="Change Language / ভাষা পরিবর্তন">
+          <button type="button" class="lang-btn active" id="login-btn-lang-bn" onclick="setAppLanguage('bn')">বাং</button>
+          <button type="button" class="lang-btn" id="login-btn-lang-en" onclick="setAppLanguage('en')">EN</button>
+        </div>
+      </div>
       <div class="brand-icon" style="margin: 0 auto 12px; width: 50px; height: 50px;">
         <img src="favicon.svg" alt="MyAgent Logo" style="width: 32px; height: 32px;">
       </div>
-      <h2 class="animated-gradient-text">MyAgent v2.2.0</h2>
-      <p>কোম্পানির সংবেদনশীল ডেটা ও এআই এজেন্ট ব্যবস্থাপনায় অ্যাডমিন লগইন আবশ্যক</p>
+      <h2 class="animated-gradient-text" data-i18n="login_title">MyAgent Enterprise</h2>
+      <p data-i18n="login_desc">কোম্পানির সংবেদনশীল ডেটা ও এআই এজেন্ট ব্যবস্থাপনায় অ্যাডমিন লগইন আবশ্যক</p>
 
       <form onsubmit="performLogin(event)" style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
         <div class="form-group" style="text-align: left;">
-          <label>অ্যাডমিন ইউজারনেম (Username)</label>
-          <input type="text" id="login-username" class="text-input" placeholder="admin" autocomplete="username" required>
+          <label data-i18n="login_user_label">অ্যাডমিন ইউজারনেম (Username)</label>
+          <input type="text" id="login-username" class="text-input" placeholder="admin" data-i18n-placeholder="login_user_placeholder" autocomplete="username" required>
         </div>
         <div class="form-group" style="text-align: left;">
-          <label>পাসওয়ার্ড (Password)</label>
-          <input type="password" id="login-password" class="text-input" placeholder="••••••••" autocomplete="current-password" required>
+          <label data-i18n="login_pass_label">পাসওয়ার্ড (Password)</label>
+          <input type="password" id="login-password" class="text-input" placeholder="••••••••" data-i18n-placeholder="login_pass_placeholder" autocomplete="current-password" required>
         </div>
 
         <div id="login-error-msg" class="login-err-box" style="display:none;"></div>
 
-        <button type="submit" class="btn-primary" id="btn-do-login" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+        <button type="submit" class="btn-primary" id="btn-do-login" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;" data-i18n="login_btn">
           লগইন করুন
         </button>
       </form>
       <div style="margin-top: 16px; font-size: 0.72rem; color: var(--text-muted); line-height: 1.6;">
-        হোস্ট: <code>192.168.9.9:3399</code> • সুরক্ষিত অভ্যন্তরীণ নেটওয়ার্ক<br>
+        <span data-i18n-html="login_host_info">হোস্ট: <code>192.168.9.9:3399</code> • সুরক্ষিত অভ্যন্তরীণ নেটওয়ার্ক</span><br>
         © 2026 <a href="https://itsupport.com.bd" target="_blank" style="color:var(--cyan-glow); text-decoration:none;">IT support BD</a> • Made By <a href="https://arifmahmud.com/" target="_blank" style="color:#a855f7; text-decoration:none;">Arif</a>
       </div>
     </div>
@@ -271,21 +277,21 @@
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span class="hide-mobile" data-i18n="tooltip_export_chat">এক্সপোর্ট</span>
+            <span class="hide-mobile" data-i18n="btn_export">এক্সপোর্ট</span>
           </button>
 
           <button class="btn-secondary" id="btn-clear-chat" onclick="createNewChatSession()">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            <span class="hide-mobile" data-i18n="sessions_new">নতুন চ্যাট</span>
+            <span class="hide-mobile" data-i18n="btn_new_chat">নতুন চ্যাট</span>
           </button>
 
           <button class="btn-primary" id="btn-quick-upload" onclick="switchTab('knowledge')">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <span class="hide-mobile">ইনজেস্ট</span>
+            <span class="hide-mobile" data-i18n="btn_ingest">ইনজেস্ট</span>
           </button>
         </div>
       </header>
@@ -301,13 +307,13 @@
             <div class="gemini-hero-container" id="empty-hero">
               <div class="gemini-sparkle-pill">
                 <span class="sparkle-spark">✨</span>
-                <span>MyAgent Enterprise AI</span>
+                <span data-i18n="hero_badge">MyAgent Enterprise AI</span>
               </div>
               <h2 class="gemini-greeting-title">
-                হ্যালো, <span class="gemini-user-highlight" id="gemini-user-name">Admin</span><br>
-                <span class="gemini-sub-sparkle">আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?</span>
+                <span data-i18n="hero_hello">হ্যালো,</span> <span class="gemini-user-highlight" id="gemini-user-name">Admin</span><br>
+                <span class="gemini-sub-sparkle" data-i18n="hero_sub_sparkle">আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?</span>
               </h2>
-              <p class="gemini-hero-desc">
+              <p class="gemini-hero-desc" data-i18n="hero_desc">
                 কোম্পানির নিজস্ব সিকিউর ডাটাবেস ও অন-প্রিমিসেস এআই মডেলে পরিচালিত আপনার স্মার্ট কর্পোরেট সহকারী।
               </p>
               
@@ -316,8 +322,8 @@
                 <div class="gemini-card" onclick="usePrompt('আমাদের কোম্পানির অভ্যন্তরীণ নীতিমালা এবং ছুটির নিয়মগুলো বিস্তারিত জানাও')">
                   <div class="card-icon-bubble icon-blue">📄</div>
                   <div class="card-content">
-                    <h4>কোম্পানি পলিসি ও রুলস</h4>
-                    <p>অভ্যন্তরীণ কর্মপদ্ধতি, ছুটি ও নিয়মাবলী অনুসন্ধান</p>
+                    <h4 data-i18n="hero_card_1_title">কোম্পানি পলিসি ও রুলস</h4>
+                    <p data-i18n="hero_card_1_desc">অভ্যন্তরীণ কর্মপদ্ধতি, ছুটি ও নিয়মাবলী অনুসন্ধান</p>
                   </div>
                   <span class="card-arrow">↗</span>
                 </div>
@@ -325,8 +331,8 @@
                 <div class="gemini-card" onclick="usePrompt('আপলোড করা এক্সেল ফাইলের হিসাব, বিক্রয় তথ্য ও প্রধান পরিসংখ্যান বিশ্লেষণ করো')">
                   <div class="card-icon-bubble icon-purple">📊</div>
                   <div class="card-content">
-                    <h4>বিগ ডেটা ও এক্সেল অ্যানালাইসিস</h4>
-                    <p>স্প্রেডশিটের হিসাব, মেট্রিক্স ও ট্রেন্ড টেবিল তৈরি</p>
+                    <h4 data-i18n="hero_card_2_title">বিগ ডেটা ও এক্সেল অ্যানালাইসিস</h4>
+                    <p data-i18n="hero_card_2_desc">স্প্রেডশিটের হিসাব, মেট্রিক্স ও ট্রেন্ড টেবিল তৈরি</p>
                   </div>
                   <span class="card-arrow">↗</span>
                 </div>
@@ -334,8 +340,8 @@
                 <div class="gemini-card" onclick="usePrompt('আমাদের সাম্প্রতিক কোম্পানির নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ রিপোর্ট তৈরি করো')">
                   <div class="card-icon-bubble icon-emerald">📑</div>
                   <div class="card-content">
-                    <h4>এক্সিকিউটিভ ডাটা রিপোর্ট</h4>
-                    <p>অটোমেটেড রিপোর্ট জেনারেশন ও পরবর্তী করণীয়</p>
+                    <h4 data-i18n="hero_card_3_title">এক্সিকিউটিভ ডাটা রিপোর্ট</h4>
+                    <p data-i18n="hero_card_3_desc">অটোমেটেড রিপোর্ট জেনারেশন ও পরবর্তী করণীয়</p>
                   </div>
                   <span class="card-arrow">↗</span>
                 </div>
@@ -343,8 +349,8 @@
                 <div class="gemini-card" onclick="usePrompt('আপলোড করা ইমেজ বা ছবির মধ্যে কী কী টেক্সট বা তথ্য রয়েছে বিস্তারিত ব্যাখ্যা করো')">
                   <div class="card-icon-bubble icon-amber">🖼️</div>
                   <div class="card-content">
-                    <h4>ফটো ও ইমেজ OCR রিডিং</h4>
-                    <p>ছবি থেকে টেক্সট ও ডকুমেন্ট সারসংক্ষেপ নিষ্কাশন</p>
+                    <h4 data-i18n="hero_card_4_title">ফটো ও ইমেজ OCR রিডিং</h4>
+                    <p data-i18n="hero_card_4_desc">ছবি থেকে টেক্সট ও ডকুমেন্ট সারসংক্ষেপ নিষ্কাশন</p>
                   </div>
                   <span class="card-arrow">↗</span>
                 </div>
@@ -357,19 +363,19 @@
           <div class="chat-input-wrapper-outer">
             <!-- Productivity Quick Action Chips Bar -->
             <div class="productivity-quick-bar" id="productivity-quick-bar">
-              <span class="quick-bar-label">⚡ অ্যাকশন:</span>
-              <button class="quick-chip highlight-chip" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য সংরক্ষণ">📌 মেমোরিতে নোট সেভ</button>
-              <button class="quick-chip" onclick="useProductivityAction('data_analysis')">📊 বিগ ডেটা</button>
-              <button class="quick-chip" onclick="useProductivityAction('memory_search')">🔍 পলিসি সার্চ</button>
-              <button class="quick-chip" onclick="useProductivityAction('generate_report')">📑 রিপোর্ট তৈরি</button>
-              <button class="quick-chip" onclick="useProductivityAction('python_sandbox')">🐍 পাইথন স্যান্ডবক্স</button>
-              <button class="quick-chip" onclick="useProductivityAction('security_audit')">🛡️ সিকিউরিটি</button>
+              <span class="quick-bar-label" data-i18n="quick_bar_label">⚡ অ্যাকশন:</span>
+              <button class="quick-chip highlight-chip" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য সংরক্ষণ" data-i18n="chip_quick_note">📌 মেমোরিতে নোট সেভ</button>
+              <button class="quick-chip" onclick="useProductivityAction('data_analysis')" data-i18n="chip_big_data">📊 বিগ ডেটা</button>
+              <button class="quick-chip" onclick="useProductivityAction('memory_search')" data-i18n="chip_policy_search">🔍 পলিসি সার্চ</button>
+              <button class="quick-chip" onclick="useProductivityAction('generate_report')" data-i18n="chip_gen_report">📑 রিপোর্ট তৈরি</button>
+              <button class="quick-chip" onclick="useProductivityAction('python_sandbox')" data-i18n="chip_py_sandbox">🐍 পাইথন স্যান্ডবক্স</button>
+              <button class="quick-chip" onclick="useProductivityAction('security_audit')" data-i18n="chip_sec_audit">🛡️ সিকিউরিটি</button>
             </div>
 
             <!-- Real-time Upload & Memory Indexing Progress Pill -->
             <div class="upload-progress-pill" id="upload-progress-pill" style="display: none;">
               <span class="spinner-inline" style="width: 13px; height: 13px; border-width: 2px;"></span>
-              <span id="upload-progress-text">মেমোরি ইনডেক্সিং হচ্ছে...</span>
+              <span id="upload-progress-text" data-i18n="upload_indexing">মেমোরি ইনডেক্সিং হচ্ছে...</span>
             </div>
 
             <!-- ChatGPT / Gemini Style Floating Rounded Prompt Pill -->
@@ -418,13 +424,13 @@
             <div class="chat-drag-drop-overlay" id="chat-drag-drop-overlay" style="display: none;">
               <div class="drag-drop-card">
                 <div class="drag-drop-icon">📎</div>
-                <h3>এখানে ফাইল বা ছবি ছেড়ে দিন</h3>
-                <p>Excel (.xlsx, .csv), ছবি/ফটো OCR (.png, .jpg), PDF বা ডকুমেন্টস সরাসরি বিশ্লেষণ হবে</p>
+                <h3 data-i18n="drag_drop_title">এখানে ফাইল বা ছবি ছেড়ে দিন</h3>
+                <p data-i18n="drag_drop_desc">Excel (.xlsx, .csv), ছবি/ফটো OCR (.png, .jpg), PDF বা ডকুমেন্টস সরাসরি বিশ্লেষণ হবে</p>
               </div>
             </div>
 
             <div class="chat-privacy-footer">
-              <span>🔒 MyAgent Enterprise • সুরক্ষিত অন-প্রিমিসেস ডেটাবেস ও নিজস্ব এলএলএম সার্ভারে পরিচালিত</span>
+              <span data-i18n="chat_privacy_footer">🔒 MyAgent Enterprise • সুরক্ষিত অন-প্রিমিসেস ডেটাবেস ও নিজস্ব এলএলএম সার্ভারে পরিচালিত</span>
             </div>
           </div>
 
@@ -436,12 +442,12 @@
         <div class="admin-view-container">
           <div class="view-header-row">
             <div>
-              <h3 class="animated-gradient-text">📊 এন্টারপ্রাইজ অ্যানালিটিক্স ড্যাশবোর্ড</h3>
-              <p>রিয়েলটাইম মেমোরি গ্রোথ, স্টোরেজ ব্যবহার এবং সার্ভার কর্মক্ষমতা পর্যবেক্ষণ করুন।</p>
+              <h3 class="animated-gradient-text" data-i18n="dash_title">📊 এন্টারপ্রাইজ অ্যানালিটিক্স ড্যাশবোর্ড</h3>
+              <p data-i18n="dash_desc">রিয়েলটাইম মেমোরি গ্রোথ, স্টোরেজ ব্যবহার এবং সার্ভার কর্মক্ষমতা পর্যবেক্ষণ করুন।</p>
             </div>
             <button class="btn-secondary" onclick="loadDashboardFull()" style="gap:6px;">
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              রিফ্রেশ
+              <span data-i18n="btn_refresh">রিফ্রেশ</span>
             </button>
           </div>
 
@@ -451,7 +457,7 @@
               <div class="kpi-icon icon-purple">📁</div>
               <div class="kpi-data">
                 <div class="kpi-num" id="kpi-docs-count">০</div>
-                <div class="kpi-label">ইনজেস্টেড ডকুমেন্টস</div>
+                <div class="kpi-label" data-i18n="dash_kpi_docs">ইনজেস্টেড ডকুমেন্টস</div>
               </div>
             </div>
 
@@ -459,7 +465,7 @@
               <div class="kpi-icon icon-cyan">🧠</div>
               <div class="kpi-data">
                 <div class="kpi-num" id="kpi-chunks-count">০</div>
-                <div class="kpi-label">ভেক্টর মেমোরি চাঙ্কস</div>
+                <div class="kpi-label" data-i18n="dash_kpi_chunks">ভেক্টর মেমোরি চাঙ্কস</div>
               </div>
             </div>
 
@@ -467,7 +473,7 @@
               <div class="kpi-icon icon-emerald">💬</div>
               <div class="kpi-data">
                 <div class="kpi-num" id="kpi-sessions-count">০</div>
-                <div class="kpi-label">চ্যাট সেশনসমূহ</div>
+                <div class="kpi-label" data-i18n="dash_kpi_sessions">চ্যাট সেশনসমূহ</div>
               </div>
             </div>
 
@@ -475,7 +481,7 @@
               <div class="kpi-icon icon-amber">👥</div>
               <div class="kpi-data">
                 <div class="kpi-num" id="kpi-users-count">১</div>
-                <div class="kpi-label">নিবন্ধিত ইউজার</div>
+                <div class="kpi-label" data-i18n="dash_kpi_users">নিবন্ধিত ইউজার</div>
               </div>
             </div>
 

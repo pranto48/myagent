@@ -1,13 +1,27 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 2.3.0
+ * Project: MyAgent | Version: 3.0.0
  * ============================================================================== */
 
-// Internationalization (i18n) Engine: English & Bangla (Only 2 Languages)
+// Internationalization (i18n) Engine: Strictly English & Bangla (Only 2 Languages)
 
 const I18N_TRANSLATIONS = {
   bn: {
+    // Brand & App
+    app_title: "MyAgent v3.0.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স",
+    app_description: "ডকারাইজড কোম্পানি এআই এজেন্ট, পারসিসটেন্ট মেমোরি, অ্যাডমিন ড্যাশবোর্ড ও বিগ ডাটা অ্যানালিটিক্স",
+
+    // Login Overlay
+    login_title: "MyAgent Enterprise",
+    login_desc: "কোম্পানির সংবেদনশীল ডেটা ও এআই এজেন্ট ব্যবস্থাপনায় অ্যাডমিন লগইন আবশ্যক",
+    login_user_label: "অ্যাডমিন ইউজারনেম (Username)",
+    login_user_placeholder: "admin",
+    login_pass_label: "পাসওয়ার্ড (Password)",
+    login_pass_placeholder: "••••••••",
+    login_btn: "লগইন করুন",
+    login_host_info: "হোস্ট: <code>192.168.9.9:3399</code> • সুরক্ষিত অভ্যন্তরীণ নেটওয়ার্ক",
+
     // Navigation Menu
     nav_chat: "এআই চ্যাট (Chat)",
     nav_admin: "অ্যাডমিন কমান্ড সেন্টার",
@@ -36,6 +50,9 @@ const I18N_TRANSLATIONS = {
     tooltip_theme: "থিম পরিবর্তন করুন (ডার্ক / লাইট)",
     tooltip_export_chat: "চ্যাট এক্সপোর্ট করুন",
     tooltip_lang: "ভাষা পরিবর্তন (বাংলা / English)",
+    btn_export: "এক্সপোর্ট",
+    btn_new_chat: "নতুন চ্যাট",
+    btn_ingest: "ইনজেস্ট",
 
     // Chat Sessions Panel
     sessions_title: "চ্যাট সেশনসমূহ",
@@ -50,20 +67,67 @@ const I18N_TRANSLATIONS = {
     tooltip_logout: "লগআউট",
 
     // Chat Empty State Hero
-    hero_title: "আমি কীভাবে আপনাকে সাহায্য করতে পারি?",
-    hero_desc: "কোম্পানির অভ্যন্তরীণ নথি, স্প্রেডশিট, পলিসি বা ফাইল সম্পর্কিত যেকোনো প্রশ্ন করুন।",
+    hero_badge: "MyAgent Enterprise AI",
+    hero_hello: "হ্যালো,",
+    hero_sub_sparkle: "আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?",
+    hero_desc: "কোম্পানির নিজস্ব সিকিউর ডাটাবেস ও অন-প্রিমিসেস এআই মডেলে পরিচালিত আপনার স্মার্ট কর্পোরেট সহকারী।",
     hero_chip_1: "📊 কোম্পানির আর্থিক বিবরণী বিশ্লেষণ",
     hero_chip_2: "📋 অভ্যন্তরীণ নীতি ও ছুটির নিয়মাবলী",
     hero_chip_3: "🖥️ কম্পিউটার ও আইটি ইনভেন্টরি রিপোর্ট",
     hero_chip_4: "📁 সংযুক্ত ফাইল বা ছবি থেকে ডেটা এক্সট্রাক্ট",
+    hero_card_1_title: "কোম্পানি পলিসি ও রুলস",
+    hero_card_1_desc: "অভ্যন্তরীণ কর্মপদ্ধতি, ছুটি ও নিয়মাবলী অনুসন্ধান",
+    hero_card_2_title: "বিগ ডেটা ও এক্সেল অ্যানালাইসিস",
+    hero_card_2_desc: "স্প্রেডশিটের হিসাব, মেট্রিক্স ও ট্রেন্ড টেবিল তৈরি",
+    hero_card_3_title: "এক্সিকিউটিভ ডাটা রিপোর্ট",
+    hero_card_3_desc: "অটোমেটেড রিপোর্ট জেনারেশন ও পরবর্তী করণীয়",
+    hero_card_4_title: "ফটো ও ইমেজ OCR রিডিং",
+    hero_card_4_desc: "ছবি থেকে টেক্সট ও ডকুমেন্ট সারসংক্ষেপ নিষ্কাশন",
 
-    // Chat Input Bar
-    chat_placeholder: "আপনার প্রশ্ন বা ডেটা বিশ্লেষণ নির্দেশ লিখুন... (Ctrl+V দিয়ে ছবি বা ফাইল পেস্ট করতে পারেন)",
+    // Productivity Quick Action Bar
+    quick_bar_label: "⚡ অ্যাকশন:",
+    chip_quick_note: "📌 মেমোরিতে নোট সেভ",
+    chip_big_data: "📊 বিগ ডেটা",
+    chip_policy_search: "🔍 পলিসি সার্চ",
+    chip_gen_report: "📑 রিপোর্ট তৈরি",
+    chip_py_sandbox: "🐍 পাইথন স্যান্ডবক্স",
+    chip_sec_audit: "🛡️ সিকিউরিটি",
+
+    // Chat Input Bar & Attachments
+    chat_placeholder: "MyAgent-কে প্রশ্ন করুন, বা ফাইল/এক্সেল/ছবি সংযুক্ত করুন... (Shift+Enter নতুন লাইনের জন্য)",
     btn_send_title: "বার্তা পাঠান (Enter)",
     btn_stop_title: "উত্তর তৈরি থামান (Stop Generating)",
     btn_attach_title: "ফাইল বা ফটো যুক্ত করুন (Excel, PDF, Word, Image)",
     memory_checkbox_label: "কোম্পানি মেমোরিতে সংরক্ষণ করুন",
     memory_toggle_label: "কোম্পানি মেমোরি",
+    upload_indexing: "মেমোরি ইনডেক্সিং হচ্ছে...",
+    drag_drop_title: "এখানে ফাইল বা ছবি ছেড়ে দিন",
+    drag_drop_desc: "Excel (.xlsx, .csv), ছবি/ফটো OCR (.png, .jpg), PDF বা ডকুমেন্টস সরাসরি বিশ্লেষণ হবে",
+    chat_privacy_footer: "🔒 MyAgent Enterprise • সুরক্ষিত অন-প্রিমিসেস ডেটাবেস ও নিজস্ব এলএলএম সার্ভারে পরিচালিত",
+
+    // Analytics Dashboard View
+    dash_title: "📊 এন্টারপ্রাইজ অ্যানালিটিক্স ড্যাশবোর্ড",
+    dash_desc: "রিয়েলটাইম মেমোরি গ্রোথ, স্টোরেজ ব্যবহার এবং সার্ভার কর্মক্ষমতা পর্যবেক্ষণ করুন।",
+    dash_kpi_docs: "ইনজেস্টেড ডকুমেন্টস",
+    dash_kpi_chunks: "ভেক্টর মেমোরি চাঙ্কস",
+    dash_kpi_sessions: "চ্যাট সেশনসমূহ",
+    dash_kpi_users: "নিবন্ধিত ইউজার",
+    dash_activity_chart: "📅 ৭ দিনের চ্যাট অ্যাক্টিভিটি",
+    dash_doc_type: "📁 ডকুমেন্ট টাইপ ডিস্ট্রিবিউশন",
+    dash_memory_growth: "🧠 মেমোরি গ্রোথ ট্রেন্ড",
+    dash_llm_status: "⚡ LLM সার্ভার স্ট্যাটাস",
+    dash_recent_docs: "📂 সাম্প্রতিক ডকুমেন্টস",
+    dash_audit_log: "⚡ রিয়েলটাইম অ্যাক্টিভিটি লগ",
+
+    // AI Report Generator View
+    reports_title: "📊 AI রিপোর্ট জেনারেটর",
+    reports_desc: "কোম্পানির নথি ও তথ্যের ভিত্তিতে তাৎক্ষণিক পেশাদার এক্সিকিউটিভ রিপোর্ট তৈরি করুন।",
+    reports_new_title: "✨ নতুন রিপোর্ট তৈরি করুন",
+    reports_saved_title: "📋 সংরক্ষিত রিপোর্টসমূহ",
+
+    // User Management View
+    users_title: "👥 ইউজার ও রোল ম্যানেজমেন্ট",
+    users_desc: "কোম্পানির কর্মকর্তা ও অ্যানালিস্টদের একাউন্ট পারমিশন নিয়ন্ত্রণ করুন।",
 
     // Settings View
     settings_title: "সিস্টেম ও সার্ভার সেটিংস",
@@ -98,6 +162,7 @@ const I18N_TRANSLATIONS = {
     btn_save_memory: "মেমোরিতে সেভ করুন",
 
     // Knowledge View
+    kb_title: "ডেটা ও নলেজবেস হাব",
     kb_upload_title: "ফাইল, এক্সেল ও ফটো আপলোড",
     kb_upload_desc: "PDF, Word (.docx), Excel (.xlsx), CSV, Text এবং ফটো/ছবি (.png, .jpg) আপলোড করুন।",
     kb_dropzone_text: "ফাইল বা ছবি এখানে ড্রপ করুন অথবা ব্রাউজ করুন",
@@ -112,13 +177,50 @@ const I18N_TRANSLATIONS = {
     btn_reindex_docs: "🔄 স্মার্ট রি-ইনডেক্স",
     btn_refresh: "🔄 রিফ্রেশ",
 
+    // Models View
+    models_title: "⚡ এআই মডেল হাব ও লাইভ লেটেন্সি পিং সিস্টেম",
+
+    // MCP View
+    mcp_title: "🔌 টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব",
+
+    // Security View
+    sec_title: "🛡️ এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স",
+
+    // Backup View
+    backup_title: "💾 ডেটা, চ্যাট ও সেটিংস সম্পূর্ণ ব্যাকআপ এবং রিস্টোর",
+
+    // Admin View
+    admin_title: "অ্যাডমিন কমান্ড ও কন্ট্রোল সেন্টার",
+
     // Toasts & Notifications
     toast_lang_changed: "🌐 ভাষা পরিবর্তন করা হয়েছে: বাংলা",
     toast_session_created: "নতুন চ্যাট সেশন শুরু হয়েছে।",
     toast_copied: "ক্লিপবোর্ডে কপি করা হয়েছে!",
-    toast_saved: "সফলভাবে সংরক্ষিত হয়েছে!"
+    toast_saved: "সফলভাবে সংরক্ষিত হয়েছে!",
+    toast_gen_stopped: "উত্তর তৈরি বন্ধ করা হয়েছে।",
+    toast_mem_active: "কোম্পানি মেমোরি সার্চ সক্রিয়",
+    toast_mem_disabled: "মেমোরি সার্চ বন্ধ",
+    toast_no_export: "এক্সপোর্ট করার মতো কোনো মেসেজ নেই।",
+    toast_export_ok: "চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!",
+    toast_clip_attached: "ফাইল ক্লিপবোর্ড থেকে সংযুক্ত করা হয়েছে",
+    toast_login_required: "অনুগ্রহ করে অ্যাডমিন লগইন সম্পন্ন করুন।"
   },
+
   en: {
+    // Brand & App
+    app_title: "MyAgent v3.0.0 - Enterprise Company AI Agent & Analytics",
+    app_description: "Dockerized Company AI Agent, Persistent Memory, Admin Dashboard & Big Data Analytics",
+
+    // Login Overlay
+    login_title: "MyAgent Enterprise",
+    login_desc: "Admin login required to access sensitive company data and AI agent control",
+    login_user_label: "Admin Username",
+    login_user_placeholder: "admin",
+    login_pass_label: "Password",
+    login_pass_placeholder: "••••••••",
+    login_btn: "Sign In",
+    login_host_info: "Host: <code>192.168.9.9:3399</code> • Secure Internal Network",
+
     // Navigation Menu
     nav_chat: "AI Chat",
     nav_admin: "Admin Command Center",
@@ -147,6 +249,9 @@ const I18N_TRANSLATIONS = {
     tooltip_theme: "Toggle Theme (Dark / Light)",
     tooltip_export_chat: "Export Chat Conversation",
     tooltip_lang: "Change Language (Bangla / English)",
+    btn_export: "Export",
+    btn_new_chat: "New Chat",
+    btn_ingest: "Ingest",
 
     // Chat Sessions Panel
     sessions_title: "Chat Sessions",
@@ -161,20 +266,67 @@ const I18N_TRANSLATIONS = {
     tooltip_logout: "Logout",
 
     // Chat Empty State Hero
-    hero_title: "How can I help you today?",
-    hero_desc: "Ask any question regarding company documents, spreadsheets, policies, or internal files.",
-    hero_chip_1: "📊 Analyze Financial Statements",
+    hero_badge: "MyAgent Enterprise AI",
+    hero_hello: "Hello,",
+    hero_sub_sparkle: "How can I assist you today?",
+    hero_desc: "Your smart corporate assistant powered by internal company database and on-premises AI models.",
+    hero_chip_1: "📊 Financial Statement Analysis",
     hero_chip_2: "📋 Internal Policies & Leave Rules",
     hero_chip_3: "🖥️ IT & Computer Inventory Report",
     hero_chip_4: "📁 Extract Data from Files & Photos",
+    hero_card_1_title: "Company Policies & Rules",
+    hero_card_1_desc: "Internal procedures, leave policies, and guidelines",
+    hero_card_2_title: "Big Data & Excel Analysis",
+    hero_card_2_desc: "Spreadsheet calculation, metrics, and trend tables",
+    hero_card_3_title: "Executive Data Report",
+    hero_card_3_desc: "Automated report generation and action items",
+    hero_card_4_title: "Photo & Image OCR Reading",
+    hero_card_4_desc: "Extract text and document summaries from images",
 
-    // Chat Input Bar
-    chat_placeholder: "Type your question or data analysis instructions... (Ctrl+V to paste photos/files)",
+    // Productivity Quick Action Bar
+    quick_bar_label: "⚡ Actions:",
+    chip_quick_note: "📌 Save Note",
+    chip_big_data: "📊 Big Data",
+    chip_policy_search: "🔍 Policy Search",
+    chip_gen_report: "📑 Generate Report",
+    chip_py_sandbox: "🐍 Python Sandbox",
+    chip_sec_audit: "🛡️ Security",
+
+    // Chat Input Bar & Attachments
+    chat_placeholder: "Ask MyAgent, or attach files/Excel/photos... (Shift+Enter for newline)",
     btn_send_title: "Send Message (Enter)",
     btn_stop_title: "Stop Generating",
     btn_attach_title: "Attach Files or Photos (Excel, PDF, Word, Image)",
     memory_checkbox_label: "Save to company memory",
     memory_toggle_label: "Company Memory",
+    upload_indexing: "Indexing into memory...",
+    drag_drop_title: "Drop files or photos here",
+    drag_drop_desc: "Excel (.xlsx, .csv), Image OCR (.png, .jpg), PDF, or documents analyzed directly",
+    chat_privacy_footer: "🔒 MyAgent Enterprise • Secure on-premises database & dedicated LLM server",
+
+    // Analytics Dashboard View
+    dash_title: "📊 Enterprise Analytics Dashboard",
+    dash_desc: "Monitor real-time memory growth, storage utilization, and server performance.",
+    dash_kpi_docs: "Ingested Documents",
+    dash_kpi_chunks: "Vector Memory Chunks",
+    dash_kpi_sessions: "Chat Sessions",
+    dash_kpi_users: "Registered Users",
+    dash_activity_chart: "📅 7-Day Chat Activity",
+    dash_doc_type: "📁 Document Type Distribution",
+    dash_memory_growth: "🧠 Memory Growth Trend",
+    dash_llm_status: "⚡ LLM Server Status",
+    dash_recent_docs: "📂 Recent Documents",
+    dash_audit_log: "⚡ Real-time Activity Log",
+
+    // AI Report Generator View
+    reports_title: "📊 AI Report Generator",
+    reports_desc: "Generate instant executive corporate reports backed by internal documents.",
+    reports_new_title: "✨ Create New Report",
+    reports_saved_title: "📋 Saved Reports",
+
+    // User Management View
+    users_title: "👥 User & Role Management",
+    users_desc: "Manage company personnel and role access permissions.",
 
     // Settings View
     settings_title: "System & Server Settings",
@@ -209,6 +361,7 @@ const I18N_TRANSLATIONS = {
     btn_save_memory: "Save to Memory",
 
     // Knowledge View
+    kb_title: "Data & Knowledge Base Hub",
     kb_upload_title: "Upload Files, Spreadsheets & Photos",
     kb_upload_desc: "Upload PDF, Word (.docx), Excel (.xlsx), CSV, Text, and Photos/Images (.png, .jpg).",
     kb_dropzone_text: "Drop files or photos here or click to browse",
@@ -223,11 +376,33 @@ const I18N_TRANSLATIONS = {
     btn_reindex_docs: "🔄 Smart Re-index",
     btn_refresh: "🔄 Refresh",
 
+    // Models View
+    models_title: "⚡ AI Model Hub & Live Latency Ping",
+
+    // MCP View
+    mcp_title: "🔌 Tools & Model Context Protocol (MCP) Hub",
+
+    // Security View
+    sec_title: "🛡️ Enterprise Data Security & Compliance",
+
+    // Backup View
+    backup_title: "💾 Full Data, Chat & Settings Backup and Restore",
+
+    // Admin View
+    admin_title: "Admin Command & Control Center",
+
     // Toasts & Notifications
     toast_lang_changed: "🌐 Language switched to: English",
     toast_session_created: "New chat session started.",
     toast_copied: "Copied to clipboard!",
-    toast_saved: "Saved successfully!"
+    toast_saved: "Saved successfully!",
+    toast_gen_stopped: "Generation stopped.",
+    toast_mem_active: "Company memory search enabled",
+    toast_mem_disabled: "Memory search disabled",
+    toast_no_export: "No messages to export.",
+    toast_export_ok: "Chat conversation exported successfully!",
+    toast_clip_attached: "Files attached from clipboard",
+    toast_login_required: "Please log in to continue."
   }
 };
 
@@ -289,7 +464,7 @@ function setAppLanguage(lang, notify = true) {
     if (val) el.title = val;
   });
 
-  // 5. Update language toggle buttons in Topbar and Mobile Navbar
+  // 5. Update language toggle buttons across Topbar, Mobile Navbar, Login Card
   updateLanguageSwitcherUI(lang);
 
   // 6. Update Settings View Language Cards
@@ -305,34 +480,28 @@ function setAppLanguage(lang, notify = true) {
 }
 
 /**
- * Updates UI state of language switcher buttons across topbar and mobile navbar.
+ * Updates UI state of language switcher buttons across topbar, mobile navbar, and login overlay.
  */
 function updateLanguageSwitcherUI(lang) {
-  // Topbar Buttons
-  const btnBn = document.getElementById('btn-lang-bn');
-  const btnEn = document.getElementById('btn-lang-en');
-  if (btnBn && btnEn) {
-    if (lang === 'bn') {
-      btnBn.classList.add('active');
-      btnEn.classList.remove('active');
-    } else {
-      btnEn.classList.add('active');
-      btnBn.classList.remove('active');
-    }
-  }
+  const switchers = [
+    { bn: 'btn-lang-bn', en: 'btn-lang-en' },
+    { bn: 'mobile-btn-lang-bn', en: 'mobile-btn-lang-en' },
+    { bn: 'login-btn-lang-bn', en: 'login-btn-lang-en' }
+  ];
 
-  // Mobile Navbar Buttons
-  const mBtnBn = document.getElementById('mobile-btn-lang-bn');
-  const mBtnEn = document.getElementById('mobile-btn-lang-en');
-  if (mBtnBn && mBtnEn) {
-    if (lang === 'bn') {
-      mBtnBn.classList.add('active');
-      mBtnEn.classList.remove('active');
-    } else {
-      mBtnEn.classList.add('active');
-      mBtnBn.classList.remove('active');
+  switchers.forEach(s => {
+    const btnBn = document.getElementById(s.bn);
+    const btnEn = document.getElementById(s.en);
+    if (btnBn && btnEn) {
+      if (lang === 'bn') {
+        btnBn.classList.add('active');
+        btnEn.classList.remove('active');
+      } else {
+        btnEn.classList.add('active');
+        btnBn.classList.remove('active');
+      }
     }
-  }
+  });
 }
 
 /**

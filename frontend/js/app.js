@@ -26,10 +26,10 @@ function stopGenerating() {
     sendBtn.classList.remove('streaming-active');
     sendBtn.disabled = false;
     sendBtn.innerHTML = SEND_ICON_SVG;
-    sendBtn.title = 'বার্তা পাঠান (Enter)';
+    sendBtn.title = typeof t === 'function' ? t('btn_send_title', 'বার্তা পাঠান (Enter)') : 'বার্তা পাঠান (Enter)';
   }
   attachChatEventListeners();
-  showToast('উত্তর তৈরি বন্ধ করা হয়েছে।', 'info');
+  showToast(typeof t === 'function' ? t('toast_gen_stopped', 'উত্তর তৈরি বন্ধ করা হয়েছে।') : 'উত্তর তৈরি বন্ধ করা হয়েছে।', 'info');
 }
 
 // Original Send Button SVG Icon
@@ -319,9 +319,16 @@ function toggleMemoryUsage() {
     chk.checked = !chk.checked;
     useMemory = chk.checked;
     if (text) {
-      text.innerText = useMemory ? 'মেমোরি অন' : 'মেমোরি অফ';
+      text.innerText = useMemory 
+        ? (typeof t === 'function' ? t('memory_toggle_label', 'কোম্পানি মেমোরি') : 'কোম্পানি মেমোরি')
+        : (typeof t === 'function' ? (getAppLanguage() === 'en' ? 'Memory Off' : 'মেমোরি বন্ধ') : 'মেমোরি বন্ধ');
     }
-    showToast(useMemory ? 'কোম্পানি মেমোরি সার্চ সক্রিয়' : 'মেমোরি সার্চ বন্ধ', 'info');
+    showToast(
+      useMemory 
+        ? (typeof t === 'function' ? t('toast_mem_active', 'কোম্পানি মেমোরি সার্চ সক্রিয়') : 'কোম্পানি মেমোরি সার্চ সক্রিয়')
+        : (typeof t === 'function' ? t('toast_mem_disabled', 'মেমোরি সার্চ বন্ধ') : 'মেমোরি সার্চ বন্ধ'),
+      'info'
+    );
   }
 }
 
@@ -437,7 +444,7 @@ function toggleMemoryUsage() {
 // Export Chat Conversation as Markdown
 function exportChatConversation() {
   if (!conversationHistory || conversationHistory.length === 0) {
-    showToast('এক্সপোর্ট করার মতো কোনো মেসেজ নেই।', 'info');
+    showToast(typeof t === 'function' ? t('toast_no_export', 'এক্সপোর্ট করার মতো কোনো মেসেজ নেই।') : 'এক্সপোর্ট করার মতো কোনো মেসেজ নেই।', 'info');
     return;
   }
 
@@ -458,7 +465,7 @@ function exportChatConversation() {
   a.download = `myagent_chat_${Date.now()}.md`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!', 'success');
+  showToast(typeof t === 'function' ? t('toast_export_ok', 'চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!') : 'চ্যাট কথোপকথন সফলভাবে ডাউনলোড হয়েছে!', 'success');
 }
 
 // Quick Productivity Action Prompt Handlers
@@ -557,7 +564,7 @@ async function createNewChatSession() {
       }
       
       await loadChatSessions();
-      showToast('নতুন চ্যাট সেশন শুরু হয়েছে।', 'info');
+      showToast(typeof t === 'function' ? t('toast_session_created', 'নতুন চ্যাট সেশন শুরু হয়েছে।') : 'নতুন চ্যাট সেশন শুরু হয়েছে।', 'info');
       return currentSessionId;
     }
   } catch (err) {
@@ -1340,4 +1347,26 @@ function filterChatMessages(query) {
     }
   });
 }
+
+// Listen for Language Switch Events
+window.addEventListener('appLanguageChanged', (e) => {
+  const lang = e.detail && e.detail.language ? e.detail.language : 'bn';
+  if (typeof t === 'function') {
+    document.title = t('app_title', document.title);
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', t('app_description', metaDesc.getAttribute('content')));
+    }
+    const statusText = document.getElementById('agent-online-status');
+    if (statusText) {
+      statusText.innerText = isServerHealthy ? t('status_online', 'অনলাইন') : t('status_offline', 'অফলাইন');
+    }
+    const memToggleText = document.getElementById('memory-toggle-text');
+    if (memToggleText) {
+      memToggleText.innerText = useMemory 
+        ? t('memory_toggle_label', 'কোম্পানি মেমোরি')
+        : (lang === 'en' ? 'Memory Off' : 'মেমোরি বন্ধ');
+    }
+  }
+});
 
