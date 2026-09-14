@@ -148,3 +148,36 @@ class ChatSessionStore:
             return True
         finally:
             await db.close()
+
+    @classmethod
+    async def purge_all_sessions(cls) -> Dict[str, Any]:
+        """
+        Nuclear Chat Session Purge:
+        1. Deletes all chat messages and sessions.
+        2. Executes VACUUM on SQLite database to defragment storage.
+        3. Initializes a fresh initial conversation session.
+        """
+        db = await cls.get_db()
+        try:
+            cursor = await db.execute("SELECT COUNT(*) FROM messages")
+            msg_count = (await cursor.fetchone())[0]
+            cursor = await db.execute("SELECT COUNT(*) FROM sessions")
+            sess_count = (await cursor.fetchone())[0]
+
+            await db.execute("DELETE FROM messages")
+            await db.execute("DELETE FROM sessions")
+            await db.commit()
+            await db.execute("VACUUM")
+            await db.commit()
+
+            # Create clean initial session
+            new_session = await cls.create_session(title="নতুন চ্যাট")
+            return {
+                "success": True,
+                "purged_sessions": sess_count,
+                "purged_messages": msg_count,
+                "new_session_id": new_session["id"]
+            }
+        finally:
+            await db.close()
+

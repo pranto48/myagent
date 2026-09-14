@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from memory.vector_store import VectorMemoryStore
+from memory.chat_session_store import ChatSessionStore
 from models.schemas import MemorySearchRequest, MemorySearchResult, AddMemoryNoteRequest
 
 router = APIRouter(prefix="/api/memory", tags=["Vector Memory"])
@@ -10,6 +11,11 @@ router = APIRouter(prefix="/api/memory", tags=["Vector Memory"])
 class UpdateChunkRequest(BaseModel):
     content: str
     metadata: Optional[Dict[str, Any]] = None
+
+class PurgeMemoryRequest(BaseModel):
+    purge_type: str = "nuclear"  # "nuclear", "vectors_only", "chat_only"
+    auto_backup: bool = True
+    confirmation_code: str
 
 @router.get("/chunks")
 async def list_chunks(
@@ -135,4 +141,71 @@ async def optimize_vector_store():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"মেমোরি অপ্টিমাইজেশন ব্যর্থ হয়েছে: {str(e)}")
+
+@router.post("/purge")
+async def purge_agent_memory(req: PurgeMemoryRequest):
+    """
+    Cognitive 200IQ Multi-Tier Agent Memory Purge & Reset:
+    - Tier 1: 'nuclear' - Purges all vectors, documents, FTS5 index, and all chat sessions.
+    - Tier 2: 'vectors_only' - Purges all vector memories, documents, and FTS5 index (preserves chat history).
+    - Tier 3: 'chat_only' - Purges all chat sessions and conversation history (preserves vector knowledge base).
+    Requires safety confirmation code 'DELETE' or 'মুছে ফেলুন'.
+    """
+    valid_codes = ["DELETE", "PURGE", "CONFIRM_DELETE", "মুছে ফেলুন"]
+    if req.confirmation_code.strip().upper() not in [c.upper() for c in valid_codes]:
+        raise HTTPException(
+            status_code=400,
+            detail="নিরাপত্তা নিশ্চিতকরণ কোডটি মেলেনি। মেমোরি মুছতে হলে সঠিকভাবে 'DELETE' টাইপ করুন।"
+        )
+
+    store = VectorMemoryStore()
+    results: Dict[str, Any] = {
+        "success": True,
+        "purge_type": req.purge_type,
+        "auto_backup": req.auto_backup
+    }
+
+    # 1. Vector Knowledge Base & Document Purge
+    if req.purge_type in ["nuclear", "vectors_only"]:
+        vec_res = store.purge_all_vector_memory(preserve_backup=req.auto_backup)
+        results["vector_memory"] = vec_res
+
+    # 2. Chat Sessions Purge
+    if req.purge_type in ["nuclear", "chat_only"]:
+        chat_res = await ChatSessionStore.purge_all_sessions()
+        results["chat_sessions"] = chat_res
+
+    # Message summary
+    if req.purge_type == "nuclear":
+        results["message"] = "এজেন্টের সমস্ত ভেক্টর নলেজবেস, ডকুমেন্টস এবং চ্যাট হিস্ট্রি সম্পূর্ণভাবে মুছে ক্লিন ফ্যাক্টরি রিসেট করা হয়েছে।"
+    elif req.purge_type == "vectors_only":
+        results["message"] = "এজেন্টের সমস্ত ভেক্টর নলেজবেস ও সংরক্ষিত ডকুমেন্টস সফলভাবে মুছে ফ্রেশ বেসলাইনে অপ্টিমাইজ করা হয়েছে।"
+    else:
+        results["message"] = "এজেন্টের সমস্ত কনভারসেশন ও চ্যাট ডায়ালগ সেশন সফলভাবে মুছে নতুন চ্যাট সেশন শুরু করা হয়েছে।"
+
+    return results
+
+@router.get("/health")
+async def get_memory_health():
+    """
+    Returns real-time 200IQ cognitive memory health diagnostics, storage footprint, and performance metrics.
+    """
+    store = VectorMemoryStore()
+    telemetry = store.get_memory_health_telemetry()
+    
+    try:
+        db = await ChatSessionStore.get_db()
+        try:
+            cur = await db.execute("SELECT COUNT(*) FROM sessions")
+            telemetry["total_chat_sessions"] = (await cur.fetchone())[0]
+            cur = await db.execute("SELECT COUNT(*) FROM messages")
+            telemetry["total_chat_messages"] = (await cur.fetchone())[0]
+        finally:
+            await db.close()
+    except Exception:
+        telemetry["total_chat_sessions"] = 0
+        telemetry["total_chat_messages"] = 0
+
+    return telemetry
+
 

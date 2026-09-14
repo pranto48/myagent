@@ -679,7 +679,27 @@ const I18N_TRANSLATIONS = {
     backup_status_protected: "সুরক্ষিত",
     reports_gen_btn: "📊 রিপোর্ট তৈরি করুন",
     btn_save_changes: "পরিবর্তন সেভ করুন",
-  },
+  
+    // Cognitive Memory Purge & Reset Hub
+    btn_purge_memory: "🗑️ মেমোরি পার্জ ও রিসেট",
+    admin_action_purge: "নিউক্লিয়ার মেমোরি রিসেট",
+    admin_action_purge_desc: "ভেক্টর মেমোরি ও চ্যাট হিস্ট্রি ফ্যাক্টরি ওয়াইপ",
+    purge_modal_title: "এআই মেমোরি পার্জ ও কগনিটিভ রিসেট সেন্টার",
+    purge_modal_subtitle: "এজেন্টের মেমোরি পিউরিফিকেশন ও জিরো-ওভারহেড পাওয়ার-আপ হাব",
+    purge_stat_chunks: "মোট ভেক্টর চাঙ্ক:",
+    purge_stat_docs: "ডকুমেন্টস:",
+    purge_stat_sessions: "চ্যাট সেশন:",
+    purge_mode_label: "পার্জ ও রিসেট মোড নির্বাচন করুন:",
+    purge_mode_nuclear_title: "সম্পূর্ণ নিউক্লিয়ার ফ্যাক্টরি রিসেট (সুপার পাওয়ার-আপ)",
+    purge_mode_nuclear_desc: "সকল ভেক্টর এমবেডিংস, ডকুমেন্টস, FTS5 ইন্ডেক্স ও চ্যাট সেশন ক্লিন মুছে ডাটাবেস সম্পূর্ণ ভ্যাকুয়াম ও ফ্রেশ করে।",
+    purge_mode_vectors_title: "শুধুমাত্র নলেজবেস ও ভেক্টর মেমোরি রিসেট",
+    purge_mode_vectors_desc: "সমস্ত আপলোডকৃত ফাইল ও ভেক্টর এমবেডিং মুছে ফেলা হবে, তবে চ্যাট হিস্ট্রি সংরক্ষিত থাকবে।",
+    purge_mode_chat_title: "শুধুমাত্র চ্যাট হিস্ট্রি ও ডায়ালগ মেমোরি রিসেট",
+    purge_mode_chat_desc: "পূর্বের সমস্ত চ্যাট কনভারসেশন ও বার্তা মুছে নতুন ফ্রেশ চ্যাট শুরু করে, নলেজবেস অপরিবর্তিত থাকে।",
+    purge_auto_backup_label: "🛡️ স্বয়ংক্রিয় সেফটি ব্যাকআপ (মুছে ফেলার পূর্বে ইনস্ট্যান্ট .zip ব্যাকআপ তৈরি করুন)",
+    purge_confirm_phrase_label: "নিশ্চিত করতে নিচের বক্সে DELETE টাইপ করুন:",
+    btn_confirm_purge: "💀 মেমোরি স্থায়ীভাবে রিসেট করুন",
+},
 
   en: {
     // Brand & App
@@ -1353,6 +1373,26 @@ const I18N_TRANSLATIONS = {
     backup_status_protected: "Protected",
     reports_gen_btn: "📊 Generate Report",
     btn_save_changes: "Save Changes",
+
+    // Cognitive Memory Purge & Reset Hub
+    btn_purge_memory: "🗑️ Purge & Reset Memory",
+    admin_action_purge: "Nuclear Memory Reset",
+    admin_action_purge_desc: "Factory wipe all vector memory & chat history",
+    purge_modal_title: "AI Memory Purge & Cognitive Reset Center",
+    purge_modal_subtitle: "Agent Memory Purification & Zero-Overhead Power-Up Hub",
+    purge_stat_chunks: "Total Vector Chunks:",
+    purge_stat_docs: "Documents:",
+    purge_stat_sessions: "Chat Sessions:",
+    purge_mode_label: "Select Purge & Reset Mode:",
+    purge_mode_nuclear_title: "Full Nuclear Factory Reset (Super Power-Up)",
+    purge_mode_nuclear_desc: "Wipes all vector embeddings, documents, FTS5 index, and chat sessions; vacuums databases completely.",
+    purge_mode_vectors_title: "Knowledge Base & Vectors Only",
+    purge_mode_vectors_desc: "Purges all uploaded documents and vector embeddings, while preserving chat history.",
+    purge_mode_chat_title: "Chat History & Dialogues Only",
+    purge_mode_chat_desc: "Wipes previous conversation dialogues and starts fresh chat; leaves knowledge base intact.",
+    purge_auto_backup_label: "🛡️ Automated Safety Backup (Create instant .zip backup prior to purge)",
+    purge_confirm_phrase_label: "To confirm, type DELETE in the box below:",
+    btn_confirm_purge: "💀 Permanently Reset Memory",
   }
 };
 

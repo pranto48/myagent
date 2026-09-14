@@ -535,3 +535,133 @@ document.addEventListener('DOMContentLoaded', () => {
   loadChunksList();
 });
 
+// =============================================================================
+// 💀 COGNITIVE 200IQ MEMORY PURGE & FACTORY RESET ENGINE
+// =============================================================================
+
+async function openPurgeMemoryModal() {
+  const modal = document.getElementById('purge-memory-modal');
+  if (!modal) return;
+
+  // Reset state
+  const confirmInput = document.getElementById('purge-confirm-input');
+  if (confirmInput) confirmInput.value = '';
+  const execBtn = document.getElementById('btn-execute-purge');
+  if (execBtn) execBtn.disabled = true;
+  const radios = document.querySelectorAll('input[name="purge-type-radio"]');
+  radios.forEach(r => { if (r.value === 'nuclear') r.checked = true; });
+  const backupChk = document.getElementById('purge-auto-backup');
+  if (backupChk) backupChk.checked = true;
+
+  // Load telemetry
+  try {
+    const res = await fetch('/api/memory/health', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const cv = document.getElementById('purge-stat-chunks-val');
+      const dv = document.getElementById('purge-stat-docs-val');
+      const sv = document.getElementById('purge-stat-sessions-val');
+      if (cv) cv.textContent = (d.total_chunks || 0).toLocaleString();
+      if (dv) dv.textContent = (d.total_documents || 0).toLocaleString();
+      if (sv) sv.textContent = (d.total_chat_sessions || 0).toLocaleString();
+    }
+  } catch (e) {
+    // Silently ignore telemetry load errors
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closePurgeMemoryModal() {
+  const modal = document.getElementById('purge-memory-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function checkPurgeCodeInput() {
+  const val = (document.getElementById('purge-confirm-input')?.value || '').trim().toUpperCase();
+  const btn = document.getElementById('btn-execute-purge');
+  const validCodes = ['DELETE', 'PURGE', 'CONFIRM_DELETE', 'মুছে ফেলুন'];
+  if (btn) btn.disabled = !validCodes.includes(val);
+}
+
+async function executePurgeMemory() {
+  const confirmCode = document.getElementById('purge-confirm-input')?.value.trim() || '';
+  const purgeType = document.querySelector('input[name="purge-type-radio"]:checked')?.value || 'nuclear';
+  const autoBackup = document.getElementById('purge-auto-backup')?.checked ?? true;
+  const execBtn = document.getElementById('btn-execute-purge');
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+
+  if (execBtn) {
+    execBtn.disabled = true;
+    execBtn.innerHTML = isEn ? '⏳ Purging Agent Memory...' : '⏳ এজেন্ট মেমোরি মুছে হচ্ছে...';
+  }
+
+  showToast(
+    isEn ? '💀 Agent Memory Purge Engine activated. Processing...' : '💀 এজেন্ট মেমোরি পার্জ ইঞ্জিন সক্রিয়। প্রসেসিং চলছে...',
+    'info'
+  );
+
+  try {
+    const res = await fetch('/api/memory/purge', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof getAuthHeaders === 'function' ? getAuthHeaders() : {})
+      },
+      body: JSON.stringify({
+        purge_type: purgeType,
+        auto_backup: autoBackup,
+        confirmation_code: confirmCode
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      closePurgeMemoryModal();
+
+      const vm = data.vector_memory || {};
+      const cs = data.chat_sessions || {};
+      const chunksGone = vm.chunks_purged || 0;
+      const docsGone = vm.documents_purged || 0;
+      const sessGone = cs.purged_sessions || 0;
+      const backupMade = vm.backup_created || false;
+
+      const summaryMsg = isEn
+        ? `✅ Agent memory fully reset! Purged: ${chunksGone} vector chunks, ${docsGone} documents, ${sessGone} chat sessions. DB vacuumed. ${backupMade ? '🛡️ Safety backup created.' : ''}`
+        : `✅ এজেন্ট মেমোরি সম্পূর্ণ রিসেট! মুছে গেছে: ${chunksGone}টি ভেক্টর, ${docsGone}টি ডকুমেন্ট, ${sessGone}টি চ্যাট সেশন। ডাটাবেস ভ্যাকুয়াম হয়েছে। ${backupMade ? '🛡️ সেফটি ব্যাকআপ সংরক্ষিত।' : ''}`;
+
+      showToast(summaryMsg, 'success');
+
+      // Refresh all relevant panels
+      loadDocumentList();
+      loadMemoryStats();
+      loadChunksList(0);
+      if (typeof loadAdminMetrics === 'function') loadAdminMetrics();
+      if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
+      if (typeof loadSessionList === 'function') loadSessionList();
+
+      // If new session was created, switch to it
+      if (cs.new_session_id && typeof loadSessionMessages === 'function') {
+        loadSessionMessages(cs.new_session_id);
+      }
+    } else {
+      showToast(
+        isEn ? `Purge failed: ${data.detail || 'Server error'}` : `পার্জ ব্যর্থ: ${data.detail || 'সার্ভার ত্রুটি'}`,
+        'error'
+      );
+      if (execBtn) {
+        execBtn.disabled = false;
+        execBtn.innerHTML = isEn ? '💀 Permanently Reset Memory' : '💀 মেমোরি স্থায়ীভাবে রিসেট করুন';
+      }
+    }
+  } catch (err) {
+    showToast(isEn ? `Error: ${err.message}` : `ত্রুটি: ${err.message}`, 'error');
+    if (execBtn) {
+      execBtn.disabled = false;
+      execBtn.innerHTML = isEn ? '💀 Permanently Reset Memory' : '💀 মেমোরি স্থায়ীভাবে রিসেট করুন';
+    }
+  }
+}

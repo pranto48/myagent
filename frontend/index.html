@@ -796,6 +796,7 @@
                 <span class="badge-tag" id="chunks-total-count-badge" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow); font-size:0.82rem; padding:4px 10px;" data-i18n="chunks_badge_initial">০টি চাঙ্ক</span>
                 <button class="btn-sm-action" id="btn-optimize-store" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4); background:rgba(6,182,212,0.1);" onclick="optimizeMemoryStore()" title="FTS5 ইনডেক্স মার্জ, ডিফ্র্যাগমেন্টেশন ও SQLite VACUUM" data-i18n="btn_optimize_memory">⚡ মেমোরি অপ্টিমাইজ</button>
                 <button class="btn-sm-action" id="btn-reindex-docs" style="color:var(--amber-warning); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1);" onclick="reindexAllDocuments()" title="স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে সকল ফাইল পুনরায় ইনডেক্স করুন" data-i18n="btn_reindex_memory">🔄 স্মার্ট রি-ইনডেক্স</button>
+                <button class="btn-sm-action" id="btn-purge-all-memory" style="color:var(--rose-red); border-color:rgba(244,63,94,0.5); background:rgba(244,63,94,0.12);" onclick="openPurgeMemoryModal()" title="এজেন্টের সমস্ত মেমোরি ডাটা ও নলেজবেস ক্লিন রিসেট করুন" data-i18n="btn_purge_memory">🗑️ মেমোরি পার্জ ও রিসেট</button>
                 <button class="btn-sm-action" style="color:var(--emerald-green); border-color:rgba(16,185,129,0.3);" onclick="loadChunksList(currentChunksPage)" data-i18n="btn_refresh">🔄 রিফ্রেশ</button>
               </div>
             </div>
@@ -1340,6 +1341,14 @@
                 <div class="btn-text">
                   <span class="btn-title" data-i18n="admin_action_refresh">সিস্টেম মেট্রিক্স রিফ্রেশ</span>
                   <span class="btn-desc" data-i18n="admin_action_refresh_desc">টেলিমেট্রি ডাটা লাইভ আপডেট</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="openPurgeMemoryModal()" style="border-color:rgba(244,63,94,0.4);">
+                <div class="btn-icon" style="color:var(--rose-red);">💀</div>
+                <div class="btn-text">
+                  <span class="btn-title" style="color:#fb7185;" data-i18n="admin_action_purge">নিউক্লিয়ার মেমোরি রিসেট</span>
+                  <span class="btn-desc" data-i18n="admin_action_purge_desc">ভেক্টর মেমোরি ও চ্যাট হিস্ট্রি ফ্যাক্টরি ওয়াইপ</span>
                 </div>
               </button>
             </div>
@@ -1925,6 +1934,79 @@
             <button type="submit" class="btn-primary" id="btn-submit-quick-note" data-i18n="btn_save_memory">মেমোরিতে সেভ করুন</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Cognitive 200IQ Memory Purge & Factory Reset Modal -->
+    <div class="modal-backdrop" id="purge-memory-modal" style="display:none;">
+      <div class="modal-window" style="max-width: 580px; border: 1px solid rgba(244, 63, 94, 0.4); box-shadow: 0 0 35px rgba(244, 63, 94, 0.25);">
+        <div class="modal-header" style="border-bottom: 1px solid rgba(244, 63, 94, 0.2);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:1.6rem; filter: drop-shadow(0 0 10px rgba(244,63,94,0.6));">💀</span>
+            <div>
+              <h3 style="color:#fb7185; margin:0;" data-i18n="purge_modal_title">এআই মেমোরি পার্জ ও কগনিটিভ রিসেট সেন্টার</h3>
+              <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="purge_modal_subtitle">এজেন্টের মেমোরি পিউরিফিকেশন ও জিরো-ওভারহেড পাওয়ার-আপ হাব</small>
+            </div>
+          </div>
+          <button class="close-modal-btn" type="button" onclick="closePurgeMemoryModal()">&times;</button>
+        </div>
+
+        <div style="margin-top:16px; display:flex; flex-direction:column; gap:14px;">
+          <!-- Telemetry Mini Bar -->
+          <div id="purge-telemetry-box" style="background:rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; font-size:0.82rem;">
+            <span><strong data-i18n="purge_stat_chunks">মোট ভেক্টর চাঙ্ক:</strong> <span id="purge-stat-chunks-val" style="color:var(--cyan-glow);">০</span></span>
+            <span><strong data-i18n="purge_stat_docs">ডকুমেন্টস:</strong> <span id="purge-stat-docs-val" style="color:var(--amber-warning);">০</span></span>
+            <span><strong data-i18n="purge_stat_sessions">চ্যাট সেশন:</strong> <span id="purge-stat-sessions-val" style="color:#a78bfa;">০</span></span>
+          </div>
+
+          <!-- Purge Mode Selection -->
+          <div class="form-group">
+            <label style="color:#f1f5f9; font-weight:600; font-size:0.88rem; margin-bottom:8px; display:block;" data-i18n="purge_mode_label">পার্জ ও রিসেট মোড নির্বাচন করুন:</label>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:flex-start; gap:10px; background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.25); border-radius:8px; padding:10px; cursor:pointer;">
+                <input type="radio" name="purge-type-radio" value="nuclear" checked style="margin-top:3px;">
+                <div>
+                  <strong style="color:#fb7185; font-size:0.9rem;" data-i18n="purge_mode_nuclear_title">সম্পূর্ণ নিউক্লিয়ার ফ্যাক্টরি রিসেট (সুপার পাওয়ার-আপ)</strong>
+                  <p style="margin:2px 0 0; color:#94a3b8; font-size:0.78rem;" data-i18n="purge_mode_nuclear_desc">সকল ভেক্টর এমবেডিংস, ডকুমেন্টস, FTS5 ইন্ডেক্স ও চ্যাট সেশন ক্লিন মুছে ডাটাবেস সম্পূর্ণ ভ্যাকুয়াম ও ফ্রেশ করে।</p>
+                </div>
+              </label>
+
+              <label style="display:flex; align-items:flex-start; gap:10px; background:rgba(15,23,42,0.5); border:1px solid rgba(255,255,255,0.09); border-radius:8px; padding:10px; cursor:pointer;">
+                <input type="radio" name="purge-type-radio" value="vectors_only" style="margin-top:3px;">
+                <div>
+                  <strong style="color:#38bdf8; font-size:0.9rem;" data-i18n="purge_mode_vectors_title">শুধুমাত্র নলেজবেস ও ভেক্টর মেমোরি রিসেট</strong>
+                  <p style="margin:2px 0 0; color:#94a3b8; font-size:0.78rem;" data-i18n="purge_mode_vectors_desc">সমস্ত আপলোডকৃত ফাইল ও ভেক্টর এমবেডিং মুছে ফেলা হবে, তবে চ্যাট হিস্ট্রি সংরক্ষিত থাকবে।</p>
+                </div>
+              </label>
+
+              <label style="display:flex; align-items:flex-start; gap:10px; background:rgba(15,23,42,0.5); border:1px solid rgba(255,255,255,0.09); border-radius:8px; padding:10px; cursor:pointer;">
+                <input type="radio" name="purge-type-radio" value="chat_only" style="margin-top:3px;">
+                <div>
+                  <strong style="color:#c084fc; font-size:0.9rem;" data-i18n="purge_mode_chat_title">শুধুমাত্র চ্যাট হিস্ট্রি ও ডায়ালগ মেমোরি রিসেট</strong>
+                  <p style="margin:2px 0 0; color:#94a3b8; font-size:0.78rem;" data-i18n="purge_mode_chat_desc">পূর্বের সমস্ত চ্যাট কনভারসেশন ও বার্তা মুছে নতুন ফ্রেশ চ্যাট শুরু করে, নলেজবেস অপরিবর্তিত থাকে।</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Safety Auto-Backup Toggle -->
+          <label style="display:flex; align-items:center; gap:8px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:9px 12px; cursor:pointer;">
+            <input type="checkbox" id="purge-auto-backup" checked style="accent-color:#10b981;">
+            <span style="font-size:0.83rem; color:#34d399;" data-i18n="purge_auto_backup_label">🛡️ স্বয়ংক্রিয় সেফটি ব্যাকআপ (মুছে ফেলার পূর্বে ইনস্ট্যান্ট .zip ব্যাকআপ তৈরি করুন)</span>
+          </label>
+
+          <!-- Typing Verification Guard -->
+          <div class="form-group" style="margin-top:4px;">
+            <label style="font-size:0.82rem; color:#fca5a5;" data-i18n="purge_confirm_phrase_label">নিশ্চিত করতে নিচের বক্সে <strong style="color:white; text-decoration:underline;">DELETE</strong> টাইপ করুন:</label>
+            <input type="text" id="purge-confirm-input" class="text-input" placeholder="DELETE" oninput="checkPurgeCodeInput()" style="margin-top:4px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;">
+          </div>
+
+          <!-- Actions -->
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+            <button type="button" class="btn-secondary" onclick="closePurgeMemoryModal()" data-i18n="btn_cancel">বাতিল</button>
+            <button type="button" class="btn-primary" id="btn-execute-purge" disabled onclick="executePurgeMemory()" style="background:linear-gradient(135deg, #ef4444, #dc2626); border-color:#f87171; box-shadow:0 0 15px rgba(239,68,68,0.4);" data-i18n="btn_confirm_purge">💀 মেমোরি স্থায়ীভাবে রিসেট করুন</button>
+          </div>
+        </div>
       </div>
     </div>
 
