@@ -1,8 +1,8 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 2.2.0
 import os
 import json
 import logging
 import asyncio
+import httpx
 from typing import List, Dict, Any, AsyncGenerator, Optional
 from openai import AsyncOpenAI, OpenAI
 from config import settings
@@ -38,12 +38,12 @@ class CompanyAIAgent:
         self.client = AsyncOpenAI(
             base_url=base_url,
             api_key=settings.LLM_API_KEY or "not-needed",
-            timeout=120.0
+            timeout=httpx.Timeout(60.0, connect=4.0)
         )
         self.sync_client = OpenAI(
             base_url=base_url,
             api_key=settings.LLM_API_KEY or "not-needed",
-            timeout=15.0
+            timeout=httpx.Timeout(10.0, connect=3.0)
         )
 
     def refresh_client(self):
@@ -368,7 +368,8 @@ class CompanyAIAgent:
                 except Exception as plain_err:
                     logger.error(f"Error during LLM chat streaming: {plain_err}")
                     err_str = str(plain_err)
-                    if "Connection error" in err_str or "ConnectError" in err_str or "connection refused" in err_str.lower() or "Failed to connect" in err_str:
+                    err_lower = err_str.lower()
+                    if "connection error" in err_lower or "connecterror" in err_lower or "connection refused" in err_lower or "failed to connect" in err_lower or "timeout" in err_lower or "timed out" in err_lower:
                         if self.is_conversational_greeting(prompt):
                             if language == "en":
                                 fallback_reply = (
