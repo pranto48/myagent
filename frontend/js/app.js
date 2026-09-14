@@ -204,14 +204,22 @@ function renderAttachmentShelf() {
   shelf.style.display = 'flex';
   shelf.style.flexDirection = 'column';
 
+  const countText = typeof t === 'function' 
+    ? (getAppLanguage() === 'en' ? `📎 Attached Files (${attachedChatFiles.length})` : `📎 সংযুক্ত ফাইল (${attachedChatFiles.length}টি)`)
+    : `📎 সংযুক্ত ফাইল (${attachedChatFiles.length}টি)`;
+
+  const memLabel = typeof t === 'function' ? t('memory_checkbox_label', 'স্থায়ী মেমোরিতে সংরক্ষণ করুন') : 'স্থায়ী মেমোরিতে সংরক্ষণ করুন';
+  const memTitle = typeof t === 'function' ? t('save_memory_toggle_title', 'ইউজার/অ্যাডমিন সিদ্ধান্ত: চেক করলে এই ফাইলগুলো স্থায়ীভাবে কোম্পানির ভেক্টর মেমোরিতে সেভ হবে') : 'ইউজার/অ্যাডমিন সিদ্ধান্ত: চেক করলে এই ফাইলগুলো স্থায়ীভাবে কোম্পানির ভেক্টর মেমোরিতে সেভ হবে';
+  const removeTitle = typeof t === 'function' ? t('btn_remove', 'মুছে ফেলুন') : 'মুছে ফেলুন';
+
   const headerHtml = `
     <div class="attachment-shelf-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.08);">
       <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary, #e2e8f0); display: flex; align-items: center; gap: 6px;">
-        📎 সংযুক্ত ফাইল (${attachedChatFiles.length}টি)
+        ${countText}
       </span>
-      <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; cursor: pointer; color: #c7d2fe; background: rgba(99, 102, 241, 0.15); padding: 4px 10px; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.35); transition: all 0.2s ease;" title="ইউজার/অ্যাডমিন সিদ্ধান্ত: চেক করলে এই ফাইলগুলো স্থায়ীভাবে কোম্পানির ভেক্টর মেমোরিতে সেভ হবে">
+      <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; cursor: pointer; color: #c7d2fe; background: rgba(99, 102, 241, 0.15); padding: 4px 10px; border-radius: 16px; border: 1px solid rgba(99, 102, 241, 0.35); transition: all 0.2s ease;" title="${escapeHtml(memTitle)}">
         <input type="checkbox" id="chat-save-memory-checkbox" ${prevChecked ? 'checked' : ''} style="cursor: pointer; accent-color: #6366f1;">
-        <span style="font-weight: 600;">💾 স্থায়ী মেমোরিতে সংরক্ষণ করুন</span>
+        <span style="font-weight: 600;">💾 ${escapeHtml(memLabel)}</span>
       </label>
     </div>
   `;
@@ -236,7 +244,7 @@ function renderAttachmentShelf() {
               <span class="attachment-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
               <span class="attachment-size">${formatFileSize(item.size)}</span>
             </div>
-            <button type="button" class="attachment-remove-btn" title="মুছে ফেলুন" onclick="removeAttachedFile('${item.id}')">&times;</button>
+            <button type="button" class="attachment-remove-btn" title="${escapeHtml(removeTitle)}" onclick="removeAttachedFile('${item.id}')">&times;</button>
           </div>
         `;
       }).join('')}
@@ -364,51 +372,40 @@ function switchTab(tabName) {
     sidebar.classList.remove('mobile-open');
   }
 
-  if (tabName === 'chat') {
-    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট';
-    if (topbarDesc) topbarDesc.innerText = 'ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই';
-  } else if (tabName === 'admin') {
-    if (topbarTitle) topbarTitle.innerText = 'অ্যাডমিন কমান্ড সেন্টার ও সিস্টেম কন্ট্রোল';
-    if (topbarDesc) topbarDesc.innerText = 'সার্ভার হার্টবিট, ক্লাউড মেট্রিক্স ও ইনস্ট্যান্ট অ্যাডমিন অ্যাকশন হাব';
-    if (typeof loadAdminDashboard === 'function') loadAdminDashboard();
-  } else if (tabName === 'dashboard') {
-    if (topbarTitle) topbarTitle.innerText = 'অ্যানালিটিক্স ও সিস্টেম মনিটরিং ড্যাশবোর্ড';
-    if (topbarDesc) topbarDesc.innerText = 'সার্ভার পারফরম্যান্স, মেমোরি চাঙ্কস এবং স্টোরেজ অ্যানালাইসিস';
+  const tabTitles = {
+    chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+    admin: { title: 'tab_admin_title', desc: 'tab_admin_desc' },
+    dashboard: { title: 'tab_dash_title', desc: 'tab_dash_desc' },
+    users: { title: 'tab_users_title', desc: 'tab_users_desc' },
+    knowledge: { title: 'tab_kb_title', desc: 'tab_kb_desc' },
+    models: { title: 'tab_models_title', desc: 'tab_models_desc' },
+    mcp: { title: 'tab_mcp_title', desc: 'tab_mcp_desc' },
+    security: { title: 'tab_sec_title', desc: 'tab_sec_desc' },
+    backup: { title: 'tab_backup_title', desc: 'tab_backup_desc' },
+    reports: { title: 'tab_reports_title', desc: 'tab_reports_desc' },
+    settings: { title: 'tab_settings_title', desc: 'tab_settings_desc' }
+  };
+
+  if (tabTitles[tabName]) {
+    if (topbarTitle) topbarTitle.innerText = typeof t === 'function' ? t(tabTitles[tabName].title) : '';
+    if (topbarDesc) topbarDesc.innerText = typeof t === 'function' ? t(tabTitles[tabName].desc) : '';
+  }
+
+  if (tabName === 'admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
+  else if (tabName === 'dashboard') {
     if (typeof loadDashboardFull === 'function') loadDashboardFull();
     else if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
-  } else if (tabName === 'users') {
-    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ইউজার ও এক্সেস কন্ট্রোল';
-    if (topbarDesc) topbarDesc.innerText = 'অভ্যন্তরীণ কর্মকর্তা ও কর্মচারীদের রোল ম্যানেজমেন্ট';
-    if (typeof loadUsersList === 'function') loadUsersList();
-  } else if (tabName === 'knowledge') {
-    if (topbarTitle) topbarTitle.innerText = 'কোম্পানি ডেটা লাইব্রেরি ও মেমোরি ইনজেস্ট';
-    if (topbarDesc) topbarDesc.innerText = 'PDF, Word, Excel, CSV ও ফটো/ছবি OCR প্রসেসিং';
+  } else if (tabName === 'users' && typeof loadUsersList === 'function') loadUsersList();
+  else if (tabName === 'knowledge') {
     if (typeof loadDocumentList === 'function') loadDocumentList();
     if (typeof loadMemoryStats === 'function') loadMemoryStats();
     if (typeof loadChunksList === 'function') loadChunksList();
-  } else if (tabName === 'models') {
-    if (topbarTitle) topbarTitle.innerText = 'এআই মডেল হাব ও রিয়েলটাইম পিং টেস্ট';
-    if (topbarDesc) topbarDesc.innerText = 'বাহ্যিক এলএলএম সার্ভারের সংযোগ ও রেসপন্স টাইম (ms)';
-    if (typeof loadModelsOverview === 'function') loadModelsOverview();
-  } else if (tabName === 'mcp') {
-    if (topbarTitle) topbarTitle.innerText = 'টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব';
-    if (topbarDesc) topbarDesc.innerText = 'ওপেন-সোর্স টুলস স্যুট ও ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা';
-    if (typeof loadMcpDashboard === 'function') loadMcpDashboard();
-  } else if (tabName === 'security') {
-    if (topbarTitle) topbarTitle.innerText = 'এন্টারপ্রাইজ ডাটা সিকিউরিটি ও কমপ্লায়েন্স';
-    if (topbarDesc) topbarDesc.innerText = 'AES-256 এনক্রিপশন, PII/DLP রিডাকশন, ফায়ারওয়াল ও অডিট ট্রেইল';
-    if (typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
-  } else if (tabName === 'backup') {
-    if (topbarTitle) topbarTitle.innerText = 'সম্পূর্ণ ডেটা ও সেটিংস ব্যাকআপ এবং রিস্টোর';
-    if (topbarDesc) topbarDesc.innerText = 'ডকুমেন্টস, চ্যাট হিস্ট্রি, ভেক্টর মেমোরি ও সেটিংসের সার্বিক সুরক্ষা';
-    if (typeof loadBackupDashboard === 'function') loadBackupDashboard();
-  } else if (tabName === 'reports') {
-    if (topbarTitle) topbarTitle.innerText = 'AI রিপোর্ট জেনারেটর — এন্টারপ্রাইজ ইন্টেলিজেন্স রিপোর্টিং';
-    if (topbarDesc) topbarDesc.innerText = 'কোম্পানি নলেজবেস থেকে ডেটা রিট্রিভ করে পেশাদার AI রিপোর্ট তৈরি করুন';
-    if (typeof loadReportsPage === 'function') loadReportsPage();
-  } else if (tabName === 'settings') {
-    if (topbarTitle) topbarTitle.innerText = 'সিস্টেম সেটিংস ও এআই ইঞ্জিন কনফিগারেশন';
-    if (topbarDesc) topbarDesc.innerText = 'থিম সিলেকশন, LM Studio সংযোগ, মডেল প্যারামিটার ও সিকিউরিটি কন্ট্রোল';
+  } else if (tabName === 'models' && typeof loadModelsOverview === 'function') loadModelsOverview();
+  else if (tabName === 'mcp' && typeof loadMcpDashboard === 'function') loadMcpDashboard();
+  else if (tabName === 'security' && typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
+  else if (tabName === 'backup' && typeof loadBackupDashboard === 'function') loadBackupDashboard();
+  else if (tabName === 'reports' && typeof loadReportsPage === 'function') loadReportsPage();
+  else if (tabName === 'settings') {
     if (typeof loadSettingsHub === 'function') loadSettingsHub();
     else if (typeof loadSettings === 'function') loadSettings();
   }
@@ -423,17 +420,18 @@ function toggleMemoryUsage() {
   const icon = document.getElementById('memory-toggle-icon');
   const label = document.getElementById('memory-toggle-text');
   const btn = document.getElementById('memory-toggle-btn');
+  const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
 
   if (useMemory) {
     if (icon) icon.innerText = '🧠';
-    if (label) label.innerText = 'মেমোরি: সক্রিয়';
+    if (label) label.innerText = isEn ? 'Memory: Active' : 'মেমোরি: সক্রিয়';
     if (btn) {
       btn.style.borderColor = 'rgba(6, 182, 212, 0.4)';
       btn.style.color = 'var(--cyan-glow)';
     }
   } else {
     if (icon) icon.innerText = '⚡';
-    if (label) label.innerText = 'মেমোরি: নিষ্ক্রিয়';
+    if (label) label.innerText = isEn ? 'Memory: Disabled' : 'মেমোরি: নিষ্ক্রিয়';
     if (btn) {
       btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
       btn.style.color = 'var(--text-muted)';
@@ -474,14 +472,25 @@ function useProductivityAction(actionType) {
   if (!input) return;
 
   const prompts = {
-    'data_analysis': 'অনুগ্রহ করে আমাদের আপলোড করা ডেটাসেট (CSV/Excel) বিশ্লেষণ করো। প্রধান পরিসংখ্যান, শীর্ষ ক্যাটাগরি এবং ব্যবসায়িক ফলাফল টেবিল আকারে দেখাও।',
-    'memory_search': 'কোম্পানির মেমোরি ও নলেজবেসে অনুসন্ধান করে আমাদের প্রধান নীতিমালা, নিয়মাবলী এবং কার্যপ্রণালী সম্পর্কিত তথ্য বিস্তারিত জানাও।',
-    'generate_report': 'আমাদের সাম্প্রতিক ডেটা ও নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ রিপোর্ট তৈরি করো এবং generate_data_report টুলের সাহায্যে reports ফোল্ডারে সংরক্ষণ করো।',
-    'python_sandbox': 'পাইথন স্যান্ডবক্স ব্যবহার করে আমাদের জন্য জটিল গাণিতিক হিসাব বা ডেটা প্রসেসিং সম্পন্ন করো: ',
-    'security_audit': 'আমাদের বর্তমান সিস্টেম সিকিউরিটি স্ট্যাটাস, ফায়ারওয়াল অ্যালার্ট এবং ডেটা প্রোটেকশন পরিস্থিতি বিশ্লেষণ করো।'
+    en: {
+      'data_analysis': 'Please analyze our uploaded dataset (CSV/Excel). Show key statistics, top categories, and business metrics in clean markdown tables.',
+      'memory_search': 'Search company memory and knowledge base for our primary policies, internal rules, and operational procedures in detail.',
+      'generate_report': 'Generate an executive corporate report based on our internal knowledge base and save it to the reports folder using the generate_data_report tool.',
+      'python_sandbox': 'Run complex mathematical calculations or dataset transformations using the Python sandbox: ',
+      'security_audit': 'Analyze our current system security posture, firewall alerts, DLP status, and compliance audit trail.'
+    },
+    bn: {
+      'data_analysis': 'অনুগ্রহ করে আমাদের আপলোড করা ডেটাসেট (CSV/Excel) বিশ্লেষণ করো। প্রধান পরিসংখ্যান, শীর্ষ ক্যাটাগরি এবং ব্যবসায়িক ফলাফল টেবিল আকারে দেখাও।',
+      'memory_search': 'কোম্পানির মেমোরি ও নলেজবেসে অনুসন্ধান করে আমাদের প্রধান নীতিমালা, নিয়মাবলী এবং কার্যপ্রণালী সম্পর্কিত তথ্য বিস্তারিত জানাও।',
+      'generate_report': 'আমাদের সাম্প্রতিক ডেটা ও নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ report তৈরি করো এবং generate_data_report টুলের সাহায্যে reports ফোল্ডারে সংরক্ষণ করো।',
+      'python_sandbox': 'পাইথন স্যান্ডবক্স ব্যবহার করে আমাদের জন্য জটিল গাণিতিক হিসাব বা ডেটা প্রসেসিং সম্পন্ন করো: ',
+      'security_audit': 'আমাদের বর্তমান সিস্টেম সিকিউরিটি স্ট্যাটাস, ফায়ারওয়াল অ্যালার্ট এবং ডেটা প্রোটেকশন পরিস্থিতি বিশ্লেষণ করো।'
+    }
   };
 
-  input.value = prompts[actionType] || '';
+  const lang = typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn';
+  const langPrompts = prompts[lang] || prompts['bn'];
+  input.value = langPrompts[actionType] || prompts.bn[actionType] || '';
   input.focus();
   autoResizeTextarea(input);
 }
@@ -500,10 +509,30 @@ function handleTextareaKey(e) {
   }
 }
 
-function usePrompt(text) {
+const PROMPT_SUGGESTIONS = {
+  en: {
+    policy: "Please explain our company internal policies, workplace rules, and leave guidelines in detail.",
+    excel: "Please analyze the uploaded Excel spreadsheet and dataset. Show key metrics and trends in structured tables.",
+    report: "Generate a comprehensive executive corporate report based on our company knowledge base.",
+    ocr: "Extract and thoroughly explain all text and structured information found in the uploaded image/photo."
+  },
+  bn: {
+    policy: "আমাদের কোম্পানির অভ্যন্তরীণ নীতিমালা এবং ছুটির নিয়মগুলো বিস্তারিত জানাও।",
+    excel: "আপলোড করা এক্সেল ফাইলের হিসাব, বিক্রয় তথ্য ও প্রধান পরিসংখ্যান বিশ্লেষণ করো।",
+    report: "আমাদের সাম্প্রতিক কোম্পানির নলেজবেসের উপর ভিত্তি করে একটি বিশদ এক্সিকিউটিভ রিপোর্ট তৈরি করো।",
+    ocr: "আপলোড করা ইমেজ বা ছবির মধ্যে কী কী টেক্সট বা তথ্য রয়েছে বিস্তারিত ব্যাখ্যা করো।"
+  }
+};
+
+function usePrompt(keyOrText) {
   const input = document.getElementById('chat-input');
   if (!input) return;
-  input.value = text;
+  const lang = typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn';
+  const localizedText = (PROMPT_SUGGESTIONS[lang] && PROMPT_SUGGESTIONS[lang][keyOrText])
+    ? PROMPT_SUGGESTIONS[lang][keyOrText]
+    : (PROMPT_SUGGESTIONS.bn[keyOrText] || keyOrText);
+
+  input.value = localizedText;
   autoResizeTextarea(input);
   sendMessage();
 }
@@ -670,7 +699,9 @@ async function sendMessage() {
 
   // Default prompt if user only attached files without typing
   if (!prompt && hasAttachments) {
-    prompt = 'অনুগ্রহ করে সংযুক্ত ফাইলগুলো বিশ্লেষণ করে বিস্তারিত সারসংক্ষেপ ও অন্তর্দৃষ্টি তুলে ধরুন।';
+    prompt = typeof t === 'function' 
+      ? t('default_attach_prompt', 'অনুগ্রহ করে সংযুক্ত ফাইলগুলো বিশ্লেষণ করে বিস্তারিত সারসংক্ষেপ ও অন্তর্দৃষ্টি তুলে ধরুন।') 
+      : 'অনুগ্রহ করে সংযুক্ত ফাইলগুলো বিশ্লেষণ করে বিস্তারিত সারসংক্ষেপ ও অন্তর্দৃষ্টি তুলে ধরুন।';
   }
 
   const sendBtn = document.getElementById('btn-send-message');
@@ -695,9 +726,12 @@ async function sendMessage() {
   if (hasAttachments) {
     const saveToMemoryCheckbox = document.getElementById('chat-save-memory-checkbox');
     const shouldSaveToMemory = saveToMemoryCheckbox ? saveToMemoryCheckbox.checked : false;
+    const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
 
-    const actionText = shouldSaveToMemory ? 'আপলোড ও স্থায়ী মেমোরিতে ইনডেক্সিং হচ্ছে...' : 'আপলোড ও চ্যাট বিশ্লেষণের জন্য প্রস্তুত হচ্ছে...';
-    showUploadProgress(`${attachedChatFiles.length}টি ফাইল ${actionText}`);
+    const actionText = shouldSaveToMemory 
+      ? (isEn ? 'Uploading and indexing into persistent memory...' : 'আপলোড ও স্থায়ী মেমোরিতে ইনডেক্সিং হচ্ছে...')
+      : (isEn ? 'Uploading and preparing for chat analysis...' : 'আপলোড ও চ্যাট বিশ্লেষণের জন্য প্রস্তুত হচ্ছে...');
+    showUploadProgress(isEn ? `${attachedChatFiles.length} file(s) ${actionText}` : `${attachedChatFiles.length}টি ফাইল ${actionText}`);
     try {
       const formData = new FormData();
       for (const item of attachedChatFiles) {
@@ -716,7 +750,7 @@ async function sendMessage() {
 
       if (!uploadRes.ok) {
         const errJson = await uploadRes.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'ফাইল আপলোড ব্যর্থ হয়েছে');
+        throw new Error(errJson.detail || (isEn ? 'File upload failed' : 'ফাইল আপলোড ব্যর্থ হয়েছে'));
       }
 
       const uploadData = await uploadRes.json();
@@ -739,12 +773,12 @@ async function sendMessage() {
       renderAttachmentShelf();
 
       const successToast = shouldSaveToMemory 
-        ? `${serverAttachedFiles.length}টি ফাইল সফলভাবে যুক্ত ও স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে`
-        : `${serverAttachedFiles.length}টি ফাইল চ্যাট বিশ্লেষণের জন্য প্রস্তুত করা হয়েছে`;
+        ? (isEn ? `${serverAttachedFiles.length} file(s) successfully attached and saved into permanent memory.` : `${serverAttachedFiles.length}টি ফাইল সফলভাবে যুক্ত ও স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে`)
+        : (isEn ? `${serverAttachedFiles.length} file(s) prepared for chat analysis.` : `${serverAttachedFiles.length}টি ফাইল চ্যাট বিশ্লেষণের জন্য প্রস্তুত করা হয়েছে`);
       showToast(successToast, 'success');
 
     } catch (uploadErr) {
-      showToast(`ফাইল প্রসেসিং ত্রুটি: ${uploadErr.message}`, 'error');
+      showToast((isEn ? 'File processing error: ' : 'ফাইল প্রসেসিং ত্রুটি: ') + uploadErr.message, 'error');
       if (sendBtn) {
         sendBtn.disabled = false;
         sendBtn.innerHTML = SEND_ICON_SVG;
@@ -770,7 +804,7 @@ async function sendMessage() {
   if (sendBtn) {
     sendBtn.disabled = false;
     sendBtn.classList.add('streaming-active');
-    sendBtn.title = 'উত্তর তৈরি থামান (Stop Generating)';
+    sendBtn.title = typeof t === 'function' ? t('btn_stop_title', 'Stop Generating') : 'উত্তর তৈরি থামান (Stop Generating)';
     sendBtn.innerHTML = `
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="pointer-events:none;">
         <rect x="5" y="5" width="14" height="14" rx="2"></rect>
@@ -827,16 +861,19 @@ async function sendMessage() {
             if (data.type === 'sources') {
               citations = data.sources || [];
             } else if (data.type === 'tool_call') {
-              assistantContent += `\n\n⚙️ *[টুল কল করা হচ্ছে: **${data.name}**...]*\n`;
+              const callingLabel = typeof t === 'function' ? t('calling_tool', 'টুল কল করা হচ্ছে:') : 'টুল কল করা হচ্ছে:';
+              assistantContent += `\n\n⚙️ *[${callingLabel} **${data.name}**...]*\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'tool_result') {
-              assistantContent += `\n> 💡 **[${data.name} ফলাফল]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
+              const resLabel = typeof t === 'function' ? t('tool_result', 'ফলাফল') : 'ফলাফল';
+              assistantContent += `\n> 💡 **[${data.name} ${resLabel}]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'token') {
               assistantContent += data.token;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'error') {
-              assistantContent += `\n\n⚠️ **ত্রুটি:** ${data.error}`;
+              const errLabel = typeof t === 'function' ? t('error_prefix', 'ত্রুটি:') : 'ত্রুটি:';
+              assistantContent += `\n\n⚠️ **${errLabel}** ${data.error}`;
               updateAssistantMessage(assistantBubble, assistantContent, false);
             }
           } catch (parseErr) {
@@ -847,16 +884,21 @@ async function sendMessage() {
     }
 
     // Finalize assistant message
-    updateAssistantMessage(assistantBubble, assistantContent || 'উত্তর প্রক্রিয়া সম্পন্ন হয়েছে।', false, citations);
+    const doneFallback = typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Response completed.' : 'উত্তর প্রক্রিয়া সম্পন্ন হয়েছে।';
+    updateAssistantMessage(assistantBubble, assistantContent || doneFallback, false, citations);
     conversationHistory.push({ role: 'assistant', content: assistantContent });
     loadChatSessions();
 
   } catch (err) {
+    const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
     if (err.name === 'AbortError') {
-      assistantContent += `\n\n⏹️ *[ব্যবহারকারী কর্তৃক উত্তর তৈরি থামানো হয়েছে]*`;
+      const stopText = typeof t === 'function' ? t('stopped_by_user', 'ব্যবহারকারী কর্তৃক উত্তর তৈরি থামানো হয়েছে') : 'ব্যবহারকারী কর্তৃক উত্তর তৈরি থামানো হয়েছে';
+      assistantContent += `\n\n⏹️ *[${stopText}]*`;
       updateAssistantMessage(assistantBubble, assistantContent, false);
     } else {
-      assistantContent += `\n\n❌ **সার্ভার সমস্যা:** ${err.message}। অনুগ্রহ করে নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিসটি সক্রিয় রয়েছে।`;
+      const serverErrText = typeof t === 'function' ? t('server_error_prefix', 'সার্ভার সমস্যা:') : 'সার্ভার সমস্যা:';
+      const noteText = isEn ? 'Please make sure the backend service is active.' : 'অনুগ্রহ করে নিশ্চিত করুন যে ব্যাকএন্ড সার্ভিসটি সক্রিয় রয়েছে।';
+      assistantContent += `\n\n❌ **${serverErrText}** ${err.message}। ${noteText}`;
       updateAssistantMessage(assistantBubble, assistantContent, false);
     }
   } finally {
@@ -867,7 +909,7 @@ async function sendMessage() {
       sendBtn.classList.remove('streaming-active');
       sendBtn.disabled = false;
       sendBtn.innerHTML = SEND_ICON_SVG;
-      sendBtn.title = 'বার্তা পাঠান (Enter)';
+      sendBtn.title = typeof t === 'function' ? t('btn_send_title', 'Send Message (Enter)') : 'বার্তা পাঠান (Enter)';
     }
     attachChatEventListeners();
     input.focus();
@@ -882,13 +924,21 @@ function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
   messageEl.className = `chat-message ${role}-message`;
 
   const avatar = role === 'user' ? '👤' : '✨';
-  const senderTitle = role === 'user' ? 'আপনি' : 'MyAgent AI';
+  const senderTitle = role === 'user' 
+    ? (typeof t === 'function' ? t('sender_you', 'আপনি') : 'আপনি')
+    : (typeof t === 'function' ? t('sender_ai', 'MyAgent AI') : 'MyAgent AI');
+
   const avatarStyle = role === 'assistant' 
     ? 'background: linear-gradient(135deg, #4285f4, #9b72cb); color: #ffffff; box-shadow: 0 0 12px rgba(155, 114, 203, 0.45);' 
     : '';
 
   let attachmentHtml = '';
   if (attachedFiles && attachedFiles.length > 0) {
+    const savedBadgeText = typeof t === 'function' ? t('file_saved_badge', '✅ মেমোরিতে সংরক্ষিত') : '✅ মেমোরিতে সংরক্ষিত';
+    const savedBadgeTitle = typeof t === 'function' ? t('file_saved_title', 'এই ফাইলটি কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত') : 'এই ফাইলটি কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত';
+    const saveBtnText = typeof t === 'function' ? t('file_save_btn', '💾 মেমোরিতে সেভ করুন') : '💾 মেমোরিতে সেভ করুন';
+    const saveBtnTitle = typeof t === 'function' ? t('file_save_title', 'ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে') : 'ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে';
+
     attachmentHtml = `
       <div class="user-attached-files-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
         ${attachedFiles.map(f => {
@@ -901,8 +951,8 @@ function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
               <span>${escapeHtml(fname)}</span>
               <span style="opacity: 0.75; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
               ${isSaved 
-                ? `<span class="chip-memory-badge saved" title="এই ফাইলটি কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত">✅ মেমোরিতে সংরক্ষিত</span>`
-                : `<button type="button" class="chip-save-memory-btn" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)" title="ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে">💾 মেমোরিতে সেভ করুন</button>`
+                ? `<span class="chip-memory-badge saved" title="${escapeHtml(savedBadgeTitle)}">${escapeHtml(savedBadgeText)}</span>`
+                : `<button type="button" class="chip-save-memory-btn" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)" title="${escapeHtml(saveBtnTitle)}">${escapeHtml(saveBtnText)}</button>`
               }
             </div>
           `;
@@ -914,7 +964,7 @@ function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
   messageEl.innerHTML = `
     <div class="chat-avatar" style="${avatarStyle}">${avatar}</div>
     <div class="message-content-wrapper">
-      <div class="message-sender-name">${senderTitle}</div>
+      <div class="message-sender-name" data-role="${role}">${senderTitle}</div>
       <div class="message-bubble">
         ${attachmentHtml}
         <div class="message-text">${renderMarkdown(text)}</div>
@@ -953,15 +1003,22 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
     });
 
     if (validCitations.length > 0) {
+      const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+      const headerTitle = isEn 
+        ? `📑 Memory References & Sources (${validCitations.length})` 
+        : `📑 মেমোরি রেফারেন্স ও সোর্স (${validCitations.length}টি)`;
+      const pageLabel = typeof t === 'function' ? t('sources_page', 'পৃষ্ঠা') : 'পৃষ্ঠা';
+      const matchLabel = typeof t === 'function' ? t('sources_match', 'মিল') : 'মিল';
+
       sourcesSlot.innerHTML = `
         <div class="sources-container">
           <div class="sources-header">
-            <span>📑 মেমোরি রেফারেন্স ও সোর্স (${validCitations.length}টি)</span>
+            <span>${headerTitle}</span>
           </div>
           <div class="sources-list">
             ${validCitations.map(c => `
               <span class="citation-chip" title="${escapeHtml(c.content)}">
-                📄 ${escapeHtml(c.source)} (পৃষ্ঠা ${c.page || 1}) • ${(c.score * 100).toFixed(0)}% মিল
+                📄 ${escapeHtml(c.source)} (${pageLabel} ${c.page || 1}) • ${(c.score * 100).toFixed(0)}% ${matchLabel}
               </span>
             `).join('')}
           </div>
@@ -982,21 +1039,31 @@ function updateAssistantMessage(messageEl, content, isStreaming, citations = [])
       if (bubble) {
         toolbar = document.createElement('div');
         toolbar.className = 'msg-action-toolbar';
+
+        const copyBtn = typeof t === 'function' ? t('msg_copy_btn', 'কপি') : 'কপি';
+        const copyTitle = typeof t === 'function' ? t('msg_copy_title', 'কপি করুন') : 'কপি করুন';
+        const saveMemBtn = typeof t === 'function' ? t('msg_save_mem_btn', 'মেমোরিতে সেভ') : 'মেমোরিতে সেভ';
+        const saveMemTitle = typeof t === 'function' ? t('msg_save_mem_title', 'এআই-এর উত্তরটি কোম্পানির স্থায়ী মেমোরিতে সেভ করুন') : 'এআই-এর উত্তরটি কোম্পানির স্থায়ী মেমোরিতে সেভ করুন';
+        const retryBtn = typeof t === 'function' ? t('msg_retry_btn', 'রিট্রাই') : 'রিট্রাই';
+        const retryTitle = typeof t === 'function' ? t('msg_retry_title', 'পুনরায় চেষ্টা করুন') : 'পুনরায় চেষ্টা করুন';
+        const likeTitle = typeof t === 'function' ? t('msg_like_title', 'পছন্দ হয়েছে') : 'পছন্দ হয়েছে';
+        const dislikeTitle = typeof t === 'function' ? t('msg_dislike_title', 'অপছন্দ হয়েছে') : 'অপছন্দ হয়েছে';
+
         toolbar.innerHTML = `
-          <button class="msg-tool-btn" onclick="copyMessageText(this)" title="কপি করুন">
+          <button class="msg-tool-btn msg-tool-copy" onclick="copyMessageText(this)" title="${escapeHtml(copyTitle)}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            কপি
+            <span class="btn-label">${escapeHtml(copyBtn)}</span>
           </button>
-          <button class="msg-tool-btn" onclick="saveMsgToAgentMemory(this)" title="এআই-এর উত্তরটি কোম্পানির স্থায়ী মেমোরিতে সেভ করুন">
+          <button class="msg-tool-btn msg-tool-save" onclick="saveMsgToAgentMemory(this)" title="${escapeHtml(saveMemTitle)}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            মেমোরিতে সেভ
+            <span class="btn-label">${escapeHtml(saveMemBtn)}</span>
           </button>
-          <button class="msg-tool-btn" onclick="retryLastPrompt()" title="পুনরায় চেষ্টা করুন">
+          <button class="msg-tool-btn msg-tool-retry" onclick="retryLastPrompt()" title="${escapeHtml(retryTitle)}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-            রিট্রাই
+            <span class="btn-label">${escapeHtml(retryBtn)}</span>
           </button>
-          <button class="msg-tool-btn" onclick="toggleMsgLike(this, 'like')" title="পছন্দ হয়েছে">👍</button>
-          <button class="msg-tool-btn" onclick="toggleMsgLike(this, 'dislike')" title="অপছন্দ হয়েছে">👎</button>
+          <button class="msg-tool-btn msg-tool-like" onclick="toggleMsgLike(this, 'like')" title="${escapeHtml(likeTitle)}">👍</button>
+          <button class="msg-tool-btn msg-tool-dislike" onclick="toggleMsgLike(this, 'dislike')" title="${escapeHtml(dislikeTitle)}">👎</button>
         `;
         bubble.appendChild(toolbar);
       }
@@ -1051,12 +1118,13 @@ function renderMarkdown(md) {
   html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     const codeId = 'code_' + Math.random().toString(36).substring(2, 9);
     const displayLang = lang ? lang.toLowerCase() : 'code';
+    const copyCodeLabel = typeof t === 'function' ? t('msg_copy_code', 'Copy Code') : 'Copy Code';
     return `<div class="chatgpt-code-box">
       <div class="code-box-header">
         <span class="code-lang-label">${displayLang}</span>
         <button class="copy-code-btn" type="button" onclick="copyCodeBlock(this, '${codeId}')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          কপি কোড
+          ${copyCodeLabel}
         </button>
       </div>
       <pre class="code-box-content" id="${codeId}"><code class="lang-${displayLang}">${code.trim()}</code></pre>
@@ -1098,16 +1166,18 @@ function copyCodeBlock(btn, codeId) {
   const codeEl = document.getElementById(codeId);
   if (!codeEl) return;
   const text = codeEl.innerText || codeEl.textContent;
+  const copiedBadge = typeof t === 'function' ? t('copied_badge', '✓ Copied!') : '✓ Copied!';
+  const copyFailed = typeof t === 'function' ? t('copy_failed', 'Failed to copy to clipboard') : 'Failed to copy to clipboard';
   navigator.clipboard.writeText(text).then(() => {
     const originalText = btn.innerHTML;
-    btn.innerHTML = '✓ কপি হয়েছে!';
+    btn.innerHTML = copiedBadge;
     btn.style.color = '#34d399';
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.style.color = '';
     }, 2000);
   }).catch(() => {
-    showToast('ক্লিপবোর্ডে কপি করা যায়নি', 'error');
+    showToast(copyFailed, 'error');
   });
 }
 
@@ -1117,16 +1187,18 @@ function copyMessageText(btn) {
   const textEl = bubble.querySelector('.message-text');
   if (!textEl) return;
   const text = textEl.innerText || textEl.textContent;
+  const copiedBadge = typeof t === 'function' ? t('copied_badge', '✓ Copied!') : '✓ Copied!';
+  const copyFailed = typeof t === 'function' ? t('copy_failed', 'Failed to copy to clipboard') : 'Failed to copy to clipboard';
   navigator.clipboard.writeText(text).then(() => {
     const originalText = btn.innerHTML;
-    btn.innerHTML = '✓ কপি হয়েছে!';
+    btn.innerHTML = copiedBadge;
     btn.style.color = '#34d399';
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.style.color = '';
     }, 2000);
   }).catch(() => {
-    showToast('ক্লিপবোর্ডে কপি করা যায়নি', 'error');
+    showToast(copyFailed, 'error');
   });
 }
 
@@ -1146,10 +1218,10 @@ function retryLastPrompt() {
 function toggleMsgLike(btn, type) {
   if (type === 'like') {
     btn.classList.toggle('active-like');
-    showToast('ফিডব্যাকের জন্য ধন্যবাদ!', 'success');
+    showToast(typeof t === 'function' ? t('toast_feedback_like', 'Thank you for your feedback!') : 'Thank you for your feedback!', 'success');
   } else {
     btn.classList.toggle('active-dislike');
-    showToast('ফিডব্যাক গ্রহণ করা হয়েছে। আমরা মডেল উন্নত করছি।', 'info');
+    showToast(typeof t === 'function' ? t('toast_feedback_dislike', 'Feedback recorded. We are improving the model.') : 'Feedback recorded. We are improving the model.', 'info');
   }
 }
 
@@ -1186,13 +1258,13 @@ async function submitQuickNote(event) {
   const category = catInput ? catInput.value : 'notes';
 
   if (!title || !content) {
-    showToast('দয়া করে শিরোনাম ও বিস্তারিত কনটেন্ট লিখুন', 'error');
+    showToast(typeof t === 'function' && getAppLanguage() === 'en' ? 'Please provide both title and detailed content.' : 'দয়া করে শিরোনাম ও বিস্তারিত কনটেন্ট লিখুন', 'error');
     return;
   }
 
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerText = 'সেভ হচ্ছে...';
+    submitBtn.innerText = typeof t === 'function' ? t('saving_text', 'Saving...') : 'সেভ হচ্ছে...';
   }
 
   try {
@@ -1209,11 +1281,11 @@ async function submitQuickNote(event) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'মেমোরি সেভ ব্যর্থ হয়েছে');
+      throw new Error(err.detail || (typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Failed to save memory' : 'মেমোরি সেভ ব্যর্থ হয়েছে'));
     }
 
     const data = await res.json();
-    showToast(data.message || 'নোট সফলভাবে মেমোরিতে সংরক্ষিত হয়েছে!', 'success');
+    showToast(data.message || (typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Note successfully saved to memory!' : 'নোট সফলভাবে মেমোরিতে সংরক্ষিত হয়েছে!'), 'success');
     titleInput.value = '';
     contentInput.value = '';
     closeQuickMemoryModal();
@@ -1222,11 +1294,11 @@ async function submitQuickNote(event) {
     if (typeof loadMemoryStats === 'function') loadMemoryStats();
     if (typeof loadChunksList === 'function') loadChunksList();
   } catch (err) {
-    showToast(`ত্রুটি: ${err.message}`, 'error');
+    showToast(`Error: ${err.message}`, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerText = 'মেমোরিতে সেভ করুন';
+      submitBtn.innerText = typeof t === 'function' ? t('btn_save_memory', 'Save to Memory') : 'মেমোরিতে সেভ করুন';
     }
   }
 }
@@ -1239,10 +1311,11 @@ async function saveMsgToAgentMemory(btn) {
   const content = (textEl.innerText || textEl.textContent).trim();
   if (!content) return;
 
-  const firstLine = content.split('\n')[0].replace(/^[#\*\s\-]+/, '').trim().slice(0, 45) || 'চ্যাট নোট';
+  const defaultNoteTitle = typeof t === 'function' ? t('chat_note_default', 'Chat Note') : 'Chat Note';
+  const firstLine = content.split('\n')[0].replace(/^[#\*\s\-]+/, '').trim().slice(0, 45) || defaultNoteTitle;
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
-  btn.innerText = 'সেভ হচ্ছে...';
+  btn.innerText = typeof t === 'function' ? t('saving_text', 'Saving...') : 'Saving...';
 
   try {
     const res = await fetch('/api/documents/quick-note', {
@@ -1257,29 +1330,31 @@ async function saveMsgToAgentMemory(btn) {
     });
 
     if (res.ok) {
-      btn.innerHTML = '✓ সেভ হয়েছে!';
+      btn.innerHTML = typeof t === 'function' ? t('saved_badge', '✓ Saved!') : '✓ Saved!';
       btn.style.color = '#34d399';
-      showToast(`'${firstLine}' সফলভাবে এজেন্টের স্থায়ী মেমোরিতে সেভ হয়েছে!`, 'success');
+      const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+      showToast(isEn ? `'${firstLine}' successfully saved to company permanent memory!` : `'${firstLine}' সফলভাবে এজেন্টের স্থায়ী মেমোরিতে সেভ হয়েছে!`, 'success');
       setTimeout(() => {
         btn.innerHTML = originalHtml;
         btn.style.color = '';
         btn.disabled = false;
       }, 3000);
     } else {
-      throw new Error('সার্ভারে সেভ করা যায়নি');
+      throw new Error(typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Failed to save on server' : 'সার্ভারে সেভ করা যায়নি');
     }
   } catch (err) {
     btn.innerHTML = originalHtml;
     btn.disabled = false;
-    showToast('মেমোরিতে সেভ ব্যর্থ হয়েছে', 'error');
+    showToast(typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Failed to save to memory' : 'মেমোরিতে সেভ ব্যর্থ হয়েছে', 'error');
   }
 }
 
 async function saveAttachedFileToMemory(docId, filename, btnEl) {
   if (!docId || !filename) return;
+  const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
   if (btnEl) {
     btnEl.disabled = true;
-    btnEl.innerText = 'সংরক্ষণ হচ্ছে...';
+    btnEl.innerText = typeof t === 'function' ? t('saving_text', 'Saving...') : 'সংরক্ষণ হচ্ছে...';
   }
   try {
     const res = await fetch('/api/chat/save-attachment-to-memory', {
@@ -1288,21 +1363,25 @@ async function saveAttachedFileToMemory(docId, filename, btnEl) {
       body: JSON.stringify({ doc_id: docId, filename: filename })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'মেমোরিতে সংরক্ষণ ব্যর্থ হয়েছে');
+    if (!res.ok) throw new Error(data.detail || (isEn ? 'Failed to save to memory' : 'মেমোরিতে সংরক্ষণ ব্যর্থ হয়েছে'));
 
-    showToast(data.message || `'${filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!`, 'success');
+    const successMsg = isEn 
+      ? `'${filename}' successfully saved into permanent company memory!` 
+      : (data.message || `'${filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে!`);
+    showToast(successMsg, 'success');
+
     if (btnEl) {
       const badge = document.createElement('span');
       badge.className = 'chip-memory-badge saved';
-      badge.title = 'কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত';
-      badge.innerText = '✅ মেমোরিতে সংরক্ষিত';
+      badge.title = typeof t === 'function' ? t('file_saved_title', 'This file is saved in company persistent memory') : 'কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত';
+      badge.innerText = typeof t === 'function' ? t('file_saved_badge', '✅ Saved in Memory') : '✅ মেমোরিতে সংরক্ষিত';
       btnEl.replaceWith(badge);
     }
   } catch (err) {
-    showToast(`মেমোরি সংরক্ষণ ত্রুটি: ${err.message}`, 'error');
+    showToast((isEn ? 'Memory save error: ' : 'মেমোরি সংরক্ষণ ত্রুটি: ') + err.message, 'error');
     if (btnEl) {
       btnEl.disabled = false;
-      btnEl.innerText = '💾 মেমোরিতে সেভ করুন';
+      btnEl.innerText = typeof t === 'function' ? t('file_save_btn', '💾 Save to Memory') : '💾 মেমোরিতে সেভ করুন';
     }
   }
 }
@@ -1364,8 +1443,89 @@ window.addEventListener('appLanguageChanged', (e) => {
     const memToggleText = document.getElementById('memory-toggle-text');
     if (memToggleText) {
       memToggleText.innerText = useMemory 
-        ? t('memory_toggle_label', 'কোম্পানি মেমোরি')
-        : (lang === 'en' ? 'Memory Off' : 'মেমোরি বন্ধ');
+        ? (lang === 'en' ? 'Memory: Active' : 'মেমোরি: সক্রিয়')
+        : (lang === 'en' ? 'Memory: Disabled' : 'মেমোরি: নিষ্ক্রিয়');
+    }
+
+    // Update active tab topbar texts
+    const activeTabBtn = document.querySelector('.nav-btn.active');
+    if (activeTabBtn && activeTabBtn.id) {
+      const tabKey = activeTabBtn.id.replace('nav-', '').replace('-btn', '');
+      const tabTitles = {
+        chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+        admin: { title: 'tab_admin_title', desc: 'tab_admin_desc' },
+        dashboard: { title: 'tab_dash_title', desc: 'tab_dash_desc' },
+        users: { title: 'tab_users_title', desc: 'tab_users_desc' },
+        knowledge: { title: 'tab_kb_title', desc: 'tab_kb_desc' },
+        models: { title: 'tab_models_title', desc: 'tab_models_desc' },
+        mcp: { title: 'tab_mcp_title', desc: 'tab_mcp_desc' },
+        security: { title: 'tab_sec_title', desc: 'tab_sec_desc' },
+        backup: { title: 'tab_backup_title', desc: 'tab_backup_desc' },
+        reports: { title: 'tab_reports_title', desc: 'tab_reports_desc' },
+        settings: { title: 'tab_settings_title', desc: 'tab_settings_desc' }
+      };
+      if (tabTitles[tabKey]) {
+        const topbarTitle = document.getElementById('topbar-title-text');
+        const topbarDesc = document.getElementById('topbar-desc-text');
+        if (topbarTitle) topbarTitle.innerText = t(tabTitles[tabKey].title);
+        if (topbarDesc) topbarDesc.innerText = t(tabTitles[tabKey].desc);
+      }
+    }
+
+    // Update existing user & assistant message headers in chat feed
+    document.querySelectorAll('.chat-message.user-message .message-sender-name').forEach(el => {
+      el.innerText = t('sender_you', 'You');
+    });
+    document.querySelectorAll('.chat-message.assistant-message .message-sender-name').forEach(el => {
+      el.innerText = t('sender_ai', 'MyAgent AI');
+    });
+
+    // Update existing action toolbars
+    document.querySelectorAll('.msg-action-toolbar').forEach(tb => {
+      const copyBtn = tb.querySelector('.msg-tool-copy');
+      if (copyBtn) {
+        copyBtn.title = t('msg_copy_title');
+        const lbl = copyBtn.querySelector('.btn-label');
+        if (lbl) lbl.innerText = t('msg_copy_btn');
+      }
+      const saveBtn = tb.querySelector('.msg-tool-save');
+      if (saveBtn) {
+        saveBtn.title = t('msg_save_mem_title');
+        const lbl = saveBtn.querySelector('.btn-label');
+        if (lbl) lbl.innerText = t('msg_save_mem_btn');
+      }
+      const retryBtn = tb.querySelector('.msg-tool-retry');
+      if (retryBtn) {
+        retryBtn.title = t('msg_retry_title');
+        const lbl = retryBtn.querySelector('.btn-label');
+        if (lbl) lbl.innerText = t('msg_retry_btn');
+      }
+      const likeBtn = tb.querySelector('.msg-tool-like');
+      if (likeBtn) likeBtn.title = t('msg_like_title');
+      const dislikeBtn = tb.querySelector('.msg-tool-dislike');
+      if (dislikeBtn) dislikeBtn.title = t('msg_dislike_title');
+    });
+
+    // Update existing code block copy buttons
+    document.querySelectorAll('.copy-code-btn').forEach(btn => {
+      if (!btn.innerText.includes('✓')) {
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> ${t('msg_copy_code', 'Copy Code')}`;
+      }
+    });
+
+    // Update existing attached file chips
+    document.querySelectorAll('.chip-memory-badge.saved').forEach(badge => {
+      badge.innerText = t('file_saved_badge');
+      badge.title = t('file_saved_title');
+    });
+    document.querySelectorAll('.chip-save-memory-btn').forEach(btn => {
+      btn.innerText = t('file_save_btn');
+      btn.title = t('file_save_title');
+    });
+
+    // Update attachment shelf if currently visible
+    if (attachedChatFiles && attachedChatFiles.length > 0) {
+      renderAttachmentShelf();
     }
   }
 });
