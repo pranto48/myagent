@@ -97,14 +97,20 @@ async def save_attachment_to_memory(
             doc_id=doc_id,
             original_filename=safe_filename
         )
+        if not chunks:
+            raise HTTPException(status_code=422, detail=f"'{safe_filename}' ফাইল থেকে কোনো chunk তৈরি হয়নি। ফাইলটি খালি বা অসমর্থিত ফর্যাট হতে পারে।")
         stored_count = store.add_chunks(chunks)
+        logger.info(f"save-attachment-to-memory: '{safe_filename}' indexed {stored_count} chunks into permanent memory (doc_id={doc_id}).")
         return {
             "success": True,
-            "message": f"ফাইল '{safe_filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে ({stored_count}টি চাঙ্ক ইনডেক্সড)।",
+            "message": f"ফাইল '{safe_filename}' সফলভাবে কোম্পানির স্থায়ী মেমোরিতে সংরক্ষণ করা হয়েছে ({stored_count}টি চাঙ্ক ইনডেক্সড)।",
             "doc_id": doc_id,
             "chunks_indexed": stored_count
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"save-attachment-to-memory FAILED for '{safe_filename}': {e}")
         raise HTTPException(status_code=500, detail=f"মেমোরিতে সংরক্ষণ করতে সমস্যা: {str(e)}")
 
 @router.post("/upload")

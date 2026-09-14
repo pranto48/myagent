@@ -208,7 +208,8 @@ class VectorMemoryStore:
                 "chunk_index": int(c.get("chunk_index", 1)),
                 "category": c.get("category", "general"),
                 "security_level": c.get("security_level", "INTERNAL"),
-                "content_hash": c.get("content_hash", "")
+                "content_hash": c.get("content_hash", ""),
+                "tags": str(c.get("tags", ""))
             }
             for c in chunks
         ]
@@ -309,11 +310,13 @@ class VectorMemoryStore:
         title: str,
         content: str,
         category: str = "notes",
-        security_level: str = "INTERNAL"
+        security_level: str = "INTERNAL",
+        tags: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Instant Note / Knowledge Saver: Saves a note directly to vector memory
         and physical disk file in < 50ms without requiring a file upload.
+        Supports tags for categorized retrieval and filtering.
         """
         import uuid
         import re
@@ -324,6 +327,9 @@ class VectorMemoryStore:
         if not clean_content:
             raise ValueError("নোটের কনটেন্ট খালি হতে পারে না।")
 
+        tags_list = [t.strip() for t in (tags or []) if t.strip()]
+        tags_str = ",".join(tags_list) if tags_list else ""
+
         doc_id = f"note_{uuid.uuid4().hex[:8]}"
         safe_slug = re.sub(r'[^a-zA-Z0-9_\-\u0980-\u09FF]+', '_', clean_title).strip('_')[:40] or "note"
         file_name = f"Note: {clean_title}"
@@ -333,7 +339,8 @@ class VectorMemoryStore:
             os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
             doc_file_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_slug}.txt")
             with open(doc_file_path, "w", encoding="utf-8") as f:
-                f.write(f"# {clean_title}\n\n{clean_content}\n")
+                tag_header = f"Tags: {tags_str}\n" if tags_str else ""
+                f.write(f"# {clean_title}\n{tag_header}\n{clean_content}\n")
         except Exception as e:
             logger.warning(f"Could not persist note file to disk: {e}")
 
@@ -356,11 +363,13 @@ class VectorMemoryStore:
                 "chunk_index": idx,
                 "content": c_text,
                 "category": category,
-                "security_level": security_level
+                "security_level": security_level,
+                "tags": tags_str
             })
 
         stored_count = self.add_chunks(chunks)
         self.cache.clear()
+        logger.info(f"Note saved: '{clean_title}' | doc_id={doc_id} | chunks={stored_count} | tags={tags_str} | category={category}")
 
         return {
             "doc_id": doc_id,
@@ -368,6 +377,7 @@ class VectorMemoryStore:
             "filename": file_name,
             "category": category,
             "security_level": security_level,
+            "tags": tags_list,
             "chunks_count": stored_count,
             "created_at": time.strftime('%Y-%m-%d %H:%M:%S')
         }

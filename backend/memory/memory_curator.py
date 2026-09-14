@@ -280,7 +280,7 @@ Return ONLY valid JSON matching this schema:
             }
         }]
 
-        # If file is larger, also add clean paragraphs excluding headers/footers
+        # Process ALL clean paragraphs from the full file — no arbitrary 6-chunk cap
         if raw_filepath and os.path.exists(raw_filepath):
             try:
                 raw_chunks = DocumentProcessor.process_file_into_chunks(
@@ -288,11 +288,13 @@ Return ONLY valid JSON matching this schema:
                     doc_id=doc_id,
                     original_filename=filename
                 )
-                # Filter out small boilerplate chunks (< 60 chars)
-                for rc in raw_chunks[:6]:
+                # Filter out small boilerplate chunks (< 80 chars) to avoid noise
+                for rc in raw_chunks:
                     if len(rc.get("content", "").strip()) > 80:
                         rc["metadata"]["is_curated"] = True
+                        rc["tags"] = ",".join(tags)
                         chunks.append(rc)
+                logger.info(f"MemoryCurator: Queued {len(raw_chunks)} raw chunks from '{filename}' for full indexing.")
             except Exception as ex:
                 logger.warning(f"Could not extract additional chunks from {filename}: {ex}")
 

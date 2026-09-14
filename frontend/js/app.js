@@ -876,6 +876,13 @@ async function sendMessage() {
             } else if (data.type === 'token') {
               assistantContent += data.token;
               updateAssistantMessage(assistantBubble, assistantContent, true);
+            } else if (data.type === 'memory_saved') {
+              // 🧠 Cognitive Auto-Memory saved — show subtle neural toast
+              const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+              const memMsg = isEn
+                ? `🧠 Auto-Memory Saved: "${data.note}"`
+                : `🧠 স্বয়ংক্রিয় মেমোরি সংরক্ষিত: "${data.note}"`;
+              if (typeof showToast === 'function') showToast(memMsg, 'info');
             } else if (data.type === 'error') {
               const errLabel = typeof t === 'function' ? t('error_prefix', 'ত্রুটি:') : 'ত্রুটি:';
               assistantContent += `\n\n⚠️ **${errLabel}** ${data.error}`;

@@ -109,7 +109,7 @@ async def add_memory_note(req: AddMemoryNoteRequest):
         return {
             "success": True,
             "note_id": note_id,
-            "message": f"সফলভাবে কোম্পানি তথ্য নোট '{title_str}' মেমোরিতে সংরক্ষিত হয়েছে।"
+            "message": f"সফলভাবে কোম্পানি তথ্য নোট '{title_str}' মেমোরিতে সংরক্ষিত হয়েছে."
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

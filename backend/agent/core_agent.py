@@ -541,8 +541,107 @@ class CompanyAIAgent:
                 yield f"data: {json.dumps({'type': 'error', 'error': f'Communication Error: {str(e)}'})}\n\n"
                 return
 
-        # End of turns
+        # End of turns — Cognitive Auto-Memory Extraction runs silently after streaming
         yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+
+        # 🧠 Cognitive Auto-Memory Extraction Engine (background, non-blocking)
+        # Scans the user prompt for factual statements worth saving to permanent memory
+        if use_memory and prompt.strip() and not self.is_conversational_greeting(prompt):
+            try:
+                extracted = await self._cognitive_auto_extract(prompt, language=language)
+                if extracted:
+                    save_res = self.vector_store.add_note(
+                        title=extracted["title"],
+                        content=extracted["content"],
+                        category="ai_auto_extracted",
+                        tags=extracted.get("tags", ["auto_extracted"])
+                    )
+                    logger.info(f"[AutoMemory] Saved: '{extracted['title']}' | doc_id={save_res['doc_id']} | chunks={save_res['chunks_count']}")
+                    yield f"data: {json.dumps({'type': 'memory_saved', 'note': extracted['title'], 'doc_id': save_res['doc_id']})}\n\n"
+            except Exception as auto_err:
+                logger.debug(f"[AutoMemory] Extraction skipped: {auto_err}")
+
+    async def _cognitive_auto_extract(self, prompt: str, language: str = "bn") -> Optional[Dict[str, Any]]:
+        """
+        🧠 Cognitive Auto-Memory Extraction Engine.
+        Scans user prompt with regex + heuristic NLP to detect factual statements:
+          - Named entities: people, companies, places, projects
+          - Dates, deadlines, time references
+          - Financial figures, salaries, budgets
+          - Rules, policies, instructions, procedures
+          - Contact info: phone, email, address
+        Returns a structured {title, content, tags} dict if worthy data found, else None.
+        Minimum threshold: 25 chars and at least 1 factual signal to save.
+        """
+        import re
+
+        text = prompt.strip()
+        if len(text) < 25:
+            return None
+
+        lower = text.lower()
+
+        # ── Signal Pattern Library ──────────────────────────────────────────────
+        date_pat       = re.compile(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{2}[/-]\d{2}|জানুয়ারি|ফেব্রুয়ারি|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর|january|february|march|april|may|june|july|august|september|october|november|december)\b", re.I)
+        money_pat      = re.compile(r"\b(\d[\d,]*\s*(টাকা|taka|bdt|usd|\$|৳|লক্ষ|কোটি|হাজার|thousand|million|billion|salary|বেতন|budget|বাজেট|payment|পেমেন্ট))\b", re.I)
+        phone_pat      = re.compile(r"\b(\+?880|01)[3-9]\d{8}\b")
+        email_pat      = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
+        rule_kw        = ["নিয়ম", "নীতি", "পলিসি", "নির্দেশনা", "আইন", "ধারা", "সিদ্ধান্ত", "চুক্তি",
+                          "rule", "policy", "regulation", "guideline", "procedure", "decision", "contract", "agreement"]
+        person_kw      = ["জনাব", "মিস", "ড.", "ডাক্তার", "mr.", "mr ", "mrs.", "ms.", "dr.", "engineer", "ইঞ্জিনিয়ার",
+                          "manager", "ম্যানেজার", "director", "পরিচালক", "ceo", "md ", "chairman", "চেয়ারম্যান"]
+        project_kw     = ["প্রজেক্ট", "project", "initiative", "কার্যক্রম", "উদ্যোগ", "task", "milestone", "deadline"]
+        company_kw     = ["কোম্পানি", "company", "ltd", "limited", "corp", "inc.", "সংস্থা", "প্রতিষ্ঠান", "organization"]
+        instruction_kw = ["মনে রেখো", "মনে রাখো", "save", "remember", "record", "সংরক্ষণ", "নোট", "note down", "log this"]
+
+        # Count signals
+        signals = 0
+        tags    = []
+
+        if date_pat.search(text):
+            signals += 2; tags.append("date_reference")
+        if money_pat.search(text):
+            signals += 2; tags.append("financial")
+        if phone_pat.search(text) or email_pat.search(text):
+            signals += 2; tags.append("contact_info")
+        if any(k in lower for k in rule_kw):
+            signals += 3; tags.append("policy_rule")
+        if any(k in lower for k in person_kw):
+            signals += 2; tags.append("person_entity")
+        if any(k in lower for k in project_kw):
+            signals += 2; tags.append("project")
+        if any(k in lower for k in company_kw):
+            signals += 2; tags.append("company_data")
+        if any(k in lower for k in instruction_kw):
+            signals += 4; tags.append("user_instruction")
+
+        # Length bonus — longer statements are more likely to contain facts
+        if len(text) > 120:
+            signals += 1
+        if len(text) > 300:
+            signals += 2
+
+        # Threshold: need at least 3 signal points to save
+        if signals < 3:
+            return None
+
+        # Deduplicate tags
+        tags = list(dict.fromkeys(tags))
+        tags.append("auto_extracted")
+
+        # Build title from first meaningful sentence (max 60 chars)
+        first_sentence = re.split(r"[।\.!\n]", text)[0].strip()
+        title = (first_sentence[:57] + "...") if len(first_sentence) > 60 else first_sentence
+        if not title:
+            title = text[:57] + "..."
+
+        # Prefix indicates auto-extraction
+        if language == "en":
+            content = f"[AI Auto-Extracted Factual Memory]\nSource: User conversation\nExtracted Data:\n{text}"
+        else:
+            content = f"[এআই স্বয়ংক্রিয় ফ্যাক্টুয়াল মেমোরি এক্সট্র্যাকশন]\nউৎস: ব্যবহারকারীর কথোপকথন\nএক্সট্র্যাক্টেড তথ্য:\n{text}"
+
+        return {"title": title, "content": content, "tags": tags, "signals": signals}
 
     async def generate_response(
         self,
