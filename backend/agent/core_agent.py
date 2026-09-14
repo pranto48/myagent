@@ -117,7 +117,8 @@ class CompanyAIAgent:
             logger.info(f"Conversational greeting detected for '{prompt}', skipping RAG retrieval.")
             return prompt, []
 
-        hits = self.vector_store.super_fast_search(query=prompt, top_k=settings.TOP_K_RESULTS, user_role=user_role)
+        rag_top_k = max(settings.TOP_K_RESULTS, 6)
+        hits = self.vector_store.super_fast_search(query=prompt, top_k=rag_top_k, user_role=user_role)
         sources: List[SourceCitation] = []
 
         context_blocks = []
@@ -128,6 +129,8 @@ class CompanyAIAgent:
                 page_num = hit.get("page", 1)
                 chunk_content = str(hit.get("content", "")).strip()
                 score = float(hit.get("score", 0.0))
+                meta = hit.get("metadata", {}) or {}
+                category = meta.get("category") or hit.get("category", "")
 
                 # Quality filter: skip corrupt or placeholder entries
                 if "????" in source_file or "????" in chunk_content:
@@ -146,8 +149,9 @@ class CompanyAIAgent:
                 seen_snippets.add(snippet_fp)
 
                 idx = len(context_blocks) + 1
+                cat_tag = f" | বিভাগ: {category}" if category else ""
                 context_blocks.append(
-                    f"[Source #{idx}: {source_file} (Page {page_num})]\n{chunk_content}"
+                    f"[Source #{idx}: {source_file} (Page {page_num}{cat_tag})]\n{chunk_content}"
                 )
                 sources.append(
                     SourceCitation(
@@ -158,7 +162,7 @@ class CompanyAIAgent:
                         page=page_num
                     )
                 )
-                if len(context_blocks) >= 4:
+                if len(context_blocks) >= rag_top_k:
                     break
 
         # If no quality hits survived filtering

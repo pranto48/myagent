@@ -473,18 +473,38 @@ class VectorMemoryStore:
         except Exception as e:
             logger.debug(f"FTS5 search notice: {e}")
 
-        # Reciprocal Rank Fusion (RRF)
+        # Reciprocal Rank Fusion (RRF) with Domain Category Intent Boosting
         combined_scores: Dict[str, float] = {}
         item_map: Dict[str, Dict[str, Any]] = {}
 
+        # Detect domain category intent from query
+        query_lower = query.lower()
+        query_category = None
+        if any(w in query_lower for w in ["টাকা", "খরচ", "ব্যয়", "সেলস", "লাভ", "বাজেট", "ইনভয়েস", "মূল্য", "ক্রয়", "হিসাব", "salary", "expense", "cost", "revenue", "price", "budget"]):
+            query_category = "financial"
+        elif any(w in query_lower for w in ["ছুটি", "নিয়ম", "পলিসি", "অফিস", "কর্মচারী", "কর্মী", "এইচআর", "উপস্থিতি", "leave", "holiday", "attendance", "policy", "rule", "hr"]):
+            query_category = "hr_policy"
+        elif any(w in query_lower for w in ["পাসওয়ার্ড", "সার্ভার", "লগইন", "সিকিউরিটি", "আইটি", "নেটওয়ার্ক", "ফায়ারওয়াল", "server", "ip", "password", "security", "firewall", "vpn"]):
+            query_category = "it_security"
+        elif any(w in query_lower for w in ["মার্কেটিং", "ক্যাম্পেইন", "বিজ্ঞাপন", "ফেসবুক", "ads", "marketing", "campaign", "social"]):
+            query_category = "marketing"
+
         for rank, item in enumerate(semantic_hits):
             cid = item["id"]
-            combined_scores[cid] = combined_scores.get(cid, 0.0) + (1.0 / (60.0 + rank + 1))
+            boost = 0.0
+            item_cat = str(item.get("metadata", {}).get("category") or item.get("category", "")).lower()
+            if query_category and item_cat == query_category:
+                boost += 0.015
+            combined_scores[cid] = combined_scores.get(cid, 0.0) + (1.0 / (60.0 + rank + 1)) + boost
             item_map[cid] = item
 
         for rank, item in enumerate(keyword_hits):
             cid = item["id"]
-            combined_scores[cid] = combined_scores.get(cid, 0.0) + (1.2 / (60.0 + rank + 1)) # slight boost for exact keywords
+            boost = 0.0
+            item_cat = str(item.get("metadata", {}).get("category") or item.get("category", "")).lower()
+            if query_category and item_cat == query_category:
+                boost += 0.02
+            combined_scores[cid] = combined_scores.get(cid, 0.0) + (1.2 / (60.0 + rank + 1)) + boost
             if cid not in item_map:
                 item_map[cid] = item
 
