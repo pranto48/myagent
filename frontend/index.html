@@ -78,7 +78,13 @@
         <span style="font-weight: 700; font-size: 1rem; color: white;">MyAgent</span>
         <span class="version-tag">v2.2.0</span>
       </div>
-      <button class="btn-sm-action" onclick="createNewChatSession()">+</button>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div class="lang-switcher-pill" id="mobile-lang-switcher" title="Change Language / ভাষা পরিবর্তন">
+          <button type="button" class="lang-btn active" id="mobile-btn-lang-bn" onclick="setAppLanguage('bn')">বাং</button>
+          <button type="button" class="lang-btn" id="mobile-btn-lang-en" onclick="setAppLanguage('en')">EN</button>
+        </div>
+        <button class="btn-sm-action" onclick="createNewChatSession()">+</button>
+      </div>
     </div>
 
     <!-- Left Navigation Sidebar -->
@@ -98,7 +104,7 @@
       <div class="server-badge">
         <div class="status-indicator">
           <div class="status-dot" id="system-status-dot"></div>
-          <span id="agent-online-status">অনলাইন</span>
+          <span id="agent-online-status" data-i18n="status_online">অনলাইন</span>
         </div>
         <span class="server-ip">192.168.9.9:3399</span>
       </div>
@@ -109,70 +115,70 @@
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span>এআই চ্যাট (Chat)</span>
+          <span data-i18n="nav_chat">এআই চ্যাট (Chat)</span>
         </button>
 
         <button class="nav-btn" id="nav-admin-btn" onclick="switchTab('admin')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
           </svg>
-          <span>অ্যাডমিন কমান্ড সেন্টার</span>
+          <span data-i18n="nav_admin">অ্যাডমিন কমান্ড সেন্টার</span>
         </button>
 
         <button class="nav-btn" id="nav-dashboard-btn" onclick="switchTab('dashboard')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
-          <span>অ্যানালিটিক্স ড্যাশবোর্ড</span>
+          <span data-i18n="nav_dashboard">অ্যানালিটিক্স ড্যাশবোর্ড</span>
         </button>
 
         <button class="nav-btn" id="nav-users-btn" onclick="switchTab('users')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <span>ইউজার ম্যানেজমেন্ট</span>
+          <span data-i18n="nav_users">ইউজার ম্যানেজমেন্ট</span>
         </button>
 
         <button class="nav-btn" id="nav-knowledge-btn" onclick="switchTab('knowledge')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <span>ডেটা ও নলেজবেস</span>
+          <span data-i18n="nav_knowledge">ডেটা ও নলেজবেস</span>
         </button>
 
         <button class="nav-btn" id="nav-models-btn" onclick="switchTab('models')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          <span>এআই মডেল হাব ও পিং</span>
+          <span data-i18n="nav_models">এআই মডেল হাব ও পিং</span>
         </button>
 
         <button class="nav-btn" id="nav-mcp-btn" onclick="switchTab('mcp')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
           </svg>
-          <span>টুলস ও MCP হাব</span>
+          <span data-i18n="nav_mcp">টুলস ও MCP হাব</span>
         </button>
 
         <button class="nav-btn" id="nav-security-btn" onclick="switchTab('security')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <span>সিকিউরিটি ও কমপ্লায়েন্স</span>
+          <span data-i18n="nav_security">সিকিউরিটি ও কমপ্লায়েন্স</span>
         </button>
 
         <button class="nav-btn" id="nav-reports-btn" onclick="switchTab('reports')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <span>AI রিপোর্ট জেনারেটর</span>
+          <span data-i18n="nav_reports">AI রিপোর্ট জেনারেটর</span>
         </button>
 
         <button class="nav-btn" id="nav-backup-btn" onclick="switchTab('backup')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
           </svg>
-          <span>ব্যাকআপ ও রিস্টোর</span>
+          <span data-i18n="nav_backup">ব্যাকআপ ও রিস্টোর</span>
         </button>
 
         <button class="nav-btn" id="nav-settings-btn" onclick="switchTab('settings')">
@@ -180,18 +186,18 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span>সিস্টেম সেটিংস</span>
+          <span data-i18n="nav_settings">সিস্টেম সেটিংস</span>
         </button>
       </nav>
 
       <!-- Chat History Sessions List -->
       <div class="sessions-panel">
         <div class="sessions-header">
-          <span>চ্যাট সেশনসমূহ</span>
-          <button class="icon-btn-sm" title="নতুন চ্যাট" onclick="createNewChatSession()">+</button>
+          <span data-i18n="sessions_title">চ্যাট সেশনসমূহ</span>
+          <button class="icon-btn-sm" title="নতুন চ্যাট" data-i18n-title="new_chat_btn_title" onclick="createNewChatSession()">+</button>
         </div>
         <div class="sessions-list" id="sessions-list">
-          <div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;">সেশন লোড হচ্ছে...</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;" data-i18n="sessions_empty">সেশন লোড হচ্ছে...</div>
         </div>
       </div>
 
@@ -200,9 +206,9 @@
         <div class="user-avatar-sm">👤</div>
         <div class="user-meta">
           <span class="user-name" id="logged-in-user-name">admin</span>
-          <span class="user-role">সিস্টেম অ্যাডমিন</span>
+          <span class="user-role" id="logged-in-user-role" data-i18n="role_admin">সিস্টেম অ্যাডমিন</span>
         </div>
-        <button class="logout-btn" title="লগআউট" onclick="logout()">
+        <button class="logout-btn" title="লগআউট" data-i18n-title="tooltip_logout" onclick="logout()">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
@@ -223,14 +229,20 @@
       <!-- Topbar -->
       <header class="workspace-topbar">
         <div class="topbar-title">
-          <h2 id="topbar-title-text" class="animated-gradient-text">কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট</h2>
-          <p id="topbar-desc-text">ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই</p>
+          <h2 id="topbar-title-text" class="animated-gradient-text" data-i18n="topbar_title">কোম্পানি ডেটা ইন্টেলিজেন্স এজেন্ট</h2>
+          <p id="topbar-desc-text" data-i18n="topbar_desc">ওপেনক্ল-স্টাইল পারসিসটেন্ট মেমোরি ও অটোনোমাস কোম্পানি এআই</p>
         </div>
 
         <div class="topbar-actions">
+          <!-- Language Switcher (Bangla / English) -->
+          <div class="lang-switcher-pill" id="topbar-lang-switcher" title="Change Language / ভাষা পরিবর্তন" data-i18n-title="tooltip_lang">
+            <button type="button" class="lang-btn active" id="btn-lang-bn" onclick="setAppLanguage('bn')">বাং</button>
+            <button type="button" class="lang-btn" id="btn-lang-en" onclick="setAppLanguage('en')">EN</button>
+          </div>
+
           <!-- Model Switcher Dropdown -->
           <div class="model-picker-wrap">
-            <span style="font-size: 0.75rem; color: var(--text-muted);">মডেল:</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="topbar_model_label">মডেল:</span>
             <select id="topbar-model-select" class="model-select" onchange="onModelSelectChange(this.value)">
               <option value="llama3.3">llama3.3</option>
             </select>
@@ -238,35 +250,35 @@
 
           <!-- Chat Search Box -->
           <div class="chat-search-wrap">
-            <input type="text" id="chat-search-input" class="chat-search-input" placeholder="🔍 খুঁজুন..." oninput="filterChatMessages(this.value)" title="বর্তমান চ্যাট মেসেজের ভেতর অনুসন্ধান করুন">
+            <input type="text" id="chat-search-input" class="chat-search-input" placeholder="🔍 খুঁজুন..." data-i18n-placeholder="chat_search_placeholder" oninput="filterChatMessages(this.value)" title="বর্তমান চ্যাট মেসেজের ভেতর অনুসন্ধান করুন">
           </div>
 
           <!-- Quick Note to Memory Button -->
-          <button class="btn-secondary" id="btn-quick-note" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য/নোট সেভ করুন">
+          <button class="btn-secondary" id="btn-quick-note" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য/নোট সেভ করুন" data-i18n-title="tooltip_quick_note">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            <span class="hide-mobile">নোট সেভ</span>
+            <span class="hide-mobile" data-i18n="btn_quick_note">নোট সেভ</span>
           </button>
 
           <!-- Quick Theme Toggle Action -->
-          <button class="btn-icon-theme" id="quick-theme-toggle" onclick="toggleTheme()" title="থিম পরিবর্তন করুন (ডার্ক / লাইট)">
+          <button class="btn-icon-theme" id="quick-theme-toggle" onclick="toggleTheme()" title="থিম পরিবর্তন করুন (ডার্ক / লাইট)" data-i18n-title="tooltip_theme">
             <span id="theme-toggle-icon">🌙</span>
           </button>
 
           <!-- Export Chat Action -->
-          <button class="btn-secondary" id="btn-export-chat" onclick="exportChatConversation()" title="চ্যাট এক্সপোর্ট করুন">
+          <button class="btn-secondary" id="btn-export-chat" onclick="exportChatConversation()" title="চ্যাট এক্সপোর্ট করুন" data-i18n-title="tooltip_export_chat">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span class="hide-mobile">এক্সপোর্ট</span>
+            <span class="hide-mobile" data-i18n="tooltip_export_chat">এক্সপোর্ট</span>
           </button>
 
           <button class="btn-secondary" id="btn-clear-chat" onclick="createNewChatSession()">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            <span class="hide-mobile">নতুন চ্যাট</span>
+            <span class="hide-mobile" data-i18n="sessions_new">নতুন চ্যাট</span>
           </button>
 
           <button class="btn-primary" id="btn-quick-upload" onclick="switchTab('knowledge')">
@@ -372,6 +384,7 @@
                 id="chat-input" 
                 class="chatgpt-textarea" 
                 placeholder="MyAgent-কে প্রশ্ন করুন, বা ফাইল/এক্সেল/ছবি সংযুক্ত করুন... (Shift+Enter নতুন লাইনের জন্য)" 
+                data-i18n-placeholder="chat_placeholder"
                 rows="1"
                 oninput="autoResizeTextarea(this)"
                 onkeydown="handleTextareaKey(event)"
@@ -379,7 +392,7 @@
 
               <div class="pill-bottom-toolbar">
                 <div class="pill-tools-left">
-                  <button type="button" class="pill-icon-btn" id="pill-btn-attach" title="ফাইল, এক্সেল বা ছবি সংযুক্ত করুন (অথবা ড্র্যাগ করে ছেড়ে দিন / পেস্ট করুন)" onclick="openChatFilePicker()">
+                  <button type="button" class="pill-icon-btn" id="pill-btn-attach" title="ফাইল বা ফটো যুক্ত করুন" data-i18n-title="btn_attach_title" onclick="openChatFilePicker()">
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                     </svg>
@@ -387,12 +400,12 @@
                   <label class="memory-pill-toggle" id="memory-toggle-btn" onclick="toggleMemoryUsage()" title="কোম্পানি ভেক্টর মেমোরি সার্চ চালু/বন্ধ">
                     <input type="checkbox" id="chk-use-memory" checked style="display:none;">
                     <span class="memory-dot"></span>
-                    <span id="memory-toggle-text">মেমোরি অন</span>
+                    <span id="memory-toggle-text" data-i18n="memory_toggle_label">কোম্পানি মেমোরি</span>
                   </label>
                 </div>
 
                 <div class="pill-tools-right">
-                  <button type="button" class="pill-send-btn" id="btn-send-message" onclick="sendMessage()" title="বার্তা পাঠান (Enter)" aria-label="বার্তা পাঠান">
+                  <button type="button" class="pill-send-btn" id="btn-send-message" onclick="sendMessage()" title="বার্তা পাঠান (Enter)" data-i18n-title="btn_send_title" aria-label="বার্তা পাঠান">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                     </svg>
@@ -1662,10 +1675,29 @@
           <button class="close-modal-btn" onclick="closeSettingsModal()">&times;</button>
         </div>
 
+        <!-- Language Selection Section (English & Bangla Only) -->
+        <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+          <div class="theme-section-title">
+            <span data-i18n="settings_lang_title">🌐 ভাষা পরিবর্তন (Language Selection)</span>
+          </div>
+          <div class="theme-options-grid" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="theme-option-card selected" id="lang-card-bn" onclick="setAppLanguage('bn')">
+              <span class="theme-card-icon">🇧🇩</span>
+              <span class="theme-card-title" data-i18n="lang_bn_title">বাংলা (Bangla)</span>
+              <span class="theme-card-desc" data-i18n="lang_bn_desc">বাংলা ইন্টারফেস ও রেসপন্স</span>
+            </div>
+            <div class="theme-option-card" id="lang-card-en" onclick="setAppLanguage('en')">
+              <span class="theme-card-icon">🇬🇧</span>
+              <span class="theme-card-title" data-i18n="lang_en_title">English</span>
+              <span class="theme-card-desc" data-i18n="lang_en_desc">English interface & responses</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Theme & Appearance Switching Section -->
         <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
           <div class="theme-section-title">
-            <span>🎨 ডিসপ্লে ও থিম মোড (Theme Mode)</span>
+            <span data-i18n="settings_theme_title">🎨 ডিসপ্লে ও থিম মোড (Theme Mode)</span>
           </div>
           <div class="theme-options-grid">
             <div class="theme-option-card" id="theme-card-dark" data-theme="dark" onclick="selectTheme('dark')">
@@ -1835,16 +1867,16 @@
     <div class="modal-backdrop" id="quick-memory-modal" style="display:none;">
       <div class="modal-window" style="max-width: 520px;">
         <div class="modal-header">
-          <h3>📌 সরাসরি মেমোরিতে নোট/তথ্য সংরক্ষণ</h3>
+          <h3 data-i18n="quick_note_modal_title">🧠 মেমোরিতে দ্রুত নোট/তথ্য যুক্ত করুন</h3>
           <button class="close-modal-btn" type="button" onclick="closeQuickMemoryModal()">&times;</button>
         </div>
         <form onsubmit="submitQuickNote(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
           <div class="form-group">
-            <label>নোটের শিরোনাম বা বিষয়</label>
-            <input type="text" id="quick-note-title" class="text-input" placeholder="যেমন: ধানমন্ডি অফিসের নতুন ঠিকানা বা নীতিমালা" required>
+            <label data-i18n="quick_note_title_label">নোটের শিরোনাম</label>
+            <input type="text" id="quick-note-title" class="text-input" placeholder="যেমন: ধানমন্ডি শাখা অফিস সময়সূচি ও রুলস" data-i18n-placeholder="quick_note_title_placeholder" required>
           </div>
           <div class="form-group">
-            <label>ক্যাটাগরি</label>
+            <label data-i18n="quick_note_category_label">ক্যাটাগরি / বিভাগ</label>
             <select id="quick-note-category" class="text-input">
               <option value="notes">সাধারণ নোট (General Notes)</option>
               <option value="company_policy">কোম্পানি পলিসি ও রুলস (Policies)</option>
@@ -1853,12 +1885,12 @@
             </select>
           </div>
           <div class="form-group">
-            <label>বিস্তারিত তথ্য / গাইডলাইন</label>
-            <textarea id="quick-note-content" class="text-input" rows="5" placeholder="যে তথ্যটি এআই এজেন্টের সারাজীবন মনে রাখা প্রয়োজন..." required></textarea>
+            <label data-i18n="quick_note_content_label">বিস্তারিত তথ্য / গাইডলাইন</label>
+            <textarea id="quick-note-content" class="text-input" rows="5" placeholder="যে তথ্যটি এআই এজেন্টের সারাজীবন মনে রাখা প্রয়োজন..." data-i18n-placeholder="quick_note_content_placeholder" required></textarea>
           </div>
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
-            <button type="button" class="btn-secondary" onclick="closeQuickMemoryModal()">বাতিল</button>
-            <button type="submit" class="btn-primary" id="btn-submit-quick-note">মেমোরিতে সেভ করুন</button>
+            <button type="button" class="btn-secondary" onclick="closeQuickMemoryModal()" data-i18n="btn_cancel">বাতিল</button>
+            <button type="submit" class="btn-primary" id="btn-submit-quick-note" data-i18n="btn_save_memory">মেমোরিতে সেভ করুন</button>
           </div>
         </form>
       </div>
@@ -1870,6 +1902,7 @@
   </div>
 
   <!-- Scripts -->
+  <script src="js/i18n.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/user_manager.js"></script>

@@ -1629,6 +1629,45 @@ body {
   transform: scale(1.05);
 }
 
+/* Language Switcher Pill (Bangla / English) */
+.lang-switcher-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease;
+}
+.lang-switcher-pill:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+}
+.lang-btn {
+  padding: 4px 9px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border-radius: calc(var(--radius-sm) - 2px);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+.lang-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.lang-btn.active {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(168, 85, 247, 0.25));
+  border-color: rgba(6, 182, 212, 0.5);
+  color: var(--cyan-glow);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.2);
+}
+
+
 /* Modal Dialog System */
 .modal-backdrop {
   position: fixed;

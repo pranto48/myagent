@@ -77,11 +77,13 @@ async function loadServerStatus() {
       const topModelSelect = document.getElementById('topbar-model-select');
 
       if (statusDot) statusDot.style.background = '#10b981';
-      if (statusText) statusText.innerText = 'অনলাইন';
+      if (statusText) statusText.innerText = typeof t === 'function' ? t('status_online', 'অনলাইন') : 'অনলাইন';
       if (sideModel && data.llm_model) sideModel.innerText = data.llm_model;
       if (topModelSelect && data.llm_model) topModelSelect.value = data.llm_model;
     }
   } catch (e) {
+    const statusText = document.getElementById('agent-online-status');
+    if (statusText) statusText.innerText = typeof t === 'function' ? t('status_offline', 'অফলাইন') : 'অফলাইন';
     console.warn('Server status check notice:', e);
   }
 }
@@ -787,7 +789,8 @@ async function sendMessage() {
         prompt: prompt,
         history: conversationHistory.slice(-8),
         use_memory: useMemory,
-        attached_files: serverAttachedFiles
+        attached_files: serverAttachedFiles,
+        language: typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn'
       })
     });
 

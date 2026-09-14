@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(default=None, description="Sampling temperature override")
     model: Optional[str] = Field(default=None, description="Specific model override")
     attached_files: Optional[List[Dict[str, Any]]] = Field(default=None, description="Metadata and extracted summaries of files attached from chat bar")
+    language: Optional[str] = Field(default="bn", description="Preferred response language: 'bn' or 'en'")
 
 class SourceCitation(BaseModel):
     source: str

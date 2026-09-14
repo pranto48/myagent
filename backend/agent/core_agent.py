@@ -198,7 +198,8 @@ class CompanyAIAgent:
         model: Optional[str] = None,
         username: str = "admin",
         user_role: str = "admin",
-        attached_files: Optional[List[Dict[str, Any]]] = None
+        attached_files: Optional[List[Dict[str, Any]]] = None,
+        language: str = "bn"
     ) -> AsyncGenerator[str, None]:
         """
         Executes agent reasoning with dynamic tool calling (local tools & MCP)
@@ -303,6 +304,12 @@ class CompanyAIAgent:
 
         # 5. Build conversation payload
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
+        # Apply language preference directive (English or Bangla)
+        if language == "en":
+            system_content += "\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected English as their preferred interface language. Generate all your final responses, insights, analyses, and citations in professional English (while strictly observing the internal company data and memory boundaries)."
+        else:
+            system_content += "\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected Bangla as their preferred interface language. Generate all your final responses, insights, analyses, and citations in natural, professional, and elegant Bangla (বাংলা)."
+
         # Add tool usage instructions into system prompt for models without native function calling
         system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. NOTE: Do not search for other companies on the web. Only company internal memory and files are permitted for company operations. You may call tools using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
 
@@ -492,7 +499,8 @@ class CompanyAIAgent:
         use_memory: bool = True,
         temperature: Optional[float] = None,
         model: Optional[str] = None,
-        attached_files: Optional[List[Dict[str, Any]]] = None
+        attached_files: Optional[List[Dict[str, Any]]] = None,
+        language: str = "bn"
     ) -> Dict[str, Any]:
         """Non-streaming generation for API consumers."""
         target_model = model or settings.LLM_MODEL
@@ -531,6 +539,10 @@ class CompanyAIAgent:
                 user_content = f"### [সরাসরি চ্যাটে সংযুক্ত ফাইল ও ডাটা কনটেক্সট]:\n\n{merged_attachments}\n\n### [ব্যবহারকারীর প্রশ্ন / নির্দেশনা]:\n{user_content}"
 
         system_content = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
+        if language == "en":
+            system_content += "\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected English as their preferred interface language. Generate your final response in clear, professional English (while strictly observing the internal company data and memory boundaries)."
+        else:
+            system_content += "\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected Bangla as their preferred interface language. Generate your final response in natural, professional, and elegant Bangla (বাংলা)."
         messages = [{"role": "system", "content": system_content}]
 
         for msg in history[-8:]:

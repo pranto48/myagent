@@ -169,7 +169,8 @@ async def stream_chat_endpoint(
                 model=request.model,
                 username=username,
                 user_role=user_role,
-                attached_files=request.attached_files
+                attached_files=request.attached_files,
+                language=request.language or "bn"
             )
 
             async for chunk in generator:
@@ -226,7 +227,8 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
             use_memory=request.use_memory,
             temperature=request.temperature,
             model=request.model,
-            attached_files=request.attached_files
+            attached_files=request.attached_files,
+            language=request.language or "bn"
         )
 
         if session_id:
