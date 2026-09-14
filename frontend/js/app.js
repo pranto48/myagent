@@ -315,7 +315,8 @@ function setupChatDragDropAndPaste() {
 
     if (filesToUpload.length > 0) {
       handleChatFilesSelected(filesToUpload);
-      showToast(`${filesToUpload.length}টি ফাইল ক্লিপবোর্ড থেকে সংযুক্ত করা হয়েছে`, 'info');
+      const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
+      showToast(isEn ? `${filesToUpload.length} file(s) attached from clipboard` : `${filesToUpload.length}টি ফাইল ক্লিপবোর্ড থেকে সংযুক্ত করা হয়েছে`, 'info');
     }
   });
 }
@@ -546,8 +547,9 @@ async function loadChatSessions() {
     const res = await fetch('/api/sessions', { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {} });
     if (res.ok) {
       const sessions = await res.json();
+      const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
       if (!sessions || sessions.length === 0) {
-        listEl.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">কোনো পূর্ববর্তী চ্যাট নেই।</div>';
+        listEl.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">${isEn ? 'No previous chats.' : 'কোনো পূর্ববর্তী চ্যাট নেই।'}</div>`;
         if (!currentSessionId) {
           await createNewChatSession();
         }
@@ -558,7 +560,7 @@ async function loadChatSessions() {
         <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="switchSession('${s.id}')" id="session-item-${s.id}">
           <span class="session-title-text" title="${escapeHtml(s.title)}">💬 ${escapeHtml(s.title)}</span>
           <div class="session-actions">
-            <button class="session-del-btn" title="ডিলিট করুন" onclick="deleteChatSession('${s.id}', event)">&times;</button>
+            <button class="session-del-btn" title="${typeof t === 'function' ? t('btn_delete', 'ডিলিট করুন') : 'ডিলিট করুন'}" onclick="deleteChatSession('${s.id}', event)">&times;</button>
           </div>
         </div>
       `).join('');
@@ -574,11 +576,12 @@ async function loadChatSessions() {
 }
 
 async function createNewChatSession() {
+  const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
   try {
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'নতুন চ্যাট' })
+      body: JSON.stringify({ title: isEn ? 'New Chat' : 'নতুন চ্যাট' })
     });
     if (res.ok) {
       const newSession = await res.json();
@@ -597,7 +600,7 @@ async function createNewChatSession() {
       return currentSessionId;
     }
   } catch (err) {
-    showToast(`সেশন তৈরিতে সমস্যা: ${err.message}`, 'error');
+    showToast((isEn ? 'Session error: ' : 'সেশন তৈরিতে সমস্যা: ') + err.message, 'error');
   }
 
   if (!currentSessionId) {
@@ -646,7 +649,8 @@ async function switchSession(sessionId) {
 
 async function deleteChatSession(sessionId, event) {
   if (event) event.stopPropagation();
-  if (!confirm('আপনি কি এই চ্যাট সেশনটি মুছে ফেলতে চান?')) return;
+  const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
+  if (!confirm(isEn ? 'Are you sure you want to delete this chat session?' : 'আপনি কি এই চ্যাট সেশনটি মুছে ফেলতে চান?')) return;
 
   try {
     const res = await fetch(`/api/sessions/${sessionId}`, {
@@ -654,7 +658,7 @@ async function deleteChatSession(sessionId, event) {
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
     if (res.ok) {
-      showToast('চ্যাট সেশন মুছে ফেলা হয়েছে।', 'info');
+      showToast(isEn ? 'Chat session deleted.' : 'চ্যাট সেশন মুছে ফেলা হয়েছে।', 'info');
       if (currentSessionId === sessionId) {
         currentSessionId = null;
         await createNewChatSession();
@@ -663,19 +667,20 @@ async function deleteChatSession(sessionId, event) {
       }
     }
   } catch (err) {
-    showToast(`ডিলিট ব্যর্থ: ${err.message}`, 'error');
+    showToast((isEn ? 'Delete failed: ' : 'ডিলিট ব্যর্থ: ') + err.message, 'error');
   }
 }
 
 // Model Switcher from Topbar
 function onModelSelectChange(newModel) {
+  const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
   fetch('/api/settings', {
     method: 'POST',
     headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
     body: JSON.stringify({ llm_model: newModel })
   }).then(res => {
     if (res.ok) {
-      showToast(`সক্রিয় মডেল: ${newModel}`, 'success');
+      showToast((isEn ? 'Active Model: ' : 'সক্রিয় মডেল: ') + newModel, 'success');
       const sideModel = document.getElementById('sidebar-model-name');
       if (sideModel) sideModel.innerText = newModel;
     }
