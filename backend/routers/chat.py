@@ -13,6 +13,7 @@ from agent.core_agent import CompanyAIAgent
 from memory.chat_session_store import ChatSessionStore
 from memory.document_loader import DocumentProcessor
 from memory.vector_store import VectorMemoryStore
+from memory.memory_curator import MemoryCurator
 from routers.auth import get_optional_current_user
 from config import settings
 
@@ -29,6 +30,41 @@ def get_agent() -> CompanyAIAgent:
 class SaveAttachmentRequest(BaseModel):
     doc_id: str
     filename: str
+
+class SaveCuratedMemoryRequest(BaseModel):
+    doc_id: str
+    filename: str
+    curation: Optional[dict] = None
+
+@router.post("/save-curated-memory")
+async def save_curated_memory(
+    request: SaveCuratedMemoryRequest,
+    current_user: dict = Depends(get_optional_current_user)
+):
+    """
+    Saves only the AI-distilled and curated facts into permanent company vector memory.
+    """
+    doc_id = request.doc_id
+    safe_filename = Path(request.filename).name
+
+    candidate_path = os.path.join(settings.UPLOADS_DIR, f"{doc_id}_{safe_filename}")
+    if not os.path.exists(candidate_path):
+        candidate_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+
+    curation = request.curation
+    if not curation:
+        curation = await MemoryCurator.curate_uploaded_file(candidate_path, safe_filename)
+
+    try:
+        res = MemoryCurator.save_curated_memory_chunks(
+            doc_id=doc_id,
+            filename=safe_filename,
+            curation=curation,
+            raw_filepath=candidate_path
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"কিউরেটেড মেমোরি সংরক্ষণ করতে সমস্যা: {str(e)}")
 
 @router.post("/save-attachment-to-memory")
 async def save_attachment_to_memory(
@@ -81,8 +117,8 @@ async def upload_chat_files(
     """
     Directly uploads and processes files (Excel, Photos/Images with OCR, PDF, Word, CSV)
     from the Gemini/ChatGPT-style chat bar.
-    Only saves to permanent company memory if user or admin explicitly requests it (save_to_memory=True).
-    Otherwise, processes for immediate session context and chat analysis.
+    Executes AI Cognitive Curation to reason what data is in the file, what needs to be saved,
+    and what noise should be discarded.
     """
     store = VectorMemoryStore()
     processed_results = []
@@ -106,32 +142,46 @@ async def upload_chat_files(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"ফাইল সংরক্ষণ করতে সমস্যা: {str(e)}")
 
-        stored_count = 0
-        # Only save to permanent vector memory if user/admin explicitly decided so
-        if save_to_memory:
-            doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
-            try:
-                shutil.copyfile(target_path, doc_path)
-                chunks = DocumentProcessor.process_file_into_chunks(
-                    file_path=target_path,
-                    doc_id=doc_id,
-                    original_filename=safe_filename
-                )
-                stored_count = store.add_chunks(chunks)
-            except Exception as chunk_err:
-                pass
-
         # Generate rich instant summary, markdown table, or OCR extraction for chat analysis
         file_summary = DocumentProcessor.generate_file_quick_summary(
             file_path=target_path,
             filename=safe_filename
         )
         file_summary["doc_id"] = doc_id
+
+        # Cognitive AI Memory Curation Analysis: Think & Reason on what to save
+        try:
+            ai_curation = await MemoryCurator.curate_uploaded_file(
+                file_path=target_path,
+                filename=safe_filename,
+                quick_summary=file_summary
+            )
+        except Exception as cur_err:
+            ai_curation = MemoryCurator._heuristic_curation(file_summary.get("preview_text", ""), safe_filename)
+
+        file_summary["ai_curation"] = ai_curation
+
+        stored_count = 0
+        # Only save to permanent vector memory if user/admin explicitly requested auto-save
+        if save_to_memory:
+            doc_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{safe_filename}")
+            try:
+                shutil.copyfile(target_path, doc_path)
+                cur_res = MemoryCurator.save_curated_memory_chunks(
+                    doc_id=doc_id,
+                    filename=safe_filename,
+                    curation=ai_curation,
+                    raw_filepath=target_path
+                )
+                stored_count = cur_res.get("chunks_indexed", 0)
+            except Exception as chunk_err:
+                pass
+
         file_summary["saved_to_memory"] = save_to_memory
         file_summary["chunks_indexed"] = stored_count
         processed_results.append(file_summary)
 
-    action_msg = "এবং কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে" if save_to_memory else "এবং চ্যাট বিশ্লেষণের জন্য প্রস্তুত করা হয়েছে"
+    action_msg = "এবং কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে" if save_to_memory else "এবং এআই কগনিটিভ বিশ্লেষণ প্রস্তুত করা হয়েছে"
     return {
         "success": True,
         "message": f"সফলভাবে {len(processed_results)}টি ফাইল প্রসেস {action_msg}।",

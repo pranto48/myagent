@@ -3742,3 +3742,205 @@ body.light-theme .upload-progress-pill,
   color: #0f172a;
 }
 
+/* ==============================================================================
+ * AI Cognitive Memory Curation Card Styling
+ * ============================================================================== */
+.ai-curation-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.curation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.curation-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--cyan-glow);
+  font-weight: 600;
+}
+
+.curation-brain-icon {
+  font-size: 1.15rem;
+  filter: drop-shadow(0 0 4px rgba(6, 182, 212, 0.4));
+}
+
+.curation-rec-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+
+.curation-rec-badge.rec-save {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.curation-rec-badge.rec-review {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.curation-rec-badge.rec-temp {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.curation-thought {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-primary);
+}
+
+.curation-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.curation-facts-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.curation-facts ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #f1f5f9;
+}
+
+.curation-facts li {
+  line-height: 1.4;
+}
+
+.curation-noise-bar {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.curation-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.btn-curate-save {
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-curate-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45);
+}
+
+.btn-curate-raw {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-curate-raw:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.curation-saved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Light Mode Overrides for Curation Card */
+[data-theme="light"] .ai-curation-card {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .curation-header {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .curation-thought {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+[data-theme="light"] .curation-facts ul {
+  color: #1e293b;
+}
+
+[data-theme="light"] .curation-noise-bar {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+[data-theme="light"] .btn-curate-raw {
+  background: #e2e8f0;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+

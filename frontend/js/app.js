@@ -940,20 +940,80 @@ function renderMessage(role, text, isStreaming = false, attachedFiles = []) {
     const saveBtnTitle = typeof t === 'function' ? t('file_save_title', 'ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে') : 'ব্যবহারকারী/অ্যাডমিন সিদ্ধান্ত: ক্লিক করলে এই ফাইলটি স্থায়ী মেমোরিতে সংরক্ষিত হবে';
 
     attachmentHtml = `
-      <div class="user-attached-files-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+      <div class="user-attached-files-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; width: 100%;">
         ${attachedFiles.map(f => {
           const docId = f.doc_id || '';
           const fname = f.name || f.filename || '';
           const isSaved = f.saved_to_memory === true;
+          const curation = f.ai_curation || null;
+          const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+
+          if (curation) {
+            window._curations = window._curations || {};
+            window._curations[docId] = curation;
+          }
+
+          let curationHtml = '';
+          if (curation && !isSaved) {
+            const docType = isEn ? (curation.doc_type_en || curation.doc_type_bn) : (curation.doc_type_bn || curation.doc_type_en);
+            const thought = isEn ? (curation.ai_thought_en || curation.ai_thought_bn) : (curation.ai_thought_bn || curation.ai_thought_en);
+            const facts = isEn ? (curation.distilled_facts_en || curation.distilled_facts_bn || []) : (curation.distilled_facts_bn || curation.distilled_facts_en || []);
+            const noise = isEn ? (curation.noise_filtered_en || curation.noise_filtered_bn) : (curation.noise_filtered_bn || curation.noise_filtered_en);
+            
+            const recClass = curation.recommended_action === 'SAVE_CURATED_PERMANENT' ? 'rec-save' : (curation.recommended_action === 'TEMPORARY_CHAT_ONLY' ? 'rec-temp' : 'rec-review');
+            const recText = isEn 
+              ? (curation.recommended_action === 'SAVE_CURATED_PERMANENT' ? 'Recommended: Save to Memory' : (curation.recommended_action === 'TEMPORARY_CHAT_ONLY' ? 'Temporary Analysis' : 'User Review'))
+              : (curation.recommended_action === 'SAVE_CURATED_PERMANENT' ? 'প্রস্তাবিত: মেমোরিতে সংরক্ষণ' : (curation.recommended_action === 'TEMPORARY_CHAT_ONLY' ? 'সাময়িক বিশ্লেষণ' : 'পর্যালোচনা প্রয়োজন'));
+
+            curationHtml = `
+              <div class="ai-curation-card" id="curation-card-${escapeHtml(docId)}">
+                <div class="curation-header">
+                  <div class="curation-title">
+                    <span class="curation-brain-icon">🧠</span>
+                    <span>${typeof t === 'function' ? t('curation_badge', 'AI মেমোরি বিশ্লেষণ') : 'AI মেমোরি বিশ্লেষণ'} • <strong>${escapeHtml(docType)}</strong></span>
+                  </div>
+                  <span class="curation-rec-badge ${recClass}">${escapeHtml(recText)}</span>
+                </div>
+                <div class="curation-thought">
+                  <em>"${escapeHtml(thought)}"</em>
+                </div>
+                ${facts.length > 0 ? `
+                  <div class="curation-facts">
+                    <div class="curation-facts-title">${typeof t === 'function' ? t('curation_facts_heading', 'স্থায়ী কর্পোরেট জ্ঞান ও ফ্যাক্টস') : 'স্থায়ী কর্পোরেট জ্ঞান ও ফ্যাক্টস'}</div>
+                    <ul>
+                      ${facts.slice(0, 4).map(fc => `<li>${escapeHtml(fc)}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+                ${noise ? `
+                  <div class="curation-noise-bar">
+                    <span>🧹 ${escapeHtml(noise)}</span>
+                  </div>
+                ` : ''}
+                <div class="curation-actions">
+                  <button type="button" class="btn-curate-save" onclick="saveCuratedMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', window._curations['${escapeHtml(docId)}'], this)">
+                    ${typeof t === 'function' ? t('curation_btn_curated', '💾 এআই কিউরেটেড মেমোরি সংরক্ষণ (প্রস্তাবিত)') : '💾 এআই কিউরেটেড মেমোরি সংরক্ষণ (প্রস্তাবিত)'}
+                  </button>
+                  <button type="button" class="btn-curate-raw" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)">
+                    ${typeof t === 'function' ? t('curation_btn_raw', '📦 সম্পূর্ণ ফাইল মেমোরিতে সেভ') : '📦 সম্পূর্ণ ফাইল মেমোরিতে সেভ'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }
+
           return `
-            <div class="user-attached-file-chip" data-doc-id="${escapeHtml(docId)}">
-              <span>${getFileBadgeIcon(fname)}</span>
-              <span>${escapeHtml(fname)}</span>
-              <span style="opacity: 0.75; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
-              ${isSaved 
-                ? `<span class="chip-memory-badge saved" title="${escapeHtml(savedBadgeTitle)}">${escapeHtml(savedBadgeText)}</span>`
-                : `<button type="button" class="chip-save-memory-btn" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)" title="${escapeHtml(saveBtnTitle)}">${escapeHtml(saveBtnText)}</button>`
-              }
+            <div class="user-attached-file-wrapper" style="width: 100%;">
+              <div class="user-attached-file-chip" data-doc-id="${escapeHtml(docId)}">
+                <span>${getFileBadgeIcon(fname)}</span>
+                <span>${escapeHtml(fname)}</span>
+                <span style="opacity: 0.75; font-size: 0.72rem;">(${formatFileSize(f.size || 0)})</span>
+                ${isSaved 
+                  ? `<span class="chip-memory-badge saved" title="${escapeHtml(savedBadgeTitle)}">${escapeHtml(savedBadgeText)}</span>`
+                  : `<button type="button" class="chip-save-memory-btn" onclick="saveAttachedFileToMemory('${escapeHtml(docId)}', '${escapeHtml(fname)}', this)" title="${escapeHtml(saveBtnTitle)}">${escapeHtml(saveBtnText)}</button>`
+                }
+              </div>
+              ${curationHtml}
             </div>
           `;
         }).join('')}
@@ -1386,6 +1446,70 @@ async function saveAttachedFileToMemory(docId, filename, btnEl) {
   }
 }
 
+async function saveCuratedMemory(docId, filename, curation, btnEl) {
+  if (!docId || !filename) return;
+  const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+  const originalText = btnEl ? btnEl.innerText : '';
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerText = typeof t === 'function' ? t('saving_text', 'Saving...') : 'সংরক্ষণ হচ্ছে...';
+  }
+
+  try {
+    const res = await fetch('/api/chat/save-curated-memory', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        doc_id: docId,
+        filename: filename,
+        curation: curation || (window._curations ? window._curations[docId] : null)
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || (isEn ? 'Failed to save curated memory' : 'কিউরেটেড মেমোরি সংরক্ষণ ব্যর্থ হয়েছে'));
+    }
+
+    const successMsg = isEn
+      ? `'${filename}' AI curated facts saved to permanent memory (${data.chunks_indexed || 1} chunks)!`
+      : (data.message || `'${filename}'-এর এআই কিউরেটেড ফ্যাক্টস কোম্পানির স্থায়ী মেমোরিতে সংরক্ষিত হয়েছে!`);
+    showToast(successMsg, 'success');
+
+    // Find curation card actions container and replace with saved badge
+    const curationCard = btnEl ? btnEl.closest('.ai-curation-card') : null;
+    if (curationCard) {
+      const actionsDiv = curationCard.querySelector('.curation-actions');
+      if (actionsDiv) {
+        actionsDiv.innerHTML = `
+          <div class="curation-saved-badge">
+            ${typeof t === 'function' ? t('curation_saved_success', '✅ এআই কিউরেটেড মেমোরি সংরক্ষিত হয়েছে') : '✅ এআই কিউরেটেড মেমোরি সংরক্ষিত হয়েছে'} (${data.chunks_indexed || 1} chunks)
+          </div>
+        `;
+      }
+    }
+
+    // Also update chip badge if present
+    const chip = document.querySelector(`.user-attached-file-chip[data-doc-id="${docId}"]`);
+    if (chip) {
+      const existingBtn = chip.querySelector('.chip-save-memory-btn');
+      if (existingBtn) {
+        const badge = document.createElement('span');
+        badge.className = 'chip-memory-badge saved';
+        badge.title = isEn ? 'AI Curated memory saved' : 'এআই কিউরেটেড মেমোরি সংরক্ষিত';
+        badge.innerText = isEn ? '✅ Curated Saved' : '✅ কিউরেটেড সংরক্ষিত';
+        existingBtn.replaceWith(badge);
+      }
+    }
+  } catch (err) {
+    showToast((isEn ? 'Curated save error: ' : 'কিউরেটেড মেমোরি ত্রুটি: ') + err.message, 'error');
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerText = originalText;
+    }
+  }
+}
+
 // Real-time Upload & Indexing Progress Bar Helpers
 function showUploadProgress(text) {
   const pill = document.getElementById('upload-progress-pill');
@@ -1526,6 +1650,24 @@ window.addEventListener('appLanguageChanged', (e) => {
     // Update attachment shelf if currently visible
     if (attachedChatFiles && attachedChatFiles.length > 0) {
       renderAttachmentShelf();
+    }
+
+    // Re-render the active view so its tables, badges, and statuses update immediately in the chosen language
+    const activeViewEl = document.querySelector('.tab-view.active');
+    if (activeViewEl) {
+      const activeId = activeViewEl.id;
+      if (activeId === 'view-admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
+      else if (activeId === 'view-dashboard' && typeof loadDashboardFull === 'function') loadDashboardFull();
+      else if (activeId === 'view-users' && typeof loadUsersList === 'function') loadUsersList();
+      else if (activeId === 'view-knowledge') {
+        if (typeof loadDocumentList === 'function') loadDocumentList();
+        if (typeof loadChunksList === 'function') loadChunksList(typeof currentChunksPage !== 'undefined' ? currentChunksPage : 0);
+      } else if (activeId === 'view-models' && typeof loadModelsOverview === 'function') loadModelsOverview();
+      else if (activeId === 'view-mcp' && typeof loadMcpDashboard === 'function') loadMcpDashboard();
+      else if (activeId === 'view-security' && typeof loadSecurityDashboard === 'function') loadSecurityDashboard();
+      else if (activeId === 'view-backup' && typeof loadBackupDashboard === 'function') loadBackupDashboard();
+      else if (activeId === 'view-reports' && typeof loadReportsPage === 'function') loadReportsPage();
+      else if (activeId === 'view-settings' && typeof loadSettingsHub === 'function') loadSettingsHub();
     }
   }
 });
