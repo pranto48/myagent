@@ -456,7 +456,7 @@
             <div class="kpi-card">
               <div class="kpi-icon icon-purple">📁</div>
               <div class="kpi-data">
-                <div class="kpi-num" id="kpi-docs-count">০</div>
+                <div class="kpi-num" id="kpi-docs-count">0</div>
                 <div class="kpi-label" data-i18n="dash_kpi_docs">ইনজেস্টেড ডকুমেন্টস</div>
               </div>
             </div>
@@ -464,7 +464,7 @@
             <div class="kpi-card">
               <div class="kpi-icon icon-cyan">🧠</div>
               <div class="kpi-data">
-                <div class="kpi-num" id="kpi-chunks-count">০</div>
+                <div class="kpi-num" id="kpi-chunks-count">0</div>
                 <div class="kpi-label" data-i18n="dash_kpi_chunks">ভেক্টর মেমোরি চাঙ্কস</div>
               </div>
             </div>
@@ -472,7 +472,7 @@
             <div class="kpi-card">
               <div class="kpi-icon icon-emerald">💬</div>
               <div class="kpi-data">
-                <div class="kpi-num" id="kpi-sessions-count">০</div>
+                <div class="kpi-num" id="kpi-sessions-count">0</div>
                 <div class="kpi-label" data-i18n="dash_kpi_sessions">চ্যাট সেশনসমূহ</div>
               </div>
             </div>
@@ -480,7 +480,7 @@
             <div class="kpi-card">
               <div class="kpi-icon icon-amber">👥</div>
               <div class="kpi-data">
-                <div class="kpi-num" id="kpi-users-count">১</div>
+                <div class="kpi-num" id="kpi-users-count">1</div>
                 <div class="kpi-label" data-i18n="dash_kpi_users">নিবন্ধিত ইউজার</div>
               </div>
             </div>
@@ -541,7 +541,7 @@
               <div class="dist-bars-container" id="dash-distribution-bars"></div>
               <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
                 <div class="panel-header" style="padding:0 0 8px;"><h3 data-i18n="dash_llm_title">⚡ LLM সার্ভার স্ট্যাটাস</h3></div>
-                <div id="dash-llm-latency-badge" class="status-pill-green" style="display:inline-block;">পরীক্ষা হচ্ছে...</div>
+                <div id="dash-llm-latency-badge" class="status-pill-green" style="display:inline-block;" data-i18n="status_testing">পরীক্ষা হচ্ছে...</div>
               </div>
             </div>
 
@@ -554,7 +554,7 @@
               <div class="table-card" style="margin:0; box-shadow:none; background:transparent;">
                 <table class="data-table" style="font-size:0.82rem;">
                   <thead><tr><th data-i18n="th_filename">ফাইলনাম</th><th data-i18n="th_size">সাইজ</th><th data-i18n="th_action">সংশোধন</th></tr></thead>
-                  <tbody id="dash-recent-docs"><tr><td colspan="3" style="text-align:center; color:var(--text-muted);">লোড হচ্ছে...</td></tr></tbody>
+                  <tbody id="dash-recent-docs"><tr><td colspan="3" style="text-align:center; color:var(--text-muted);" data-i18n="loading_text">লোড হচ্ছে...</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -631,7 +631,7 @@
                   <p data-i18n="reports_list_desc">পূর্বে তৈরি করা সকল AI রিপোর্ট</p>
                 </div>
                 <div id="reports-list-container">
-                  <div style="text-align:center; padding:30px; color:var(--text-muted);">লোড হচ্ছে...</div>
+                  <div style="text-align:center; padding:30px; color:var(--text-muted);" data-i18n="loading_text">লোড হচ্ছে...</div>
                 </div>
               </div>
             </div>
@@ -672,7 +672,7 @@
                 </tr>
               </thead>
               <tbody id="users-table-body">
-                <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">ইউজার লোড হচ্ছে...</td></tr>
+                <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);" data-i18n="loading_users">ইউজার লোড হচ্ছে...</td></tr>
               </tbody>
             </table>
           </div>
@@ -759,7 +759,7 @@
 
               <!-- Document List -->
               <div class="doc-list" id="doc-inventory-list">
-                <div style="text-align: center; color: var(--text-muted); padding: 20px;">ডকুমেন্ট তালিকা লোড হচ্ছে...</div>
+                <div style="text-align: center; color: var(--text-muted); padding: 20px;" data-i18n="loading_docs">ডকুমেন্ট তালিকা লোড হচ্ছে...</div>
               </div>
 
               <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 8px 0;">
@@ -793,7 +793,7 @@
                 <p data-i18n="kb_chunks_desc">ক্রোমাডিবি ও হাইব্রিড সার্চে সংরক্ষিত সমস্ত চাঙ্ক ব্রাউজ করুন এবং ভুল তথ্য সরাসরি এডিট বা ডিলিট করুন।</p>
               </div>
               <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <span class="badge-tag" id="chunks-total-count-badge" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow); font-size:0.82rem; padding:4px 10px;">০টি চাঙ্ক</span>
+                <span class="badge-tag" id="chunks-total-count-badge" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow); font-size:0.82rem; padding:4px 10px;" data-i18n="chunks_badge_initial">০টি চাঙ্ক</span>
                 <button class="btn-sm-action" id="btn-optimize-store" style="color:var(--cyan-glow); border-color:rgba(6,182,212,0.4); background:rgba(6,182,212,0.1);" onclick="optimizeMemoryStore()" title="FTS5 ইনডেক্স মার্জ, ডিফ্র্যাগমেন্টেশন ও SQLite VACUUM" data-i18n="btn_optimize_memory">⚡ মেমোরি অপ্টিমাইজ</button>
                 <button class="btn-sm-action" id="btn-reindex-docs" style="color:var(--amber-warning); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1);" onclick="reindexAllDocuments()" title="স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে সকল ফাইল পুনরায় ইনডেক্স করুন" data-i18n="btn_reindex_memory">🔄 স্মার্ট রি-ইনডেক্স</button>
                 <button class="btn-sm-action" style="color:var(--emerald-green); border-color:rgba(16,185,129,0.3);" onclick="loadChunksList(currentChunksPage)" data-i18n="btn_refresh">🔄 রিফ্রেশ</button>
@@ -817,7 +817,7 @@
                   </tr>
                 </thead>
                 <tbody id="chunks-table-body">
-                  <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
+                  <tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);" data-i18n="loading_text">লোড হচ্ছে...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -844,7 +844,7 @@
               <div class="form-group">
                 <label data-i18n="models_endpoint_label">এলএলএম সার্ভার এন্ডপয়েন্ট (OpenAI-সামঞ্জস্যপূর্ণ URL)</label>
                 <input type="text" id="hub-server-url" class="text-input" placeholder="http://192.168.9.10:11434/v1">
-                <small>যেমন: Ollama (<code>http://192.168.9.x:11434/v1</code>) বা vLLM (<code>http://192.168.9.x:8000/v1</code>)</small>
+                <small data-i18n="models_endpoint_hint">যেমন: Ollama (<code>http://192.168.9.x:11434/v1</code>) বা vLLM (<code>http://192.168.9.x:8000/v1</code>)</small>
               </div>
 
               <button class="btn-primary" id="btn-run-ping" style="align-self: flex-start; margin-top: 6px;" onclick="runLiveLatencyTest()" data-i18n="models_btn_ping">
@@ -857,7 +857,7 @@
             <div class="card-panel">
               <div class="panel-header">
                 <h3 data-i18n="models_active_card_title">সক্রিয় মডেল নির্বাচন ও টেম্পারেচার</h3>
-                <p>বর্তমান সক্রিয় মডেল: <strong id="hub-current-model" style="color:var(--cyan-glow);">llama3.3</strong></p>
+                <p data-i18n="models_current_lbl">বর্তমান সক্রিয় মডেল: <strong id="hub-current-model" style="color:var(--cyan-glow);">llama3.3</strong></p>
               </div>
 
               <div class="form-group">
@@ -873,7 +873,7 @@
               <div class="form-group">
                 <label data-i18n="models_temp_label">এজেন্ট টেম্পারেচার (০.১ - ১.০)</label>
                 <input type="number" id="hub-temperature" class="text-input" min="0.1" max="1.0" step="0.1" value="0.3">
-                <small>কম মান তথ্যভিত্তিক নির্ভুল উত্তরের জন্য সেরা</small>
+                <small data-i18n="models_temp_hint">কম মান তথ্যভিত্তিক নির্ভুল উত্তরের জন্য সেরা</small>
               </div>
 
               <button class="btn-secondary" style="align-self: flex-start; margin-top: 6px;" onclick="applyActiveModelChange()" data-i18n="btn_save_changes">
@@ -903,9 +903,9 @@
             </div>
             
             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-              <button class="btn-secondary" onclick="addQuickTemplate('filesystem')">📁 + FileSystem MCP (লোকাল ফাইল)</button>
-              <button class="btn-secondary" onclick="addQuickTemplate('sqlite')">🗄️ + SQLite Analytics MCP (ডাটাবেজ)</button>
-              <button class="btn-secondary" onclick="addQuickTemplate('web-fetch')">🌐 + Web Fetcher MCP (লাইভ ওয়েব)</button>
+              <button class="btn-secondary" onclick="addQuickTemplate('filesystem')" data-i18n="mcp_tpl_fs">📁 + FileSystem MCP (লোকাল ফাইল)</button>
+              <button class="btn-secondary" onclick="addQuickTemplate('sqlite')" data-i18n="mcp_tpl_sqlite">🗄️ + SQLite Analytics MCP (ডাটাবেজ)</button>
+              <button class="btn-secondary" onclick="addQuickTemplate('web-fetch')" data-i18n="mcp_tpl_web">🌐 + Web Fetcher MCP (লাইভ ওয়েব)</button>
             </div>
           </div>
 
@@ -920,7 +920,7 @@
             </div>
 
             <div class="mcp-servers-grid" id="mcp-servers-grid">
-              <div style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);">MCP সার্ভার লোড হচ্ছে...</div>
+              <div style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);" data-i18n="mcp_loading_servers">MCP সার্ভার লোড হচ্ছে...</div>
             </div>
           </div>
 
@@ -932,7 +932,7 @@
             </div>
 
             <div class="builtin-tools-grid" id="builtin-tools-grid">
-              <div style="text-align:center; padding:20px; color:var(--text-muted);">টুলস লোড হচ্ছে...</div>
+              <div style="text-align:center; padding:20px; color:var(--text-muted);" data-i18n="mcp_loading_tools">টুলস লোড হচ্ছে...</div>
             </div>
           </div>
 
@@ -951,13 +951,13 @@
                 </div>
                 <div class="form-group" style="margin-top:10px;">
                   <label data-i18n="mcp_lbl_args">আর্গুমেন্টস (JSON Format)</label>
-                  <textarea id="sandbox-tool-args" class="text-input" rows="4" placeholder='{"query": "কোম্পানির ছুটির নিয়ম"}' style="font-family:monospace;"></textarea>
+                  <textarea id="sandbox-tool-args" class="text-input" rows="4" placeholder='{"query": "কোম্পানির ছুটির নিয়ম"}' data-i18n-placeholder="mcp_sandbox_args_ph" style="font-family:monospace;"></textarea>
                 </div>
                 <button class="btn-primary" style="margin-top:12px;" onclick="runToolSandboxTest()" data-i18n="mcp_btn_run_test">▶ রান টুল টেস্ট</button>
               </div>
               <div>
-                <label style="font-size:0.8rem; font-weight:500; color:var(--text-secondary);">এক্সিকিউশন আউটপুট</label>
-                <pre id="sandbox-tool-output" style="background:rgba(0,0,0,0.5); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; height:160px; overflow-y:auto; font-size:0.8rem; color:var(--cyan-glow); margin-top:6px; font-family:monospace;">ফলাফল এখানে প্রদর্শিত হবে...</pre>
+                <label style="font-size:0.8rem; font-weight:500; color:var(--text-secondary);" data-i18n="mcp_sandbox_output_lbl">এক্সিকিউশন আউটপুট</label>
+                <pre id="sandbox-tool-output" style="background:rgba(0,0,0,0.5); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; height:160px; overflow-y:auto; font-size:0.8rem; color:var(--cyan-glow); margin-top:6px; font-family:monospace;" data-i18n="mcp_sandbox_output_ph">ফলাফল এখানে প্রদর্শিত হবে...</pre>
               </div>
             </div>
           </div>
@@ -985,22 +985,22 @@
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-lock" style="color:var(--cyan-glow);"></i> <span data-i18n="sec_kpi_enc">ডেটা এনক্রিপশন</span></div>
               <div class="metric-val" id="sec-encryption-badge">AES-256-GCM</div>
-              <div class="metric-sub">সক্রিয় ও পারসিসটেন্ট কি সুরক্ষিত</div>
+              <div class="metric-sub" data-i18n="sec_metric_enc_sub">সক্রিয় ও পারসিসটেন্ট কি সুরক্ষিত</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-user-shield" style="color:var(--primary-color);"></i> <span data-i18n="sec_kpi_dlp">DLP PII মাস্কিং</span></div>
               <div class="metric-val" id="sec-dlp-count">0</div>
-              <div class="metric-sub">ট্রিগার হওয়া গোপনীয় তথ্য মাস্কড</div>
+              <div class="metric-sub" data-i18n="sec_metric_dlp_sub">ট্রিগার হওয়া গোপনীয় তথ্য মাস্কড</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-fire-alt" style="color:#f59e0b);"></i> <span data-i18n="sec_kpi_fw">ফায়ারওয়াল ব্লকড</span></div>
               <div class="metric-val" id="sec-firewall-count">0</div>
-              <div class="metric-sub">ইনজেকশন ও জেলব্রেক প্রতিহত</div>
+              <div class="metric-sub" data-i18n="sec_metric_fw_sub">ইনজেকশন ও জেলব্রেক প্রতিহত</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-clipboard-list" style="color:var(--success-color);"></i> <span data-i18n="sec_kpi_audit">মোট অডিট ইভেন্টস</span></div>
               <div class="metric-val" id="sec-total-audit">0</div>
-              <div class="metric-sub">অপরিবর্তনীয় কমপ্লায়েন্স লগ</div>
+              <div class="metric-sub" data-i18n="sec_metric_audit_sub">অপরিবর্তনীয় কমপ্লায়েন্স লগ</div>
             </div>
           </div>
 
@@ -1008,9 +1008,9 @@
           <div class="card-panel" style="margin-top:20px;">
             <div class="panel-header">
               <h3><i class="fas fa-vial"></i> <span data-i18n="sec_sandbox_title">লাইভ সিকিউরিটি ও DLP স্যান্ডবক্স টেস্ট</span></h3>
-              <span class="status-badge online" id="sec-posture-badge"><span class="status-dot green"></span> সুরক্ষিত (SECURE)</span>
+              <span class="status-badge online" id="sec-posture-badge" data-i18n="sec_posture_secure"><span class="status-dot green"></span> সুরক্ষিত (SECURE)</span>
             </div>
-            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;" data-i18n="sec_sandbox_desc">
               যেকোনো সম্ভাব্য সংবেদনশীল তথ্য (ক্রেডিট কার্ড, API কি, পাসওয়ার্ড, ফোন নম্বর) বা প্রম্পট ইনজেকশন টেক্সট লিখে পরীক্ষা করুন কিভাবে নিরাপত্তা সিস্টেম তাৎক্ষণিক প্রতিক্রিয়া দেখায়।
             </p>
             <div style="display:flex; gap:10px; margin-bottom:12px;">
@@ -1049,13 +1049,13 @@
                   </tr>
                 </thead>
                 <tbody id="security-audit-tbody">
-                  <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
+                  <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);" data-i18n="loading_text">লোড হচ্ছে...</td></tr>
                 </tbody>
               </table>
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-              <span id="audit-page-indicator" style="font-size:0.85rem; color:var(--text-muted);">পৃষ্ঠা ১</span>
+              <span id="audit-page-indicator" style="font-size:0.85rem; color:var(--text-muted);" data-i18n="audit_page_1">পৃষ্ঠা ১</span>
               <div style="display:flex; gap:6px;">
                 <button class="btn-secondary" style="padding:4px 10px;" onclick="prevAuditPage()" data-i18n="btn_prev">◀ পূর্ববর্তী</button>
                 <button class="btn-secondary" style="padding:4px 10px;" onclick="nextAuditPage()" data-i18n="btn_next">পরবর্তী ▶</button>
@@ -1076,7 +1076,7 @@
               <p data-i18n="backup_desc">সংযুক্ত ফাইল, ডকুমেন্ট, ভেক্টর মেমোরি, চ্যাট হিস্ট্রি, অডিট লগ এবং সিস্টেম সেটিংসের সার্বিক ব্যাকআপ ও পুনরুদ্ধার ব্যবস্থাপনা</p>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
-              <button class="btn-secondary" onclick="loadBackupDashboard()">🔄 রিফ্রেশ</button>
+              <button class="btn-secondary" onclick="loadBackupDashboard()" data-i18n="btn_refresh">🔄 রিফ্রেশ</button>
             </div>
           </div>
 
@@ -1085,22 +1085,22 @@
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-archive" style="color:var(--cyan-glow);"></i> <span data-i18n="backup_kpi_total">সংরক্ষিত ব্যাকআপ</span></div>
               <div class="metric-val" id="backup-kpi-count">0</div>
-              <div class="metric-sub">সার্ভারে মোট স্ন্যাপশট সংখ্যা</div>
+              <div class="metric-sub" data-i18n="backup_kpi_total_sub">সার্ভারে মোট স্ন্যাপশট সংখ্যা</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-hdd" style="color:var(--primary-color);"></i> <span data-i18n="backup_kpi_size">মোট ব্যাকআপ আকার</span></div>
               <div class="metric-val" id="backup-kpi-size">0 B</div>
-              <div class="metric-sub">সংকুচিত ZIP স্টোরেজ সাইজ</div>
+              <div class="metric-sub" data-i18n="backup_kpi_size_sub">সংকুচিত ZIP স্টোরেজ সাইজ</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-clock" style="color:#f59e0b);"></i> <span data-i18n="backup_kpi_last">সর্বশেষ ব্যাকআপ</span></div>
               <div class="metric-val" id="backup-kpi-last" style="font-size:1.05rem;">-</div>
-              <div class="metric-sub">সফল ব্যাকআপের সময়কাল</div>
+              <div class="metric-sub" data-i18n="backup_kpi_last_sub">সফল ব্যাকআপের সময়কাল</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><i class="fas fa-shield-check" style="color:var(--success-color);"></i> <span data-i18n="backup_kpi_status">ব্যাকআপ স্ট্যাটাস</span></div>
-              <div class="metric-val" id="backup-kpi-status" style="font-size:0.95rem;"><span class="status-dot green"></span> প্রস্তুত</div>
-              <div class="metric-sub">সার্ভার রিস্টোর ও রিট্রিভাল সক্রিয়</div>
+              <div class="metric-val" id="backup-kpi-status" style="font-size:0.95rem;" data-i18n="backup_status_ready"><span class="status-dot green"></span> প্রস্তুত</div>
+              <div class="metric-sub" data-i18n="backup_kpi_status_sub">সার্ভার রিস্টোর ও রিট্রিভাল সক্রিয়</div>
             </div>
           </div>
 
@@ -1113,32 +1113,32 @@
                 <h3 data-i18n="backup_create_title">📦 নতুন সম্পূর্ণ ব্যাকআপ তৈরি করুন</h3>
                 <span class="badge-pill">ZIP Snapshot</span>
               </div>
-              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;" data-i18n="backup_card_desc_1">
                 সার্ভারের বর্তমান ডেটা, সমস্ত চ্যাট হিস্ট্রি, ভেক্টর ডাটাবেস ও সিস্টেম কনফিগারেশন একত্রিত করে একটি একক আর্কাইভে সংরক্ষণ করুন।
               </p>
 
               <div class="form-group" style="margin-bottom:12px;">
                 <label data-i18n="backup_lbl_note">ব্যাকআপ নোট বা বিবরণ (ঐচ্ছিক)</label>
-                <input type="text" id="backup-note-input" class="text-input" placeholder="যেমন: আপগ্রেডের পূর্বের ব্যাকআপ অথবা মাসিক আর্কাইভ">
+                <input type="text" id="backup-note-input" class="text-input" data-i18n-placeholder="backup_ph_note" placeholder="যেমন: আপগ্রেডের পূর্বের ব্যাকআপ অথবা মাসিক আর্কাইভ">
               </div>
 
               <div style="background:var(--bg-main); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); margin-bottom:16px;">
                 <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:8px;" data-i18n="backup_lbl_modules">অন্তর্ভুক্ত করার মডিউল নির্বাচন করুন:</div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.82rem;">
                   <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                    <input type="checkbox" id="chk-backup-docs" checked> ডকুমেন্টস ও এটাচড ফাইল
+                    <input type="checkbox" id="chk-backup-docs" checked> <span data-i18n="backup_mod_docs">ডকুমেন্টস ও এটাচড ফাইল</span>
                   </label>
                   <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                    <input type="checkbox" id="chk-backup-chats" checked> চ্যাট হিস্ট্রি ও সেশন ডাটাবেস
+                    <input type="checkbox" id="chk-backup-chats" checked> <span data-i18n="backup_mod_chats">চ্যাট হিস্ট্রি ও সেশন ডাটাবেস</span>
                   </label>
                   <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                    <input type="checkbox" id="chk-backup-vector" checked> ক্রোমাডিবি ভেক্টর মেমোরি
+                    <input type="checkbox" id="chk-backup-vector" checked> <span data-i18n="backup_mod_vector">ক্রোমাডিবি ভেক্টর মেমোরি</span>
                   </label>
                   <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                    <input type="checkbox" id="chk-backup-settings" checked> সিস্টেম ও মডেল সেটিংস
+                    <input type="checkbox" id="chk-backup-settings" checked> <span data-i18n="backup_mod_settings">সিস্টেম ও মডেল সেটিংস</span>
                   </label>
                   <label style="display:flex; align-items:center; gap:6px; cursor:pointer; grid-column:span 2;">
-                    <input type="checkbox" id="chk-backup-audit" checked> সিকিউরিটি অডিট ও কমপ্লায়েন্স লগ
+                    <input type="checkbox" id="chk-backup-audit" checked> <span data-i18n="backup_mod_audit">সিকিউরিটি অডিট ও কমপ্লায়েন্স লগ</span>
                   </label>
                 </div>
               </div>
@@ -1154,7 +1154,7 @@
                 <h3 data-i18n="backup_upload_title">📤 পিসি থেকে ব্যাকআপ আপলোড ও রিস্টোর</h3>
                 <span class="badge-pill" style="border-color:var(--cyan-glow); color:var(--cyan-glow);">External Restore</span>
               </div>
-              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;" data-i18n-html="backup_card_desc_2">
                 আপনার কম্পিউটার থেকে পূর্বে ডাউনলোড করা যে কোনো <code>.zip</code> ব্যাকআপ ফাইল আপলোড করে সিস্টেমের ডাটা ও সেটিংস পুনরুদ্ধার করুন।
               </p>
 
@@ -1169,7 +1169,7 @@
                 <input type="file" id="backup-upload-input" accept=".zip" style="display:none;" onchange="handleBackupUpload(event)">
               </div>
 
-              <div style="margin-top:14px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;" data-i18n="backup_warn_text">
+              <div style="margin-top:14px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;" data-i18n-html="backup_warn_text">
                 ⚠️ <strong>সতর্কতা:</strong> রিস্টোর প্রক্রিয়া চলাকালে ভেক্টর মেমোরি ও চ্যাট ডাটাবেস পুনঃসংযোগ পাবে। কোনো ঝুঁকি এড়াতে রিস্টোরের আগে স্বয়ংক্রিয় সেফটি স্ন্যাপশট সংরক্ষিত হবে।
               </div>
             </div>
@@ -1196,7 +1196,7 @@
                   </tr>
                 </thead>
                 <tbody id="backups-table-tbody">
-                  <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
+                  <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);" data-i18n="loading_text">লোড হচ্ছে...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1222,7 +1222,7 @@
                   <h3 class="animated-gradient-text" data-i18n="admin_title">অ্যাডমিন কমান্ড ও কন্ট্রোল সেন্টার</h3>
                   <span class="cyber-badge-online" data-i18n="admin_hud_status">SYSTEM OPERATIONAL</span>
                 </div>
-                <p class="hud-subtitle">হোস্ট সার্ভার: <code>192.168.9.9:3399</code> • এনক্রিপশন: <code>AES-256-GCM</code> • হাইব্রিড মেমোরি ইঞ্জিন অ্যাক্টিভ</p>
+                <p class="hud-subtitle" data-i18n="admin_hud_subtitle">হোস্ট সার্ভার: <code>192.168.9.9:3399</code> • এনক্রিপশন: <code>AES-256-GCM</code> • হাইব্রিড মেমোরি ইঞ্জিন অ্যাক্টিভ</p>
               </div>
             </div>
             <div class="hud-right">
@@ -1253,7 +1253,7 @@
                 <span class="kpi-icon-glow">⚡</span>
                 <span class="kpi-tag text-purple" data-i18n="admin_kpi_vector_chunks">VECTOR CHUNKS</span>
               </div>
-              <div class="kpi-number" id="admin-kpi-chunks">০</div>
+              <div class="kpi-number" id="admin-kpi-chunks">0</div>
               <div class="kpi-meta">ChromaDB + SQLite FTS5 (&lt; 5ms)</div>
             </div>
 
@@ -1271,8 +1271,8 @@
                 <span class="kpi-icon-glow">💾</span>
                 <span class="kpi-tag text-amber" data-i18n="admin_kpi_data_vault">DATA VAULT</span>
               </div>
-              <div class="kpi-number" id="admin-kpi-backup">সুরক্ষিত</div>
-              <div class="kpi-meta" id="admin-kpi-backup-meta">ফুল ব্যাকআপ সেন্টার সক্রিয়</div>
+              <div class="kpi-number" id="admin-kpi-backup" data-i18n="backup_status_protected">সুরক্ষিত</div>
+              <div class="kpi-meta" id="admin-kpi-backup-meta" data-i18n="admin_kpi_backup_meta">ফুল ব্যাকআপ সেন্টার সক্রিয়</div>
             </div>
 
             <div class="cyber-kpi-card">
@@ -1280,8 +1280,8 @@
                 <span class="kpi-icon-glow">👥</span>
                 <span class="kpi-tag text-rose" data-i18n="admin_kpi_admin_access">ADMIN ACCESS</span>
               </div>
-              <div class="kpi-number" id="admin-kpi-users">১</div>
-              <div class="kpi-meta" id="admin-kpi-users-meta">সক্রিয় ইউজার সেশন</div>
+              <div class="kpi-number" id="admin-kpi-users">1</div>
+              <div class="kpi-meta" id="admin-kpi-users-meta" data-i18n="admin_kpi_users_meta">সক্রিয় ইউজার সেশন</div>
             </div>
           </div>
 
@@ -1361,25 +1361,25 @@
             <div class="inline-glass-form" id="inline-add-user-form" style="display:none;">
               <div class="form-grid-3">
                 <div class="form-group">
-                  <label>ইউজারনেম (Username)</label>
+                  <label data-i18n="th_username">ইউজারনেম (Username)</label>
                   <input type="text" id="inline-user-name" class="text-input" placeholder="e.g. officer1">
                 </div>
                 <div class="form-group">
-                  <label>পাসওয়ার্ড (Password)</label>
+                  <label data-i18n="th_password">পাসওয়ার্ড (Password)</label>
                   <input type="password" id="inline-user-pass" class="text-input" placeholder="••••••••">
                 </div>
                 <div class="form-group">
-                  <label>ভূমিকা (Role)</label>
+                  <label data-i18n="th_role">ভূমিকা (Role)</label>
                   <select id="inline-user-role" class="text-input">
-                    <option value="Member">Member (সদস্য - চ্যাট ও ডাটা এক্সেস)</option>
-                    <option value="Admin">Admin (প্রশাসক - পূর্ণ নিয়ন্ত্রণ)</option>
-                    <option value="Viewer">Viewer (দর্শক - কেবল চ্যাট)</option>
+                    <option value="Member" data-i18n="role_opt_member">Member (সদস্য - চ্যাট ও ডাটা এক্সেস)</option>
+                    <option value="Admin" data-i18n="role_opt_admin">Admin (প্রশাসক - পূর্ণ নিয়ন্ত্রণ)</option>
+                    <option value="Viewer" data-i18n="role_opt_viewer">Viewer (দর্শক - কেবল চ্যাট)</option>
                   </select>
                 </div>
               </div>
               <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
-                <button type="button" class="btn-secondary" onclick="toggleInlineAddUserForm()">বাতিল</button>
-                <button type="button" class="btn-primary" onclick="submitInlineAddUser()">ইউজার সংরক্ষণ করুন</button>
+                <button type="button" class="btn-secondary" onclick="toggleInlineAddUserForm()" data-i18n="btn_cancel">বাতিল</button>
+                <button type="button" class="btn-primary" onclick="submitInlineAddUser()" data-i18n="btn_save_user">ইউজার সংরক্ষণ করুন</button>
               </div>
             </div>
 
@@ -1395,7 +1395,7 @@
                   </tr>
                 </thead>
                 <tbody id="admin-users-table-body">
-                  <tr><td colspan="4" style="text-align:center; padding:16px;">ইউজার লোড হচ্ছে...</td></tr>
+                  <tr><td colspan="4" style="text-align:center; padding:16px;" data-i18n="loading_users">ইউজার লোড হচ্ছে...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1475,18 +1475,18 @@
             <div class="theme-options-grid" style="margin-top:10px;">
               <div class="theme-option-card" id="theme-card-dark" data-theme="dark" onclick="selectTheme('dark')">
                 <span class="theme-card-icon">🌙</span>
-                <span class="theme-card-title">ডার্ক মোড (Dark Mode)</span>
-                <span class="theme-card-desc">স্লিক অনিক্স, নিয়ন গ্লো ও সাইবারপঙ্ক লুক</span>
+                <span class="theme-card-title" data-i18n="theme_dark_title">ডার্ক মোড (Dark Mode)</span>
+                <span class="theme-card-desc" data-i18n="theme_dark_desc">স্লিক অনিক্স, নিয়ন গ্লো ও সাইবারপঙ্ক লুক</span>
               </div>
               <div class="theme-option-card" id="theme-card-light" data-theme="light" onclick="selectTheme('light')">
                 <span class="theme-card-icon">☀️</span>
-                <span class="theme-card-title">লাইট মোড (Light Mode)</span>
-                <span class="theme-card-desc">ক্লিন, ক্রিস্প ও হাই-কন্ট্রাস্ট কর্পোরেট লুক</span>
+                <span class="theme-card-title" data-i18n="theme_light_title">লাইট মোড (Light Mode)</span>
+                <span class="theme-card-desc" data-i18n="theme_light_desc">ক্লিন, ক্রিস্প ও হাই-কন্ট্রাস্ট কর্পোরেট লুক</span>
               </div>
               <div class="theme-option-card" id="theme-card-system" data-theme="system" onclick="selectTheme('system')">
                 <span class="theme-card-icon">💻</span>
-                <span class="theme-card-title">সিস্টেম অটো (Auto)</span>
-                <span class="theme-card-desc">ডিভাইস ও অপারেটিং সিস্টেম প্রেফারেন্স অনুযায়ী</span>
+                <span class="theme-card-title" data-i18n="theme_system_title">সিস্টেম অটো (Auto)</span>
+                <span class="theme-card-desc" data-i18n="theme_system_desc">ডিভাইস ও অপারেটিং সিস্টেম প্রেফারেন্স অনুযায়ী</span>
               </div>
             </div>
           </div>
@@ -1528,13 +1528,13 @@
               <div class="form-group">
                 <label data-i18n="settings_lbl_server_url">বাহ্যিক এলএলএম সার্ভার URL (OpenAI-সামঞ্জস্যপূর্ণ)</label>
                 <input type="text" id="setting-llm-url" class="text-input" placeholder="http://192.168.20.10:1234/v1">
-                <small>যেমন: LM Studio (<code>http://192.168.20.10:1234/v1</code>), Ollama বা vLLM এন্ডপয়েন্ট</small>
+                <small data-i18n="settings_url_hint">যেমন: LM Studio (<code>http://192.168.20.10:1234/v1</code>), Ollama বা vLLM এন্ডপয়েন্ট</small>
               </div>
 
               <div class="form-group">
                 <label data-i18n="settings_lbl_model_name">এলএলএম মডেলের নাম (Model Name)</label>
                 <input type="text" id="setting-llm-model" class="text-input" placeholder="gemma-4-e2b-it-qat">
-                <small>যেমন: <code>gemma-4-e2b-it-qat</code>, <code>llama3.3</code>, <code>deepseek-r1</code>, <code>qwen2.5</code></small>
+                <small data-i18n="settings_model_hint">যেমন: <code>gemma-4-e2b-it-qat</code>, <code>llama3.3</code>, <code>deepseek-r1</code>, <code>qwen2.5</code></small>
               </div>
             </div>
 
@@ -1542,7 +1542,7 @@
               <div class="form-group">
                 <label data-i18n="settings_lbl_api_key">এপিআই কি (API Key)</label>
                 <input type="password" id="setting-llm-key" class="text-input" placeholder="sk-lm-...">
-                <small>লোকাল LM Studio বা ক্লাউড এন্ডপয়েন্টের অথেনটিকেশন টোকেন</small>
+                <small data-i18n="settings_key_hint">লোকাল LM Studio বা ক্লাউড এন্ডপয়েন্টের অথেনটিকেশন টোকেন</small>
               </div>
 
               <div class="form-group">
@@ -1583,25 +1583,25 @@
               <div class="form-group">
                 <label data-i18n="settings_top_k_label">সর্বোচ্চ সোর্স রেজাল্ট (Top-K)</label>
                 <select id="setting-top-k" class="text-input">
-                  <option value="3">৩টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
-                  <option value="4" selected>৪টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক (প্রস্তাবিত)</option>
-                  <option value="6">৬টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
-                  <option value="8">৮টি গভীর ডকুমেন্ট চাঙ্ক</option>
+                  <option value="3" data-i18n="rag_opt_3">৩টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
+                  <option value="4" data-i18n="rag_opt_4" selected>৪টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক (প্রস্তাবিত)</option>
+                  <option value="6" data-i18n="rag_opt_6">৬টি প্রাসঙ্গিক ডকুমেন্ট চাঙ্ক</option>
+                  <option value="8" data-i18n="rag_opt_8">৮টি গভীর ডকুমেন্ট চাঙ্ক</option>
                 </select>
               </div>
               <div class="form-group">
                 <label data-i18n="settings_sim_threshold_label">মিনিমাম সিমিলারিটি থ্রেশহোল্ড</label>
                 <select id="setting-sim-threshold" class="text-input">
-                  <option value="0.55">০.৫৫ (শিথিল ফিল্টার)</option>
-                  <option value="0.65" selected>০.৬৫ (প্রস্তাবিত ব্যালেন্সড)</option>
-                  <option value="0.75">০.৭৫ (কঠোর ফিল্টার)</option>
+                  <option value="0.55" data-i18n="sim_opt_relaxed">০.৫৫ (শিথিল ফিল্টার)</option>
+                  <option value="0.65" data-i18n="sim_opt_balanced" selected>০.৬৫ (প্রস্তাবিত ব্যালেন্সড)</option>
+                  <option value="0.75" data-i18n="sim_opt_strict">০.৭৫ (কঠোর ফিল্টার)</option>
                 </select>
               </div>
               <div class="form-group">
                 <label data-i18n="settings_fts_label">SQLite FTS5 কি-ওয়ার্ড সার্চ</label>
                 <select id="setting-fts-toggle" class="text-input">
-                  <option value="true" selected>সক্রিয় (সাব-মিলিটিসেকেন্ড গতি)</option>
-                  <option value="false">নিষ্ক্রিয়</option>
+                  <option value="true" data-i18n="fts_opt_active" selected>সক্রিয় (সাব-মিলিটিসেকেন্ড গতি)</option>
+                  <option value="false" data-i18n="fts_opt_disabled">নিষ্ক্রিয়</option>
                 </select>
               </div>
             </div>
@@ -1620,15 +1620,15 @@
               <div class="form-group">
                 <label data-i18n="settings_firewall_label">প্রম্পট ইনজেকশন ফায়ারওয়াল মোড</label>
                 <select id="setting-firewall-mode" class="text-input">
-                  <option value="strict" selected>Strict (সর্বোচ্চ নিরাপত্তা ও ব্লক)</option>
-                  <option value="standard">Standard (সাধারণ মনিটরিং)</option>
+                  <option value="strict" data-i18n="fw_opt_strict" selected>Strict (সর্বোচ্চ নিরাপত্তা ও ব্লক)</option>
+                  <option value="standard" data-i18n="fw_opt_standard">Standard (সাধারণ মনিটরিং)</option>
                 </select>
               </div>
               <div class="form-group">
                 <label data-i18n="settings_dlp_label">PII ও সংবেদনশীল ডাটা DLP রিডাকশন</label>
                 <select id="setting-dlp-mode" class="text-input">
-                  <option value="auto" selected>স্বয়ংক্রিয় রিডাকশন (Auto Masking)</option>
-                  <option value="audit_only">কেবলমাত্র অডিট লগ তৈরি</option>
+                  <option value="auto" data-i18n="dlp_opt_auto" selected>স্বয়ংক্রিয় রিডাকশন (Auto Masking)</option>
+                  <option value="audit_only" data-i18n="dlp_opt_audit">কেবলমাত্র অডিট লগ তৈরি</option>
                 </select>
               </div>
             </div>
@@ -1640,7 +1640,7 @@
                 <button type="button" class="btn-secondary" onclick="resetSettingsDefaults()" data-i18n="settings_btn_default">
                   ডিফল্ট সেটিংস
                 </button>
-                <button type="button" class="btn-primary" onclick="saveSettings()">
+                <button type="button" class="btn-primary" onclick="saveSettings()" data-i18n="settings_btn_save">
                   💾 সেটিংস সেভ করুন
                 </button>
               </div>
@@ -1656,10 +1656,10 @@
     <div class="modal-backdrop" id="chunks-modal">
       <div class="modal-window" style="max-width: 760px; max-height: 85vh; display: flex; flex-direction: column;">
         <div class="modal-header">
-          <h3 id="chunks-modal-title">ডকুমেন্ট চাঙ্কস ইন্সপেক্টর</h3>
+          <h3 id="chunks-modal-title" data-i18n="chunks_modal_title">ডকুমেন্ট চাঙ্কস ইন্সপেক্টর</h3>
           <button class="close-modal-btn" onclick="closeChunksModal()">&times;</button>
         </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted);" id="chunks-modal-meta">লোড হচ্ছে...</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted);" id="chunks-modal-meta" data-i18n="loading_ellipsis">লোড হচ্ছে...</div>
         <div class="chunks-viewer-list" id="chunks-viewer-list" style="overflow-y: auto; flex: 1; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
         </div>
       </div>
@@ -1669,27 +1669,27 @@
     <div class="modal-backdrop" id="add-user-modal">
       <div class="modal-window" style="max-width: 440px;">
         <div class="modal-header">
-          <h3>নতুন কোম্পানি ইউজার তৈরি</h3>
+          <h3 data-i18n="add_user_title">নতুন কোম্পানি ইউজার তৈরি</h3>
           <button class="close-modal-btn" onclick="closeAddUserModal()">&times;</button>
         </div>
         <form onsubmit="submitCreateUser(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
           <div class="form-group">
-            <label>ইউজারনেম</label>
-            <input type="text" id="new-user-username" class="text-input" placeholder="e.g. manager" required>
+            <label data-i18n="lbl_username">ইউজারনেম</label>
+            <input type="text" id="new-user-username" class="text-input" placeholder="e.g. manager" data-i18n-placeholder="ph_username_eg" required>
           </div>
           <div class="form-group">
-            <label>পাসওয়ার্ড</label>
+            <label data-i18n="lbl_password">পাসওয়ার্ড</label>
             <input type="password" id="new-user-password" class="text-input" placeholder="••••••••" required>
           </div>
           <div class="form-group">
-            <label>ভূমিকা (Role)</label>
+            <label data-i18n="lbl_role">ভূমিকা (Role)</label>
             <select id="new-user-role" class="text-input">
-              <option value="Member">Member (সদস্য - চ্যাট ও ডেটা এক্সেস)</option>
-              <option value="Admin">Admin (প্রশাসক - পূর্ণ নিয়ন্ত্রণ)</option>
-              <option value="Viewer">Viewer (দর্শক - কেবল চ্যাট)</option>
+              <option value="Member" data-i18n="role_opt_member">Member (সদস্য - চ্যাট ও ডেটা এক্সেস)</option>
+              <option value="Admin" data-i18n="role_opt_admin">Admin (প্রশাসক - পূর্ণ নিয়ন্ত্রণ)</option>
+              <option value="Viewer" data-i18n="role_opt_viewer">Viewer (দর্শক - কেবল চ্যাট)</option>
             </select>
           </div>
-          <button type="submit" class="btn-primary" style="margin-top:10px; justify-content:center;">
+          <button type="submit" class="btn-primary" style="margin-top:10px; justify-content:center;" data-i18n="btn_create_user">
             ইউজার তৈরি করুন
           </button>
         </form>
@@ -1702,7 +1702,7 @@
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">⚙️</span>
-            <h3>সিস্টেম ও সার্ভার সেটিংস</h3>
+            <h3 data-i18n="settings_modal_title">সিস্টেম ও সার্ভার সেটিংস</h3>
           </div>
           <button class="close-modal-btn" onclick="closeSettingsModal()">&times;</button>
         </div>
@@ -1734,55 +1734,55 @@
           <div class="theme-options-grid">
             <div class="theme-option-card" id="theme-card-dark" data-theme="dark" onclick="selectTheme('dark')">
               <span class="theme-card-icon">🌙</span>
-              <span class="theme-card-title">ডার্ক মোড</span>
-              <span class="theme-card-desc">স্লিক অনিক্স ও নিয়ন গ্লো</span>
+              <span class="theme-card-title" data-i18n="theme_dark_title">ডার্ক মোড</span>
+              <span class="theme-card-desc" data-i18n="theme_dark_desc">স্লিক অনিক্স ও নিয়ন গ্লো</span>
             </div>
             <div class="theme-option-card" id="theme-card-light" data-theme="light" onclick="selectTheme('light')">
               <span class="theme-card-icon">☀️</span>
-              <span class="theme-card-title">লাইট মোড</span>
-              <span class="theme-card-desc">ক্লিন ও ক্রিস্প কর্পোরেট</span>
+              <span class="theme-card-title" data-i18n="theme_light_title">লাইট মোড</span>
+              <span class="theme-card-desc" data-i18n="theme_light_desc">ক্লিন ও ক্রিস্প কর্পোরেট</span>
             </div>
             <div class="theme-option-card" id="theme-card-system" data-theme="system" onclick="selectTheme('system')">
               <span class="theme-card-icon">💻</span>
-              <span class="theme-card-title">সিস্টেম অটো</span>
-              <span class="theme-card-desc">ওএস প্রেফারেন্স অনুযায়ী</span>
+              <span class="theme-card-title" data-i18n="theme_sys_title">সিস্টেম অটো</span>
+              <span class="theme-card-desc" data-i18n="theme_sys_desc">ওএস প্রেফারেন্স অনুযায়ী</span>
             </div>
           </div>
         </div>
 
         <div class="form-group">
-          <label>বাহ্যিক এলএলএম সার্ভার URL (OpenAI-সামঞ্জস্যপূর্ণ)</label>
+          <label data-i18n="settings_lbl_llm_url">বাহ্যিক এলএলএম সার্ভার URL (OpenAI-সামঞ্জস্যপূর্ণ)</label>
           <input type="text" id="setting-llm-url" class="text-input" placeholder="http://192.168.9.10:11434/v1">
-          <small>Ollama, vLLM বা অন্য কোনো সার্ভারের এন্ডপয়েন্ট (যেমন: <code>http://192.168.9.x:11434/v1</code>)</small>
+          <small data-i18n-html="settings_hint_llm_url">Ollama, vLLM বা অন্য কোনো সার্ভারের এন্ডপয়েন্ট (যেমন: <code>http://192.168.9.x:11434/v1</code>)</small>
         </div>
 
         <div class="form-group">
-          <label>এলএলএম মডেলের নাম (Model Name)</label>
+          <label data-i18n="settings_lbl_model_name">এলএলএম মডেলের নাম (Model Name)</label>
           <input type="text" id="setting-llm-model" class="text-input" placeholder="llama3.3">
-          <small>যেমন: <code>llama3.3</code>, <code>deepseek-r1</code>, <code>qwen2.5</code>, <code>mistral</code> ইত্যাদি</small>
+          <small data-i18n="settings_hint_model_name">যেমন: llama3.3, deepseek-r1, qwen2.5, mistral ইত্যাদি</small>
         </div>
 
         <div class="form-group">
-          <label>এপিআই কি (ঐচ্ছিক / ক্লাউড সার্ভিসের জন্য)</label>
+          <label data-i18n="settings_lbl_api_key">এপিআই কি (ঐচ্ছিক / ক্লাউড সার্ভিসের জন্য)</label>
           <input type="password" id="setting-llm-key" class="text-input" placeholder="not-needed">
         </div>
 
         <div class="form-group">
-          <label>এজেন্ট টেম্পারেচার (Temperature)</label>
+          <label data-i18n="settings_lbl_temp">এজেন্ট টেম্পারেচার (Temperature)</label>
           <input type="number" id="setting-agent-temp" class="text-input" min="0" max="1" step="0.1" value="0.3">
         </div>
 
         <div id="test-connection-badge" class="test-res-badge"></div>
 
         <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
-          <button type="button" class="btn-secondary" style="border-color:var(--cyan-glow); color:var(--cyan-glow); font-size:0.82rem;" onclick="closeSettingsModal(); switchTab('backup');">
+          <button type="button" class="btn-secondary" style="border-color:var(--cyan-glow); color:var(--cyan-glow); font-size:0.82rem;" onclick="closeSettingsModal(); switchTab('backup');" data-i18n="settings_btn_full_backup">
             💾 সম্পূর্ণ ব্যাকআপ ও রিস্টোর
           </button>
           <div style="display:flex; gap:10px;">
-            <button class="btn-secondary" id="btn-test-conn" onclick="testConnection()">
+            <button class="btn-secondary" id="btn-test-conn" onclick="testConnection()" data-i18n="settings_btn_server_test">
               সার্ভার টেস্ট
             </button>
-            <button class="btn-primary" onclick="saveSettings()">
+            <button class="btn-primary" onclick="saveSettings()" data-i18n="settings_btn_save">
               সেটিংস সেভ করুন
             </button>
           </div>
@@ -1796,25 +1796,25 @@
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">⚠️</span>
-            <h3>সিস্টেম রিস্টোর নিশ্চিতকরণ</h3>
+            <h3 data-i18n="restore_confirm_title">সিস্টেম রিস্টোর নিশ্চিতকরণ</h3>
           </div>
           <button class="close-modal-btn" onclick="closeRestoreModal()">&times;</button>
         </div>
         <div style="margin-top:12px;">
-          <p style="font-size:0.88rem; color:var(--text-primary); line-height:1.5;">
+          <p style="font-size:0.88rem; color:var(--text-primary); line-height:1.5;" data-i18n="restore_confirm_msg">
             আপনি কি নিশ্চিত যে নিচের ব্যাকআপ থেকে পুরো সিস্টেমটি রিস্টোর করতে চান? এটি বর্তমান চ্যাট, সেটিংস এবং ফাইলগুলো আপডেট করবে।
           </p>
           <div style="margin:12px 0; padding:12px 14px; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.3); border-radius:var(--radius-sm);">
             <div style="font-weight:700; color:#ef4444; font-size:0.85rem;" id="restore-target-name">-</div>
             <div id="restore-target-meta" style="margin-top:8px;"></div>
           </div>
-          <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+          <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;" data-i18n-html="restore_confirm_safety_note">
             💡 <em>দুর্ঘটনা রোধে বর্তমান ডাটার একটি স্বয়ংক্রিয় সেফটি স্ন্যাপশট (Pre-restore Safety Snapshot) তৈরি করে রাখা হবে।</em>
           </p>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
-          <button class="btn-secondary" onclick="closeRestoreModal()">বাতিল</button>
-          <button class="btn-primary" id="btn-confirm-restore" style="background:#ef4444; border-color:#dc2626;" onclick="executeRestore()">
+          <button class="btn-secondary" onclick="closeRestoreModal()" data-i18n="btn_cancel">বাতিল</button>
+          <button class="btn-primary" id="btn-confirm-restore" style="background:#ef4444; border-color:#dc2626;" onclick="executeRestore()" data-i18n="btn_confirm_restore">
             ⚠️ নিশ্চিত রিস্টোর করুন
           </button>
         </div>
@@ -1826,20 +1826,20 @@
       <div class="modal-window" style="max-width: 680px;">
         <div class="modal-header">
           <div>
-            <h3>✏️ মেমোরি চাঙ্ক সংশোধন / এডিট (Edit Chunk)</h3>
+            <h3 data-i18n="chunk_edit_title">✏️ মেমোরি চাঙ্ক সংশোধন / এডিট (Edit Chunk)</h3>
             <small id="edit-chunk-id-display" style="color:var(--cyan-glow); font-family:monospace;"></small>
           </div>
           <button class="close-modal-btn" onclick="closeEditChunkModal()">&times;</button>
         </div>
         <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;" id="edit-chunk-source-display"></div>
         <div class="form-group">
-          <label>সংশোধিত টেক্সট কনটেন্ট (Corrected Content)</label>
-          <textarea id="edit-chunk-textarea" class="text-input" rows="8" style="font-size:0.86rem; line-height:1.5; font-family:sans-serif;" placeholder="সঠিক তথ্য লিখুন..."></textarea>
-          <small>সেভ করার সাথে সাথে ক্রোমাডিবি ভেক্টর মেমোরি এবং FTS5 ইনডেক্স নতুন এমবেডিং সহ আপডেট হবে।</small>
+          <label data-i18n="chunk_edit_lbl_content">সংশোধিত টেক্সট কনটেন্ট (Corrected Content)</label>
+          <textarea id="edit-chunk-textarea" class="text-input" rows="8" style="font-size:0.86rem; line-height:1.5; font-family:sans-serif;" placeholder="সঠিক তথ্য লিখুন..." data-i18n-placeholder="chunk_edit_ph_content"></textarea>
+          <small data-i18n="chunk_edit_hint">সেভ করার সাথে সাথে ক্রোমাডিবি ভেক্টর মেমোরি এবং FTS5 ইনডেক্স নতুন এমবেডিং সহ আপডেট হবে।</small>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
-          <button class="btn-secondary" onclick="closeEditChunkModal()">বাতিল</button>
-          <button class="btn-primary" onclick="saveEditedChunk()">💾 সংশোধন সেভ করুন</button>
+          <button class="btn-secondary" onclick="closeEditChunkModal()" data-i18n="btn_cancel">বাতিল</button>
+          <button class="btn-primary" onclick="saveEditedChunk()" data-i18n="chunk_edit_btn_save">💾 সংশোধন সেভ করুন</button>
         </div>
       </div>
     </div>
@@ -1848,35 +1848,35 @@
     <div class="modal-backdrop" id="add-mcp-modal">
       <div class="modal-window" style="max-width: 520px;">
         <div class="modal-header">
-          <h3>+ নতুন MCP সার্ভার নিবন্ধন</h3>
+          <h3 data-i18n="mcp_add_modal_title">+ নতুন MCP সার্ভার নিবন্ধন</h3>
           <button class="close-modal-btn" onclick="closeAddMcpModal()">&times;</button>
         </div>
         <form id="add-mcp-form" onsubmit="submitAddMcpServer(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
           <div class="form-group">
-            <label>MCP সার্ভারের নাম</label>
-            <input type="text" id="mcp-name" class="text-input" placeholder="e.g. GitHub MCP Server" required>
+            <label data-i18n="mcp_add_lbl_name">MCP সার্ভারের নাম</label>
+            <input type="text" id="mcp-name" class="text-input" placeholder="e.g. GitHub MCP Server" data-i18n-placeholder="mcp_add_ph_name" required>
           </div>
           <div class="form-group">
-            <label>ট্রান্সপোর্ট প্রোটোকল (Transport)</label>
+            <label data-i18n="mcp_add_lbl_transport">ট্রান্সপোর্ট প্রোটোকল (Transport)</label>
             <select id="mcp-transport-select" class="text-input" onchange="onMcpTransportChanged()">
               <option value="sse">SSE / HTTP Remote Endpoint</option>
               <option value="stdio">stdio (Local Command / Subprocess)</option>
             </select>
           </div>
           <div class="form-group" id="mcp-sse-group">
-            <label>সার্ভার Endpoint URL</label>
+            <label data-i18n="mcp_add_lbl_url">সার্ভার Endpoint URL</label>
             <input type="text" id="mcp-url" class="text-input" placeholder="http://192.168.9.x:3000/sse">
-            <small>JSON-RPC 2.0 সামঞ্জস্যপূর্ণ SSE বা HTTP রিমোট এন্ডপয়েন্ট</small>
+            <small data-i18n="mcp_add_hint_url">JSON-RPC 2.0 সামঞ্জস্যপূর্ণ SSE বা HTTP রিমোট এন্ডপয়েন্ট</small>
           </div>
           <div class="form-group" id="mcp-stdio-group" style="display:none;">
-            <label>কমান্ড (Command Executable)</label>
-            <input type="text" id="mcp-command" class="text-input" placeholder="e.g. npx বা python3">
-            <label style="margin-top:6px;">আর্গুমেন্টস (Arguments)</label>
+            <label data-i18n="mcp_add_lbl_cmd">কমান্ড (Command Executable)</label>
+            <input type="text" id="mcp-command" class="text-input" placeholder="e.g. npx বা python3" data-i18n-placeholder="mcp_add_ph_cmd">
+            <label style="margin-top:6px;" data-i18n="mcp_add_lbl_args">আর্গুমেন্টস (Arguments)</label>
             <input type="text" id="mcp-args" class="text-input" placeholder="e.g. -y @modelcontextprotocol/server-filesystem /app/data">
           </div>
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
-            <button type="button" class="btn-secondary" onclick="closeAddMcpModal()">বাতিল</button>
-            <button type="submit" class="btn-primary">সার্ভার যুক্ত করুন</button>
+            <button type="button" class="btn-secondary" onclick="closeAddMcpModal()" data-i18n="btn_cancel">বাতিল</button>
+            <button type="submit" class="btn-primary" data-i18n="mcp_add_btn_submit">সার্ভার যুক্ত করুন</button>
           </div>
         </form>
       </div>
@@ -1886,10 +1886,10 @@
     <div class="modal-backdrop" id="mcp-tools-modal">
       <div class="modal-window" style="max-width: 680px; max-height: 80vh; display:flex; flex-direction:column;">
         <div class="modal-header">
-          <h3 id="mcp-tools-modal-title">টুলস এক্সপ্লোরার</h3>
+          <h3 id="mcp-tools-modal-title" data-i18n="mcp_tools_modal_title">টুলস এক্সপ্লোরার</h3>
           <button class="close-modal-btn" onclick="closeMcpToolsModal()">&times;</button>
         </div>
-        <div id="mcp-tools-modal-body" style="overflow-y:auto; flex:1; margin-top:10px;">
+        <div id="mcp-tools-modal-body" style="overflow-y:auto; flex:1; margin-top:10px;" data-i18n="loading_ellipsis">
           লোড হচ্ছে...
         </div>
       </div>
@@ -1910,10 +1910,10 @@
           <div class="form-group">
             <label data-i18n="quick_note_category_label">ক্যাটাগরি / বিভাগ</label>
             <select id="quick-note-category" class="text-input">
-              <option value="notes">সাধারণ নোট (General Notes)</option>
-              <option value="company_policy">কোম্পানি পলিসি ও রুলস (Policies)</option>
-              <option value="technical_guide">টেকনিক্যাল গাইডলাইন (Technical)</option>
-              <option value="credentials">এক্সেস / ক্রেডেনশিয়াল গাইড (Credentials)</option>
+              <option value="notes" data-i18n="cat_notes">সাধারণ নোট (General Notes)</option>
+              <option value="company_policy" data-i18n="cat_company_policy">কোম্পানি পলিসি ও রুলস (Policies)</option>
+              <option value="technical_guide" data-i18n="cat_technical_guide">টেকনিক্যাল গাইডলাইন (Technical)</option>
+              <option value="credentials" data-i18n="cat_credentials">এক্সেস / ক্রেডেনশিয়াল গাইড (Credentials)</option>
             </select>
           </div>
           <div class="form-group">

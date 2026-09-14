@@ -256,23 +256,26 @@ async function openEditChunkModal(chunkId) {
   const textarea = document.getElementById('edit-chunk-textarea');
   const sourceDisplay = document.getElementById('edit-chunk-source-display');
 
-  title.innerText = `চাঙ্ক আইডি: ${chunkId}`;
-  textarea.value = 'ডাটা লোড হচ্ছে...';
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+  title.innerText = isEn ? `Chunk ID: ${chunkId}` : `চাঙ্ক আইডি: ${chunkId}`;
+  textarea.value = isEn ? 'Loading data...' : 'ডাটা লোড হচ্ছে...';
   modal.style.display = 'flex';
 
   try {
     const res = await fetch(`/api/memory/chunks/${chunkId}`, {
       headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
     });
-    if (!res.ok) throw new Error('চাঙ্ক তথ্য লোড করা যায়নি');
+    if (!res.ok) throw new Error(isEn ? 'Could not load chunk details' : 'চাঙ্ক তথ্য লোড করা যায়নি');
 
     const chunk = await res.json();
     textarea.value = chunk.content || '';
     if (sourceDisplay) {
-      sourceDisplay.innerText = `উৎস: ${chunk.source} (পৃষ্ঠা: ${chunk.page || 1})`;
+      sourceDisplay.innerText = isEn 
+        ? `Source: ${chunk.source} (Page: ${chunk.page || 1})` 
+        : `উৎস: ${chunk.source} (পৃষ্ঠা: ${chunk.page || 1})`;
     }
   } catch (err) {
-    textarea.value = `ত্রুটি: ${err.message}`;
+    textarea.value = (isEn ? 'Error: ' : 'ত্রুটি: ') + err.message;
   }
 }
 
@@ -346,8 +349,9 @@ async function inspectDocumentChunks(docId, filename) {
   const title = document.getElementById('chunk-modal-title');
   const body = document.getElementById('chunk-modal-body');
 
-  title.innerText = `ভেক্টর চাঙ্কস: ${filename}`;
-  body.innerHTML = '<div style="text-align:center; padding:30px; color:var(--cyan-glow);">চাঙ্কস লোড হচ্ছে...</div>';
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+  title.innerText = (isEn ? 'Vector Chunks: ' : 'ভেক্টর চাঙ্কস: ') + filename;
+  body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--cyan-glow);">${isEn ? 'Loading chunks...' : 'চাঙ্কস লোড হচ্ছে...'}</div>`;
   modal.style.display = 'flex';
 
   try {
@@ -358,7 +362,7 @@ async function inspectDocumentChunks(docId, filename) {
     const chunks = data.chunks || [];
 
     if (chunks.length === 0) {
-      body.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">কোনো সংরক্ষিত চাঙ্ক পাওয়া যায়নি।</div>';
+      body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted);">${isEn ? 'No saved chunks found.' : 'কোনো সংরক্ষিত চাঙ্ক পাওয়া যায়নি।'}</div>`;
     } else {
       body.innerHTML = chunks.map((c, idx) => `
         <div class="chunk-card">
@@ -454,11 +458,12 @@ function escapeHtml(text) {
 async function optimizeMemoryStore() {
   const btn = document.getElementById('btn-optimize-store');
   const origText = btn ? btn.innerHTML : '';
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
   if (btn) {
-    btn.innerHTML = '⚡ অপ্টিমাইজ হচ্ছে...';
+    btn.innerHTML = isEn ? '⚡ Optimizing...' : '⚡ অপ্টিমাইজ হচ্ছে...';
     btn.disabled = true;
   }
-  showToast('ভেক্টর মেমোরি ডিফ্র্যাগমেন্টেশন ও FTS5 সার্চ ইনডেক্স অপ্টিমাইজেশন চলছে...', 'info');
+  showToast(isEn ? 'Vector memory defragmentation and FTS5 optimization in progress...' : 'ভেক্টর মেমোরি ডিফ্র্যাগমেন্টেশন ও FTS5 সার্চ ইনডেক্স অপ্টিমাইজেশন চলছে...', 'info');
 
   try {
     const res = await fetch('/api/memory/optimize', {
@@ -468,14 +473,14 @@ async function optimizeMemoryStore() {
     const data = await res.json();
     if (res.ok && data.success) {
       const opt = data.optimization || {};
-      showToast(`মেমোরি সফলভাবে অপ্টিমাইজ হয়েছে! মোট চাঙ্ক: ${opt.total_chunks || 0}, সময়: ${opt.elapsed_seconds || 0}s`, 'success');
+      showToast(isEn ? `Memory optimized! Total chunks: ${opt.total_chunks || 0}, Time: ${opt.elapsed_seconds || 0}s` : `মেমোরি সফলভাবে অপ্টিমাইজ হয়েছে! মোট চাঙ্ক: ${opt.total_chunks || 0}, সময়: ${opt.elapsed_seconds || 0}s`, 'success');
       loadMemoryStats();
       loadChunksList(0);
     } else {
-      showToast(`অপ্টিমাইজেশন ব্যর্থ: ${data.detail || 'ত্রুটি'}`, 'error');
+      showToast(isEn ? `Optimization failed: ${data.detail || 'error'}` : `অপ্টিমাইজেশন ব্যর্থ: ${data.detail || 'ত্রুটি'}`, 'error');
     }
   } catch (err) {
-    showToast(`ত্রুটি: ${err.message}`, 'error');
+    showToast(`Error: ${err.message}`, 'error');
   } finally {
     if (btn) {
       btn.innerHTML = origText;
@@ -486,14 +491,15 @@ async function optimizeMemoryStore() {
 
 // Re-index all uploaded documents using smart table-aware chunker
 async function reindexAllDocuments() {
-  if (!confirm('আপনি কি সমস্ত সংরক্ষিত ফাইল পুনরায় স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে রি-ইনডেক্স করতে চান? এতে ডাটার কোয়ালিটি ও সার্চ একুরেসি সর্বোচ্চ হবে।')) {
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+  if (!confirm(isEn ? 'Do you want to re-index all uploaded files using the smart table-aware chunker? This maximizes data quality and retrieval accuracy.' : 'আপনি কি সমস্ত সংরক্ষিত ফাইল পুনরায় স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে রি-ইনডেক্স করতে চান? এতে ডাটার কোয়ালিটি ও সার্চ একুরেসি সর্বোচ্চ হবে।')) {
     return;
   }
 
   const btn = document.getElementById('btn-reindex-docs');
   const origText = btn ? btn.innerHTML : '';
   if (btn) {
-    btn.innerHTML = '🔄 রি-ইনডেক্সিং হচ্ছে...';
+    btn.innerHTML = isEn ? '🔄 Reindexing...' : '🔄 রি-ইনডেক্সিং হচ্ছে...';
     btn.disabled = true;
   }
   showToast('সকল ডকুমেন্টের ভেক্টর এমবেডিং ও টেবিল চাঙ্কিং পুনরায় তৈরি হচ্ছে...', 'info');

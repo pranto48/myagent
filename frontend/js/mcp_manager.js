@@ -105,11 +105,11 @@ function renderMcpServers(servers) {
         </div>
 
         <div class="mcp-card-actions">
-          <button class="btn-sm-action" onclick="pingMcpServer('${s.id}')" title="পিং ও টুলস রিফ্রেশ">
-            ⚡ পিং টেস্ট
+          <button class="btn-sm-action" onclick="pingMcpServer('${s.id}')" title="${typeof t === 'function' ? t('mcp_ping_title', 'পিং ও টুলস রিফ্রেশ') : 'পিং ও টুলস রিফ্রেশ'}">
+            ⚡ ${typeof t === 'function' ? t('mcp_btn_ping', 'পিং টেস্ট') : 'পিং টেস্ট'}
           </button>
-          <button class="btn-sm-action" onclick="viewMcpTools('${s.id}')" title="টুলস স্কিমা দেখুন">
-            🔍 টুলস
+          <button class="btn-sm-action" onclick="viewMcpTools('${s.id}')" title="${typeof t === 'function' ? t('mcp_tools_title', 'টুলস স্কিমা দেখুন') : 'টুলস স্কিমা দেখুন'}">
+            🔍 ${typeof t === 'function' ? t('mcp_btn_tools', 'টুলস') : 'টুলস'}
           </button>
           <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteMcpServer('${s.id}')" title="${typeof t === 'function' ? t('btn_delete', 'মুছে ফেলুন') : 'মুছে ফেলুন'}">
             🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}
@@ -151,25 +151,28 @@ async function viewMcpTools(serverId) {
   const title = document.getElementById('mcp-tools-modal-title');
   const body = document.getElementById('mcp-tools-modal-body');
 
-  title.innerText = `টুলস এক্সপ্লোরার: ${server.name} (${(server.tools_cache || []).length}টি টুল)`;
+  const isEn = typeof currentLang !== 'undefined' && currentLang === 'en';
+  title.innerText = isEn 
+    ? `Tools Explorer: ${server.name} (${(server.tools_cache || []).length} tools)` 
+    : `টুলস এক্সপ্লোরার: ${server.name} (${(server.tools_cache || []).length}টি টুল)`;
 
   if (!server.tools_cache || server.tools_cache.length === 0) {
     body.innerHTML = `
       <div style="padding:30px; text-align:center; color:var(--text-muted);">
-        কোনো সক্রিয় টুল পাওয়া যায়নি। সার্ভারটি সচল রয়েছে কিনা নিশ্চিত করতে "পিং টেস্ট" চালান।
+        ${typeof t === 'function' ? t('mcp_no_active_tools', 'কোনো সক্রিয় টুল পাওয়া যায়নি।') : 'কোনো সক্রিয় টুল পাওয়া যায়নি।'}
       </div>
     `;
   } else {
-    body.innerHTML = server.tools_cache.map(t => `
+    body.innerHTML = server.tools_cache.map(tItem => `
       <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <strong style="color:var(--cyan-glow); font-family:monospace; font-size:0.95rem;">${escapeHtml(t.name)}</strong>
+          <strong style="color:var(--cyan-glow); font-family:monospace; font-size:0.95rem;">${escapeHtml(tItem.name)}</strong>
           <span class="badge-tag">MCP Tool</span>
         </div>
-        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">${escapeHtml(t.description || 'No description provided')}</p>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">${escapeHtml(tItem.description || 'No description provided')}</p>
         <details style="font-size:0.75rem;">
-          <summary style="cursor:pointer; color:var(--purple-neon);">ইনপুট স্কিমা (JSON Schema)</summary>
-          <pre style="background:rgba(0,0,0,0.4); padding:8px; border-radius:6px; overflow-x:auto; margin-top:6px;">${escapeHtml(JSON.stringify(t.inputSchema || {}, null, 2))}</pre>
+          <summary style="cursor:pointer; color:var(--purple-neon);">${typeof t === 'function' ? t('mcp_input_schema', 'ইনপুট স্কিমা (JSON Schema)') : 'ইনপুট স্কিমা (JSON Schema)'}</summary>
+          <pre style="background:rgba(0,0,0,0.4); padding:8px; border-radius:6px; overflow-x:auto; margin-top:6px;">${escapeHtml(JSON.stringify(tItem.inputSchema || {}, null, 2))}</pre>
         </details>
       </div>
     `).join('');
@@ -382,7 +385,8 @@ async function runToolSandboxTest() {
     }
   }
 
-  outputElem.innerText = `টুল '${toolName}' এক্সিকিউট করা হচ্ছে...`;
+  const isEn = typeof currentLang !== 'undefined' && currentLang === 'en';
+  outputElem.innerText = isEn ? `Executing tool '${toolName}'...` : `টুল '${toolName}' এক্সিকিউট করা হচ্ছে...`;
 
   try {
     const res = await fetch('/api/mcp/tools/execute', {
@@ -394,7 +398,7 @@ async function runToolSandboxTest() {
     const data = await res.json();
     outputElem.innerText = data.output || JSON.stringify(data, null, 2);
   } catch (err) {
-    outputElem.innerText = `এক্সিকিউশন ত্রুটি: ${err.message}`;
+    outputElem.innerText = (isEn ? 'Execution Error: ' : 'এক্সিকিউশন ত্রুটি: ') + err.message;
   }
 }
 
