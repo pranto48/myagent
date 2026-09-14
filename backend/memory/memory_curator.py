@@ -267,6 +267,8 @@ Return ONLY valid JSON matching this schema:
         chunk_id = f"curated_{doc_id}_{uuid.uuid4().hex[:6]}"
         chunks = [{
             "id": chunk_id,
+            "doc_id": doc_id,
+            "filename": filename,
             "content": curated_text,
             "metadata": {
                 "source": filename,
