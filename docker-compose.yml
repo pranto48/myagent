@@ -27,6 +27,7 @@ services:
       - DOCUMENTS_DIR=/app/data/documents
       - CHROMA_DIR=/app/data/chroma_db
     volumes:
+      - ./backend:/app
       - ./data:/app/data
     networks:
       - myagent-network
