@@ -344,14 +344,19 @@ async function deleteChunk(chunkId) {
 }
 
 // Inspect Chunks of a specific Document
+// Inspect Chunks of a specific Document
 async function inspectDocumentChunks(docId, filename) {
-  const modal = document.getElementById('chunk-modal');
-  const title = document.getElementById('chunk-modal-title');
-  const body = document.getElementById('chunk-modal-body');
+  const modal = document.getElementById('chunks-modal') || document.getElementById('chunk-modal');
+  const title = document.getElementById('chunks-modal-title') || document.getElementById('chunk-modal-title');
+  const body = document.getElementById('chunks-viewer-list') || document.getElementById('chunk-modal-body');
+  const meta = document.getElementById('chunks-modal-meta');
+
+  if (!modal) return;
 
   const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
-  title.innerText = (isEn ? 'Vector Chunks: ' : 'ভেক্টর চাঙ্কস: ') + filename;
-  body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--cyan-glow);">${isEn ? 'Loading chunks...' : 'চাঙ্কস লোড হচ্ছে...'}</div>`;
+  if (title) title.innerText = (isEn ? 'Document Chunks: ' : 'ডকুমেন্ট চাঙ্কস: ') + filename;
+  if (meta) meta.innerText = (isEn ? `Document ID: ${docId}` : `ডকুমেন্ট আইডি: ${docId}`);
+  if (body) body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--cyan-glow);">${isEn ? 'Loading chunks...' : 'চাঙ্কস লোড হচ্ছে...'}</div>`;
   modal.style.display = 'flex';
 
   try {
@@ -361,29 +366,116 @@ async function inspectDocumentChunks(docId, filename) {
     const data = await res.json();
     const chunks = data.chunks || [];
 
+    if (!body) return;
+
     if (chunks.length === 0) {
       body.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted);">${isEn ? 'No saved chunks found.' : 'কোনো সংরক্ষিত চাঙ্ক পাওয়া যায়নি।'}</div>`;
     } else {
       body.innerHTML = chunks.map((c, idx) => `
-        <div class="chunk-card">
-          <div class="chunk-header">
-            <span>${typeof t === 'function' ? t('th_chunk_id', 'চাঙ্ক') : 'চাঙ্ক'} #${idx + 1} (${escapeHtml(c.chunk_id)})</span>
+        <div class="chunk-card" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:8px;">
+          <div class="chunk-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-family:monospace; font-size:0.78rem; color:var(--cyan-glow);">${typeof t === 'function' ? t('th_chunk_id', 'চাঙ্ক') : 'চাঙ্ক'} #${idx + 1} (${escapeHtml(c.chunk_id || c.id || '')})</span>
             <div>
-              <button class="btn-sm-action" style="color:var(--cyan-glow);" onclick="closeChunkModal(); openEditChunkModal('${c.chunk_id}')">✏️ ${typeof t === 'function' ? t('btn_edit', 'এডিট') : 'এডিট'}</button>
-              <button class="btn-sm-action" style="color:var(--rose-red);" onclick="deleteChunk('${c.chunk_id}')">🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}</button>
+              <button class="btn-sm-action" style="color:var(--cyan-glow);" onclick="closeChunksModal(); openEditChunkModal('${c.chunk_id || c.id}')">✏️ ${typeof t === 'function' ? t('btn_edit', 'এডিট') : 'এডিট'}</button>
+              <button class="btn-sm-action" style="color:var(--rose-red);" onclick="deleteChunk('${c.chunk_id || c.id}')">🗑️ ${typeof t === 'function' ? t('btn_delete', 'ডিলিট') : 'ডিলিট'}</button>
             </div>
           </div>
-          <div class="chunk-content">${escapeHtml(c.content)}</div>
+          <div class="chunk-content" style="font-size:0.84rem; color:var(--text-main); line-height:1.5; background:rgba(0,0,0,0.25); padding:8px; border-radius:6px; max-height:140px; overflow-y:auto;">${escapeHtml(c.content)}</div>
         </div>
       `).join('');
     }
   } catch (err) {
-    body.innerHTML = `<div style="color:var(--rose-red); padding:20px;">চাঙ্কস লোড করতে ত্রুটি: ${err.message}</div>`;
+    if (body) body.innerHTML = `<div style="color:var(--rose-red); padding:20px;">চাঙ্কস লোড করতে ত্রুটি: ${err.message}</div>`;
   }
 }
 
+function closeChunksModal() {
+  const m1 = document.getElementById('chunks-modal');
+  if (m1) m1.style.display = 'none';
+  const m2 = document.getElementById('chunk-modal');
+  if (m2) m2.style.display = 'none';
+}
+
 function closeChunkModal() {
-  document.getElementById('chunk-modal').style.display = 'none';
+  closeChunksModal();
+}
+
+// Execute Real-Time Semantic Search on Vector Memory
+async function executeMemorySearch() {
+  const input = document.getElementById('memory-search-input');
+  const resultsContainer = document.getElementById('memory-search-results');
+  if (!input || !resultsContainer) return;
+
+  const query = input.value.trim();
+  const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+
+  if (!query) {
+    showToast(isEn ? 'Please enter a search query!' : 'অনুগ্রহ করে সার্চ কোয়েরি লিখুন!', 'warning');
+    input.focus();
+    return;
+  }
+
+  resultsContainer.innerHTML = `
+    <div style="text-align:center; padding:24px; color:var(--cyan-glow); font-size:0.9rem;">
+      <span style="display:inline-block; margin-right:8px; animation:spin 1s linear infinite;">⚡</span>
+      ${isEn ? 'Searching semantic vector memory...' : 'সেমান্টিক ভেক্টর মেমোরিতে অনুসন্ধান চলছে...'}
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/memory/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof getAuthHeaders === 'function' ? getAuthHeaders() : {})
+      },
+      body: JSON.stringify({ query: query, top_k: 6 })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || (isEn ? 'Search failed' : 'অনুসন্ধান ব্যর্থ হয়েছে'));
+    }
+
+    const hits = await res.json();
+    if (!Array.isArray(hits) || hits.length === 0) {
+      resultsContainer.innerHTML = `
+        <div style="text-align:center; padding:24px; color:var(--text-muted); background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:8px;">
+          ${isEn ? `No relevant knowledge found matching "${escapeHtml(query)}".` : `"${escapeHtml(query)}" এর সাথে সম্পর্কিত কোনো মেমোরি ডেটা পাওয়া যায়নি।`}
+        </div>
+      `;
+      return;
+    }
+
+    resultsContainer.innerHTML = hits.map((hit, idx) => {
+      const scorePct = Math.min(100, Math.max(0, Math.round((hit.score || 0.5) * 100)));
+      const scoreColor = scorePct >= 75 ? 'var(--emerald-green)' : (scorePct >= 50 ? 'var(--cyan-glow)' : 'var(--amber-yellow)');
+
+      return `
+        <div class="memory-search-card" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:10px; transition:border-color 0.2s;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge-tag" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow); font-weight:700;">#${idx + 1}</span>
+              <strong style="color:white; font-size:0.88rem;">${escapeHtml(hit.source || 'Knowledge Base')}</strong>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:0.75rem; color:var(--text-muted);">${isEn ? 'Relevance:' : 'প্রাসঙ্গিকতা:'}</span>
+              <span class="badge-tag" style="background:${scoreColor}20; color:${scoreColor}; font-weight:700;">${scorePct}%</span>
+            </div>
+          </div>
+          <div style="font-size:0.84rem; color:var(--text-main); line-height:1.5; max-height:120px; overflow-y:auto; background:rgba(0,0,0,0.25); padding:10px; border-radius:6px; font-family:monospace;">
+            ${escapeHtml(hit.content)}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    resultsContainer.innerHTML = `
+      <div style="text-align:center; padding:20px; color:var(--rose-red); background:rgba(244,63,94,0.05); border:1px solid rgba(244,63,94,0.3); border-radius:8px;">
+        ${isEn ? 'Search error: ' : 'অনুসন্ধান ত্রুটি: '} ${escapeHtml(err.message)}
+      </div>
+    `;
+  }
 }
 
 // Save Direct Corporate Note to Memory
@@ -721,5 +813,25 @@ if (typeof window !== 'undefined') {
   window.triggerMemoryOptimization = triggerMemoryOptimization;
   window.triggerSmartReindex = triggerSmartReindex;
   window.triggerPurgeReset = triggerPurgeReset;
+  window.executeMemorySearch = executeMemorySearch;
+  window.inspectDocumentChunks = inspectDocumentChunks;
+  window.closeChunksModal = closeChunksModal;
+  window.closeChunkModal = closeChunkModal;
 }
+
+// Bind Enter key on memory-search-input
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('memory-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          executeMemorySearch();
+        }
+      });
+    }
+  });
+}
+
 
