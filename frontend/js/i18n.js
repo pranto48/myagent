@@ -1545,7 +1545,28 @@ function initLanguage() {
   setAppLanguage(savedLang, false);
 }
 
-// Auto-run on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  initLanguage();
-});
+// Auto-run on DOM ready in browser
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initLanguage();
+  });
+}
+
+// Global window attachment
+if (typeof window !== 'undefined') {
+  window.I18N_TRANSLATIONS = I18N_TRANSLATIONS;
+  window.t = t;
+  window.setAppLanguage = setAppLanguage;
+  window.getAppLanguage = getAppLanguage;
+}
+
+// CommonJS module export for testing & build verification
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    I18N_TRANSLATIONS,
+    t,
+    getAppLanguage,
+    setAppLanguage
+  };
+}
+
