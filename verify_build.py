@@ -117,23 +117,31 @@ def check_i18n_parity():
         return
 
     content = i18n_file.read_text(encoding="utf-8")
-    bn_match = re.search(r'bn:\s*\{([\s\S]*?)\n\s*\},?\s*\n\s*en:', content)
-    en_match = re.search(r'en:\s*\{([\s\S]*?)\n\s*\}\s*\n\s*\};', content)
+    bn_match = re.search(r'bn:\s*\{([\s\S]*?)\n\s*\},?\s*\n*\s*en:', content)
+    en_match = re.search(r'en:\s*\{([\s\S]*?)\n\s*\}\s*;?', content)
 
     if not bn_match or not en_match:
         log_fail("Failed to parse translations bn or en objects in i18n.js")
         return
 
-    def parse_keys(block):
-        keys = set()
+    def parse_keys_with_dupes(block, lang):
+        keys = []
         for line in block.splitlines():
             m = re.match(r'^\s*([a-zA-Z0-9_]+)\s*:', line)
             if m:
-                keys.add(m.group(1))
-        return keys
+                k = m.group(1)
+                if k not in ("bn", "en"):
+                    keys.append(k)
+        counts = {}
+        for k in keys:
+            counts[k] = counts.get(k, 0) + 1
+        dupes = [k for k, c in counts.items() if c > 1]
+        if dupes:
+            log_fail(f"Duplicate keys detected in {lang} dictionary ({len(dupes)} keys): {dupes[:5]}")
+        return set(keys)
 
-    bn_keys = parse_keys(bn_match.group(1))
-    en_keys = parse_keys(en_match.group(1))
+    bn_keys = parse_keys_with_dupes(bn_match.group(1), "Bangla (bn)")
+    en_keys = parse_keys_with_dupes(en_match.group(1), "English (en)")
 
     missing_in_en = bn_keys - en_keys
     missing_in_bn = en_keys - bn_keys
@@ -144,7 +152,7 @@ def check_i18n_parity():
         log_fail(f"Missing in Bangla dictionary ({len(missing_in_bn)} keys): {list(missing_in_bn)[:5]}")
 
     if not missing_in_en and not missing_in_bn:
-        log_pass(f"Bilingual parity confirmed: Exactly {len(bn_keys)} keys synchronized in bn and en.")
+        log_pass(f"Bilingual parity confirmed: Exactly {len(bn_keys)} keys synchronized in bn and en (0 duplicates).")
 
 
 def check_api_routers():
