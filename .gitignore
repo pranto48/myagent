@@ -18,6 +18,12 @@ data/documents/*
 !data/documents/.gitkeep
 data/uploads/*
 !data/uploads/.gitkeep
+data/backups/*
+!data/backups/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # System & Editor
 .DS_Store

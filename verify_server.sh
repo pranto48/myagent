@@ -45,6 +45,18 @@ else
     echo "❌ Admin Login Test FAILED. Response: $LOGIN_RES"
 fi
 
+# 6. Test Version & Branding Endpoint
+echo ""
+echo "🏷️ Testing API Version Endpoint:"
+VERSION_RES=$(curl -s http://localhost:8000/api/version || echo "FAILED")
+echo "Version Response: $VERSION_RES"
+
+# 7. Test Dashboard Stats Endpoint
+echo ""
+echo "📊 Testing Dashboard Stats Endpoint:"
+STATS_RES=$(curl -s -H "Authorization: Bearer $(echo "$LOGIN_RES" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)" http://localhost:8000/api/dashboard/stats || echo "FAILED")
+echo "Stats Response: $STATS_RES"
+
 echo "=========================================================="
 echo "🎯 Verification Complete. Access at: http://192.168.9.9:3399"
 echo "=========================================================="

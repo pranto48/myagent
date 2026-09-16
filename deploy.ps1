@@ -18,6 +18,7 @@ Write-Host "📁 Creating persistent storage directories..." -ForegroundColor Ye
 New-Item -ItemType Directory -Force -Path "data/documents" | Out-Null
 New-Item -ItemType Directory -Force -Path "data/chroma_db" | Out-Null
 New-Item -ItemType Directory -Force -Path "data/uploads" | Out-Null
+New-Item -ItemType Directory -Force -Path "data/backups" | Out-Null
 
 # Check .env
 if (-not (Test-Path ".env")) {

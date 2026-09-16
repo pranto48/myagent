@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -23,7 +23,7 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 # Create application data directories
-RUN mkdir -p /app/data/documents /app/data/chroma_db /app/data/uploads
+RUN mkdir -p /app/data/documents /app/data/chroma_db /app/data/uploads /app/data/backups
 
 # Copy backend source code
 COPY . .

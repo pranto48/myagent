@@ -34,6 +34,7 @@ echo "📁 Creating persistent storage directories..."
 mkdir -p data/documents
 mkdir -p data/chroma_db
 mkdir -p data/uploads
+mkdir -p data/backups
 chmod -R 775 data/
 
 # 4. Check .env file
