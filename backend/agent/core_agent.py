@@ -538,6 +538,16 @@ class CompanyAIAgent:
 
             except Exception as e:
                 logger.error(f"Error during LLM stream processing: {e}")
+                err_lower = str(e).lower()
+                if any(kw in err_lower for kw in ["connection", "timeout", "connecterror", "reset", "closed", "broken pipe"]):
+                    msg = (
+                        "\n\n⚠️ **[এলএলএম সার্ভার সংযোগ বিচ্ছিন্ন হয়েছে। অনুগ্রহ করে LM Studio বা মডেল সার্ভার পরীক্ষা করুন।]**"
+                        if language != "en"
+                        else "\n\n⚠️ **[LLM server connection interrupted. Please verify the LM Studio / model server status.]**"
+                    )
+                    yield f"data: {json.dumps({'type': 'token', 'token': msg})}\n\n"
+                    yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                    return
                 yield f"data: {json.dumps({'type': 'error', 'error': f'Communication Error: {str(e)}'})}\n\n"
                 return
 

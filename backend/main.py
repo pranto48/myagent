@@ -40,7 +40,7 @@ logger = logging.getLogger("myagent.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle initialization for vector store, persistent databases, and MCP registry."""
-    logger.info(f"Starting {settings.AGENT_NAME} v2.2.0 on port {settings.WEB_PORT}...")
+    logger.info(f"Starting {settings.AGENT_NAME} v3.0.0 on port {settings.WEB_PORT}...")
 
     # Warm up ChromaDB and FTS5
     try:
