@@ -1,4 +1,4 @@
-﻿/* ==============================================================================
+/* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
  * Project: MyAgent | Version: 3.0.0
@@ -665,3 +665,61 @@ async function executePurgeMemory() {
     }
   }
 }
+
+// =============================================================================
+// ⚡ UNIVERSAL PRODUCTIVE MEMORY WORK OPS (TOPBAR & MULTI-VIEW INTEGRATION)
+// =============================================================================
+
+function toggleMemoryOpsMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('topbar-memory-ops-menu');
+  if (!menu) return;
+  const isShown = menu.style.display === 'block';
+  menu.style.display = isShown ? 'none' : 'block';
+}
+
+function closeMemoryOpsMenu() {
+  const menu = document.getElementById('topbar-memory-ops-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+function triggerMemoryOptimization(event) {
+  if (event) event.stopPropagation();
+  closeMemoryOpsMenu();
+  optimizeMemoryStore();
+}
+
+function triggerSmartReindex(event) {
+  if (event) event.stopPropagation();
+  closeMemoryOpsMenu();
+  reindexAllDocuments();
+}
+
+function triggerPurgeReset(event) {
+  if (event) event.stopPropagation();
+  closeMemoryOpsMenu();
+  openPurgeMemoryModal();
+}
+
+// Auto close on outside click
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.memory-ops-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    closeMemoryOpsMenu();
+  }
+});
+
+// Explicit Global Window Exposure
+if (typeof window !== 'undefined') {
+  window.optimizeMemoryStore = optimizeMemoryStore;
+  window.reindexAllDocuments = reindexAllDocuments;
+  window.openPurgeMemoryModal = openPurgeMemoryModal;
+  window.closePurgeMemoryModal = closePurgeMemoryModal;
+  window.executePurgeMemory = executePurgeMemory;
+  window.toggleMemoryOpsMenu = toggleMemoryOpsMenu;
+  window.closeMemoryOpsMenu = closeMemoryOpsMenu;
+  window.triggerMemoryOptimization = triggerMemoryOptimization;
+  window.triggerSmartReindex = triggerSmartReindex;
+  window.triggerPurgeReset = triggerPurgeReset;
+}
+

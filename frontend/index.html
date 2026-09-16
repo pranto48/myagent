@@ -259,6 +259,43 @@
             <input type="text" id="chat-search-input" class="chat-search-input" placeholder="🔍 খুঁজুন..." data-i18n-placeholder="chat_search_placeholder" oninput="filterChatMessages(this.value)" title="বর্তমান চ্যাট মেসেজের ভেতর অনুসন্ধান করুন">
           </div>
 
+          <!-- Universal Memory Power Tools Dropdown -->
+          <div class="memory-ops-dropdown-wrap">
+            <button type="button" class="btn-memory-ops" id="btn-topbar-memory-ops" onclick="toggleMemoryOpsMenu(event)" title="মেমোরি পাওয়ার টুলস ও প্রোডাক্টিভিটি অপশন" data-i18n-title="tooltip_memory_ops">
+              <span class="pulse-icon">⚡</span>
+              <span class="hide-mobile" data-i18n="topbar_memory_ops">মেমোরি অপস</span>
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div class="memory-ops-menu" id="topbar-memory-ops-menu" style="display:none;">
+              <div class="ops-menu-header">
+                <span data-i18n="ops_menu_title">⚡ এন্টারপ্রাইজ মেমোরি কন্ট্রোল হাব</span>
+              </div>
+              <button type="button" class="ops-menu-item" onclick="triggerMemoryOptimization(event)">
+                <span class="ops-icon-cyan">⚡</span>
+                <div class="ops-item-text">
+                  <strong data-i18n="opt_menu_optimize_title">মেমোরি অপ্টিমাইজ (Optimize Memory)</strong>
+                  <small data-i18n="opt_menu_optimize_desc">FTS5 ইনডেক্স মার্জ, ডিফ্র্যাগমেন্টেশন ও SQLite VACUUM</small>
+                </div>
+              </button>
+              <button type="button" class="ops-menu-item" onclick="triggerSmartReindex(event)">
+                <span class="ops-icon-amber">🔄</span>
+                <div class="ops-item-text">
+                  <strong data-i18n="opt_menu_reindex_title">স্মার্ট রি-ইনডেক্স (Smart Re-Index)</strong>
+                  <small data-i18n="opt_menu_reindex_desc">টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে সকল ফাইল পুনরায় ইনডেক্স</small>
+                </div>
+              </button>
+              <button type="button" class="ops-menu-item ops-danger" onclick="triggerPurgeReset(event)">
+                <span class="ops-icon-rose">🗑️</span>
+                <div class="ops-item-text">
+                  <strong data-i18n="opt_menu_purge_title">মেমোরি পার্জ ও রিসেট (Purge & Reset)</strong>
+                  <small data-i18n="opt_menu_purge_desc">নিউক্লিয়ার বা গ্র্যানুলার মেমোরি ক্লিন ও ফ্রেশ স্টার্ট</small>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <!-- Quick Note to Memory Button -->
           <button class="btn-secondary" id="btn-quick-note" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য/নোট সেভ করুন" data-i18n-title="tooltip_quick_note">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -365,6 +402,9 @@
             <div class="productivity-quick-bar" id="productivity-quick-bar">
               <span class="quick-bar-label" data-i18n="quick_bar_label">⚡ অ্যাকশন:</span>
               <button class="quick-chip highlight-chip" onclick="openQuickMemoryModal()" title="সরাসরি এজেন্টের মেমোরিতে নতুন তথ্য সংরক্ষণ" data-i18n="chip_quick_note">📌 মেমোরিতে নোট সেভ</button>
+              <button class="quick-chip chip-cyan" onclick="optimizeMemoryStore()" title="ভেক্টর মেমোরি ও সার্চ ইনডেক্স অপ্টিমাইজ করুন" data-i18n="chip_optimize_memory">⚡ মেমোরি অপ্টিমাইজ</button>
+              <button class="quick-chip chip-amber" onclick="reindexAllDocuments()" title="স্মার্ট টেবিল-অ্যাওয়ার চাঙ্কিং দিয়ে পুনরায় ইনডেক্স করুন" data-i18n="chip_smart_reindex">🔄 স্মার্ট রি-ইনডেক্স</button>
+              <button class="quick-chip chip-rose" onclick="openPurgeMemoryModal()" title="মেমোরি ডাটা পার্জ ও রিসেট করুন" data-i18n="chip_purge_memory">🗑️ পার্জ ও রিসেট</button>
               <button class="quick-chip" onclick="useProductivityAction('data_analysis')" data-i18n="chip_big_data">📊 বিগ ডেটা</button>
               <button class="quick-chip" onclick="useProductivityAction('memory_search')" data-i18n="chip_policy_search">🔍 পলিসি সার্চ</button>
               <button class="quick-chip" onclick="useProductivityAction('generate_report')" data-i18n="chip_gen_report">📑 রিপোর্ট তৈরি</button>
@@ -682,6 +722,45 @@
       <!-- View 4: Data Management & Knowledge Base View -->
       <section class="tab-view" id="view-knowledge">
         <div class="knowledge-container">
+
+          <!-- Memory Productivity Ops Suite Banner -->
+          <div class="memory-suite-banner">
+            <div class="suite-header-row">
+              <div class="suite-title-wrap">
+                <span class="suite-badge-pulse">⚡ HIGH PERFORMANCE</span>
+                <h3 class="animated-gradient-text" data-i18n="kb_ops_banner_title">🧠 মেমোরি পাওয়ার টুলস ও অপ্টিমাইজেশন সেন্টার</h3>
+                <p data-i18n="kb_ops_banner_desc">উচ্চ-গতির সেমান্টিক রিট্রিভাল বজায় রাখতে ১-ক্লিকে মেমোরি অপ্টিমাইজ, রি-ইনডেক্স বা রিসেট করুন।</p>
+              </div>
+            </div>
+            <div class="memory-suite-grid">
+              <div class="memory-suite-card card-optimize" onclick="optimizeMemoryStore()">
+                <div class="card-icon-circle cyan-circle">⚡</div>
+                <div class="card-suite-info">
+                  <h4 data-i18n="kb_card_optimize_title">⚡ মেমোরি অপ্টিমাইজ</h4>
+                  <p data-i18n="kb_card_optimize_desc">FTS5 ইনডেক্স মার্জ, ডেটাবেস ডিফ্র্যাগমেন্টেশন ও লেটেন্সি হ্রাস (&lt; 10ms)</p>
+                </div>
+                <button type="button" class="btn-suite-trigger cyan-btn" data-i18n="btn_optimize_memory">⚡ অপ্টিমাইজ করুন</button>
+              </div>
+
+              <div class="memory-suite-card card-reindex" onclick="reindexAllDocuments()">
+                <div class="card-icon-circle amber-circle">🔄</div>
+                <div class="card-suite-info">
+                  <h4 data-i18n="kb_card_reindex_title">🔄 স্মার্ট রি-ইনডেক্স</h4>
+                  <p data-i18n="kb_card_reindex_desc">টেবিল-অ্যাওয়ার চাঙ্কার দিয়ে সমস্ত ফাইলের ভেক্টর রি-ইঞ্জিনিয়ারিং</p>
+                </div>
+                <button type="button" class="btn-suite-trigger amber-btn" data-i18n="btn_reindex_memory">🔄 রি-ইনডেক্স করুন</button>
+              </div>
+
+              <div class="memory-suite-card card-purge" onclick="openPurgeMemoryModal()">
+                <div class="card-icon-circle rose-circle">🗑️</div>
+                <div class="card-suite-info">
+                  <h4 data-i18n="kb_card_purge_title">🗑️ মেমোরি পার্জ ও রিসেট</h4>
+                  <p data-i18n="kb_card_purge_desc">নিউক্লিয়ার মোড, ভেক্টর অনলি বা চ্যাট হিস্টোরি রিসেট হাব</p>
+                </div>
+                <button type="button" class="btn-suite-trigger rose-btn" data-i18n="btn_purge_memory">🗑️ পার্জ ও রিসেট</button>
+              </div>
+            </div>
+          </div>
           
           <div class="knowledge-grid">
             <!-- Left Column: Upload New File & Photos -->
@@ -1296,6 +1375,30 @@
               <span class="section-badge">ADMIN CONTROL</span>
             </div>
             <div class="cyber-action-grid">
+              <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('optimize')">
+                <div class="btn-icon">⚡</div>
+                <div class="btn-text">
+                  <span class="btn-title" data-i18n="admin_action_optimize">ভেক্টর মেমোরি অপ্টিমাইজ</span>
+                  <span class="btn-desc" data-i18n="admin_action_optimize_desc">FTS5 মার্জ ও SQLite VACUUM এক্সিকিউশন</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('reindex')">
+                <div class="btn-icon">🔄</div>
+                <div class="btn-text">
+                  <span class="btn-title" data-i18n="admin_action_reindex">স্মার্ট টেবিল রি-ইনডেক্স</span>
+                  <span class="btn-desc" data-i18n="admin_action_reindex_desc">সমগ্র নলেজবেসের আধুনিক রি-এমবেডিং</span>
+                </div>
+              </button>
+
+              <button type="button" class="cyber-action-btn ops-danger" onclick="executeQuickAdminAction('purge')">
+                <div class="btn-icon">🗑️</div>
+                <div class="btn-text">
+                  <span class="btn-title" data-i18n="admin_action_purge">কগনিটিভ পার্জ ও রিসেট সেন্টার</span>
+                  <span class="btn-desc" data-i18n="admin_action_purge_desc">নিউক্লিয়ার ও সেশন ক্লিনআপ উইন্ডো</span>
+                </div>
+              </button>
+
               <button type="button" class="cyber-action-btn" onclick="executeQuickAdminAction('flush_cache')">
                 <div class="btn-icon">🧹</div>
                 <div class="btn-text">

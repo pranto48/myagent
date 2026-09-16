@@ -1,4 +1,4 @@
-﻿// ==============================================================================
+// ==============================================================================
 // Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 // Made By Arif (https://arifmahmud.com/)
 // Project: MyAgent | Version: 3.0.0
@@ -220,7 +220,16 @@ async function deleteAdminUser(username) {
 }
 
 async function executeQuickAdminAction(action) {
-  if (action === 'flush_cache') {
+  if (action === 'optimize') {
+    if (typeof optimizeMemoryStore === 'function') optimizeMemoryStore();
+    return;
+  } else if (action === 'reindex') {
+    if (typeof reindexAllDocuments === 'function') reindexAllDocuments();
+    return;
+  } else if (action === 'purge') {
+    if (typeof openPurgeMemoryModal === 'function') openPurgeMemoryModal();
+    return;
+  } else if (action === 'flush_cache') {
     showToast('ভেক্টর মেমোরি LRU ক্যাশ ফ্লাশ করা হচ্ছে...', 'info');
     try {
       const headers = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};

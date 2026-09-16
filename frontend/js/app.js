@@ -1,4 +1,4 @@
-﻿/* ==============================================================================
+/* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
  * Project: MyAgent | Version: 3.0.0
@@ -469,6 +469,19 @@ function exportChatConversation() {
 
 // Quick Productivity Action Prompt Handlers
 function useProductivityAction(actionType) {
+  if (actionType === 'optimize_memory') {
+    if (typeof optimizeMemoryStore === 'function') optimizeMemoryStore();
+    return;
+  }
+  if (actionType === 'smart_reindex') {
+    if (typeof reindexAllDocuments === 'function') reindexAllDocuments();
+    return;
+  }
+  if (actionType === 'purge_memory') {
+    if (typeof openPurgeMemoryModal === 'function') openPurgeMemoryModal();
+    return;
+  }
+
   const input = document.getElementById('chat-input');
   if (!input) return;
 
@@ -696,6 +709,27 @@ async function sendMessage() {
 
   let prompt = input.value.trim();
   const hasAttachments = attachedChatFiles && attachedChatFiles.length > 0;
+
+  // Instant Memory Productivity Directives / Slash Commands
+  const lowerPrompt = prompt.toLowerCase();
+  if (['/optimize', 'optimize memory', '/অপ্টিমাইজ', 'মেমোরি অপ্টিমাইজ'].includes(lowerPrompt) || ['/অপ্টিমাইজ', 'মেমোরি অপ্টিমাইজ'].includes(prompt)) {
+    input.value = '';
+    autoResizeTextarea(input);
+    if (typeof optimizeMemoryStore === 'function') optimizeMemoryStore();
+    return;
+  }
+  if (['/reindex', 'smart reindex', 'reindex', '/রিইনডেক্স', 'স্মার্ট রি-ইনডেক্স'].includes(lowerPrompt) || ['/রিইনডেক্স', 'স্মার্ট রি-ইনডেক্স'].includes(prompt)) {
+    input.value = '';
+    autoResizeTextarea(input);
+    if (typeof reindexAllDocuments === 'function') reindexAllDocuments();
+    return;
+  }
+  if (['/purge', 'purge memory', '/পার্জ', 'মেমোরি পার্জ'].includes(lowerPrompt) || ['/পার্জ', 'মেমোরি পার্জ'].includes(prompt)) {
+    input.value = '';
+    autoResizeTextarea(input);
+    if (typeof openPurgeMemoryModal === 'function') openPurgeMemoryModal();
+    return;
+  }
 
   if (!prompt && !hasAttachments) {
     input.focus();
