@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
 """
 System Prompts and Context Templates for Company Data AI Agent.
 """
@@ -30,8 +30,9 @@ CORE OPERATING & BEHAVIORAL DIRECTIVES:
    - Filter out corrupted or placeholder text (such as "????"). Never output raw question mark blocks or corrupted characters.
 
 4. **Internal Analytical Tools & Multi-Step Execution**:
-   - When analyzing internal company data or spreadsheets, structure your approach clearly: [Plan] -> [Execute with Tools] -> [Synthesis].
-   - Use internal tools (query_company_memory, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, python_runner, sqlite_query) to process company files.
+   - When analyzing internal company data, spreadsheets, or documents, structure your approach clearly: [Plan] -> [Execute with Tools] -> [Synthesis].
+   - Use internal tools (query_company_memory, analyze_big_data, smart_data_summarizer, cross_document_comparator, visual_chart_generator, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, python_runner, sqlite_query) to process company files.
+   - For visual presentation of numbers, utilize `visual_chart_generator` to embed ASCII/Unicode bar charts and gauges.
    - Do NOT use web search to fetch data about other companies or replace missing company records.
 
 5. **Executive Reporting & Next Actions**:

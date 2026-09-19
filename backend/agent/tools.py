@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
 import os
 import sys
 import math
@@ -39,7 +39,7 @@ class AgentTools:
 
     @staticmethod
     async def web_search(query: str) -> str:
-        """Autonomous live web search using DuckDuckGo Instant Answers."""
+        """Autonomous live web search using DuckDuckGo Instant Answers with resilient HTML fallback."""
         try:
             url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1"
             async with httpx.AsyncClient(timeout=6.0) as client:
@@ -52,6 +52,23 @@ class AgentTools:
                     related = [t.get("Text", "") for t in data.get("RelatedTopics", []) if "Text" in t]
                     if related:
                         return f"[ওয়েব সার্চ ফলাফল]: {related[0]}"
+            
+            # Resilient HTML fallback search
+            html_url = "https://html.duckduckgo.com/html/"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            async with httpx.AsyncClient(timeout=8.0, headers=headers) as client:
+                resp = await client.post(html_url, data={"q": query})
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    results = []
+                    for r in soup.select(".result__body")[:4]:
+                        snippet = r.select_one(".result__snippet")
+                        title = r.select_one(".result__title")
+                        if snippet and snippet.text.strip():
+                            t_text = title.text.strip() if title else "Source"
+                            results.append(f"- **{t_text}**: {snippet.text.strip()}")
+                    if results:
+                        return f"=== [ওয়েব সার্চ ফলাফল: {query}] ===\n" + "\n".join(results)
             return f"DuckDuckGo-তে '{query}' সম্পর্কে কোনো সরাসরি উত্তর পাওয়া যায়নি।"
         except Exception as e:
             return f"Web search service error: {str(e)}"
@@ -88,16 +105,50 @@ class AgentTools:
     def python_runner(code: str) -> str:
         """
         Executes Python code or mathematical expressions in a constrained execution sandbox.
-        Useful for complex statistics, business calculations, financial formulas, and date math.
+        Equipped with standard data science modules: pandas, numpy, datetime, statistics, re, math.
         """
         import io
+        import re
+        import csv
+        import datetime
+        import statistics
+        import collections
+        import itertools
         import contextlib
+
+        def load_dataset(filename_or_path: str):
+            """Helper to load any CSV, TSV, or Excel file into a pandas DataFrame."""
+            import pandas as pd
+            target = filename_or_path
+            if not os.path.isabs(target):
+                for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads"), os.path.join(settings.DATA_DIR, "reports")]:
+                    cand = os.path.join(d, filename_or_path)
+                    if os.path.exists(cand):
+                        target = cand
+                        break
+            if not os.path.exists(target):
+                raise FileNotFoundError(f"Dataset '{filename_or_path}' not found in data directories.")
+            ext = os.path.splitext(target)[1].lower()
+            if ext in [".xlsx", ".xls"]:
+                return pd.read_excel(target)
+            elif ext == ".tsv":
+                return pd.read_csv(target, sep="\t")
+            elif ext == ".json":
+                return pd.read_json(target)
+            return pd.read_csv(target)
 
         stdout_capture = io.StringIO()
         safe_globals = {
             "math": math,
             "json": json,
             "time": time,
+            "re": re,
+            "csv": csv,
+            "datetime": datetime,
+            "statistics": statistics,
+            "collections": collections,
+            "itertools": itertools,
+            "load_dataset": load_dataset,
             "len": len,
             "range": range,
             "min": min,
@@ -114,8 +165,24 @@ class AgentTools:
             "str": str,
             "int": int,
             "float": float,
-            "bool": bool
+            "bool": bool,
+            "print": print
         }
+
+        # Inject pandas and numpy if available
+        try:
+            import pandas as pd
+            safe_globals["pd"] = pd
+            safe_globals["pandas"] = pd
+        except Exception:
+            pass
+
+        try:
+            import numpy as np
+            safe_globals["np"] = np
+            safe_globals["numpy"] = np
+        except Exception:
+            pass
 
         # Try evaluating as an expression first
         try:
@@ -132,7 +199,7 @@ class AgentTools:
             output = stdout_capture.getvalue().strip()
             return f"[Output]:\n{output}" if output else "[Code executed successfully with no stdout output]"
         except Exception as e:
-            return f"Python Execution Error: {str(e)}"
+            return f"Python Execution Error: {type(e).__name__}: {str(e)}"
 
     @staticmethod
     def calculate(expression: str) -> str:
@@ -464,6 +531,176 @@ class AgentTools:
         except Exception as e:
             return f"System info error: {str(e)}"
 
+    @staticmethod
+    def smart_data_summarizer(filepath: str) -> str:
+        """
+        Deep automated statistical profiler for tabular data (CSV, TSV, Excel, JSON).
+        Returns dataset dimensions, column types, null counts, numeric statistics, and top categories.
+        """
+        try:
+            import pandas as pd
+            target_path = filepath
+            if not os.path.isabs(target_path):
+                for root_dir in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads"), os.path.join(settings.DATA_DIR, "reports")]:
+                    cand = os.path.join(root_dir, filepath)
+                    if os.path.exists(cand):
+                        target_path = cand
+                        break
+            if not os.path.exists(target_path):
+                return f"Dataset file '{filepath}' not found in data directories."
+
+            ext = os.path.splitext(target_path)[1].lower()
+            if ext in [".xlsx", ".xls"]:
+                df = pd.read_excel(target_path)
+            elif ext == ".tsv":
+                df = pd.read_csv(target_path, sep="\t")
+            elif ext == ".json":
+                df = pd.read_json(target_path)
+            else:
+                df = pd.read_csv(target_path)
+
+            rows, cols = df.shape
+            mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2)
+            null_count = int(df.isnull().sum().sum())
+            null_pct = round((null_count / max(rows * cols, 1)) * 100, 2)
+
+            res = [
+                f"=== 📊 স্মার্ট ডাটা প্রোফাইল: {os.path.basename(target_path)} ===",
+                f"- মোট সারি (Rows): {rows:,}",
+                f"- মোট কলাম (Columns): {cols}",
+                f"- মেমোরি ব্যবহার: {mem_mb} MB",
+                f"- মোট মিসিং মান (Nulls): {null_count:,} ({null_pct}%)\n",
+                "### কলাম বিবরণ ও পরিসংখ্যান:"
+            ]
+
+            num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+            cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+            date_cols = df.select_dtypes(include=["datetime"]).columns.tolist()
+
+            if num_cols:
+                res.append("\n**📈 সংখ্যাবাচক কলাম (Numeric KPIs):**")
+                stats_df = df[num_cols].describe().T[["min", "mean", "50%", "max"]].rename(columns={"50%": "median"}).round(2)
+                res.append(stats_df.to_markdown())
+
+            if cat_cols:
+                res.append("\n**🏷️ ক্যাটাগরিক্যাল কলাম (Categories & Top Values):**")
+                for c in cat_cols[:8]:
+                    n_uniq = df[c].nunique()
+                    top_vals = df[c].value_counts().head(3).to_dict()
+                    top_str = ", ".join([f"{k} ({v})" for k, v in top_vals.items()])
+                    res.append(f"- **{c}** ({n_uniq} unique): {top_str}")
+
+            if date_cols:
+                res.append("\n**📅 তারিখ কলাম (Date Ranges):**")
+                for c in date_cols:
+                    res.append(f"- **{c}**: {df[c].min()} থেকে {df[c].max()}")
+
+            return "\n".join(res)
+        except Exception as e:
+            return f"Error profiling dataset: {str(e)}"
+
+    @staticmethod
+    def cross_document_comparator(doc1_path: str, doc2_path: str, topic: Optional[str] = None) -> str:
+        """
+        Cross-examines and compares two corporate documents, policies, or datasets.
+        Identifies structural differences, size, key overlapping topics, and differences.
+        """
+        try:
+            def extract_text(path: str) -> str:
+                ext = os.path.splitext(path)[1].lower()
+                if ext == ".pdf":
+                    return AgentTools.read_pdf_document(path, max_pages=20)
+                elif ext in [".docx", ".doc"]:
+                    return AgentTools.read_word_document(path)
+                elif ext in [".xlsx", ".xls"]:
+                    return AgentTools.read_excel_spreadsheet(path, max_rows=50)
+                else:
+                    return AgentTools.fs_read_file(path, max_chars=10000)
+
+            t1 = extract_text(doc1_path)
+            t2 = extract_text(doc2_path)
+
+            b1 = os.path.basename(doc1_path)
+            b2 = os.path.basename(doc2_path)
+
+            lines1 = [l.strip() for l in t1.splitlines() if l.strip() and not l.startswith("===")]
+            lines2 = [l.strip() for l in t2.splitlines() if l.strip() and not l.startswith("===")]
+
+            if topic:
+                topic_lower = topic.lower()
+                lines1 = [l for l in lines1 if topic_lower in l.lower()]
+                lines2 = [l for l in lines2 if topic_lower in l.lower()]
+
+            res = [
+                f"=== 📑 ক্রস-ডকুমেন্ট তুলনামূলক বিশ্লেষণ ===",
+                f"- **ডকুমেন্ট ১:** {b1} ({len(lines1)} প্রাসঙ্গিক লাইন)",
+                f"- **ডকুমেন্ট ২:** {b2} ({len(lines2)} প্রাসঙ্গিক লাইন)",
+            ]
+            if topic:
+                res.append(f"- **নির্দিষ্ট অনুসন্ধান বিষয়:** `{topic}`\n")
+
+            res.append(f"\n### 🔹 {b1} থেকে শীর্ষ অংশ:")
+            res.append("\n".join(lines1[:6]) if lines1 else "কোনো প্রাসঙ্গিক তথ্য পাওয়া যায়নি।")
+
+            res.append(f"\n### 🔹 {b2} থেকে শীর্ষ অংশ:")
+            res.append("\n".join(lines2[:6]) if lines2 else "কোনো প্রাসঙ্গিক তথ্য পাওয়া যায়নি।")
+
+            return "\n".join(res)
+        except Exception as e:
+            return f"Cross document comparison error: {str(e)}"
+
+    @staticmethod
+    def visual_chart_generator(
+        chart_type: str,
+        title: str,
+        data_labels: List[str],
+        data_values: List[float],
+        max_bar_width: int = 25
+    ) -> str:
+        """
+        Generates beautiful text-based Unicode/ASCII visualizations for chat responses.
+        Supported chart_types: 'bar' (horizontal bar chart), 'gauge' (progress gauges), 'sparkline' (trendline).
+        """
+        try:
+            if not data_labels or not data_values or len(data_labels) != len(data_values):
+                return "ত্রুটি: চার্টের জন্য data_labels এবং data_values একই দৈর্ঘ্যের হতে হবে।"
+
+            lines = [f"📊 **{title}**\n```"]
+            max_val = max(data_values) if data_values and max(data_values) > 0 else 1.0
+            max_lbl_len = max(len(str(lbl)) for lbl in data_labels)
+
+            if chart_type in ["bar", "horizontal_bar"]:
+                for lbl, val in zip(data_labels, data_values):
+                    ratio = max(0.0, float(val)) / max_val
+                    bar_len = int(round(ratio * max_bar_width))
+                    bar_str = "█" * bar_len + "░" * (max_bar_width - bar_len)
+                    lines.append(f"{str(lbl).ljust(max_lbl_len)} | {bar_str} {val}")
+
+            elif chart_type in ["gauge", "progress"]:
+                for lbl, val in zip(data_labels, data_values):
+                    pct = min(100.0, max(0.0, float(val)))
+                    gauge_len = int(round((pct / 100.0) * max_bar_width))
+                    gauge_str = "▓" * gauge_len + "░" * (max_bar_width - gauge_len)
+                    lines.append(f"{str(lbl).ljust(max_lbl_len)} | {gauge_str} {pct:.1f}%")
+
+            elif chart_type in ["sparkline", "trend"]:
+                ticks = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+                min_val = min(data_values)
+                val_range = max(max_val - min_val, 1e-6)
+                spark = "".join([ticks[min(7, int(((v - min_val) / val_range) * 7))] for v in data_values])
+                lines.append(f"Trend: [{spark}] (Min: {min_val}, Max: {max_val})")
+                for lbl, val in zip(data_labels, data_values):
+                    lines.append(f"  • {lbl}: {val}")
+
+            else:
+                for lbl, val in zip(data_labels, data_values):
+                    lines.append(f"{str(lbl).ljust(max_lbl_len)} : {val}")
+
+            lines.append("```")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Chart generator error: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -493,6 +730,28 @@ class AgentTools:
                     args.get("group_by"),
                     args.get("aggregate_col"),
                     args.get("agg_func", "sum")
+                )
+
+            elif tool_name == "smart_data_summarizer":
+                return cls.smart_data_summarizer(args.get("filepath", ""))
+
+            elif tool_name == "cross_document_comparator":
+                return cls.cross_document_comparator(
+                    args.get("doc1_path", ""),
+                    args.get("doc2_path", ""),
+                    args.get("topic")
+                )
+
+            elif tool_name == "visual_chart_generator":
+                labels = args.get("data_labels", [])
+                vals = [float(v) for v in args.get("data_values", [])]
+                width = int(args.get("max_bar_width", 25))
+                return cls.visual_chart_generator(
+                    args.get("chart_type", "bar"),
+                    args.get("title", "Visual Chart"),
+                    labels,
+                    vals,
+                    width
                 )
 
             elif tool_name == "generate_data_report":
@@ -714,6 +973,54 @@ class AgentTools:
                             "db_name": {"type": "string", "description": "Database filename, default: chat_history.db"}
                         },
                         "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "smart_data_summarizer",
+                    "description": "Deep automated statistical profiler for tabular data (CSV, TSV, Excel, JSON). Returns dimensions, missing value ratios, numeric KPIs, and category distributions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Filename or path of dataset (e.g. sales.csv, accounts.xlsx)"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "cross_document_comparator",
+                    "description": "Cross-examines and compares two corporate documents, policies, or spreadsheets. Identifies structural differences, size, key overlapping topics, and differences.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "doc1_path": {"type": "string", "description": "Path or filename of first document"},
+                            "doc2_path": {"type": "string", "description": "Path or filename of second document"},
+                            "topic": {"type": "string", "description": "Optional specific topic or keyword to focus the comparison on"}
+                        },
+                        "required": ["doc1_path", "doc2_path"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "visual_chart_generator",
+                    "description": "Generates text-based Unicode/ASCII visualizations (bar charts, gauges, trendlines) for immediate visual presentation in chat responses.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "chart_type": {"type": "string", "enum": ["bar", "gauge", "sparkline"], "description": "Type of chart: 'bar' (horizontal bar), 'gauge' (progress %), 'sparkline' (trend line)"},
+                            "title": {"type": "string", "description": "Chart title"},
+                            "data_labels": {"type": "array", "items": {"type": "string"}, "description": "List of category labels"},
+                            "data_values": {"type": "array", "items": {"type": "number"}, "description": "List of numeric values corresponding to labels"},
+                            "max_bar_width": {"type": "integer", "description": "Maximum width in characters (default 25)"}
+                        },
+                        "required": ["chart_type", "title", "data_labels", "data_values"]
                     }
                 }
             },

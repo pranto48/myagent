@@ -1,5 +1,5 @@
 # ==============================================================================
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.1.0
 # MyAgent - PowerShell Deployment Script (Port: 3399)
 # ==============================================================================
 

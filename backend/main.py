@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 3.0.0
+# Project: MyAgent | Version: 3.1.0
 # ==============================================================================
 
 import logging
@@ -40,7 +40,7 @@ logger = logging.getLogger("myagent.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle initialization for vector store, persistent databases, and MCP registry."""
-    logger.info(f"Starting {settings.AGENT_NAME} v3.0.0 on port {settings.WEB_PORT}...")
+    logger.info(f"Starting {settings.AGENT_NAME} v3.1.0 on port {settings.WEB_PORT}...")
 
     # Warm up ChromaDB and FTS5
     try:
@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",
     description="Enterprise AI Agent with Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
-    version="3.0.0",
+    version="3.1.0",
     lifespan=lifespan
 )
 

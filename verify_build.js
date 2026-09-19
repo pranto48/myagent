@@ -2,7 +2,7 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 3.0.0
+ * Project: MyAgent | Version: 3.1.0
  * Autonomous Pre-Flight Build and Verification Script (Node.js Engine)
  * ============================================================================== */
 
@@ -29,8 +29,8 @@ function logWarn(msg) {
 }
 
 function checkVersionAlignment() {
-  console.log('\n[1/5] Checking Unified Version Alignment across Codebase (v3.0.0)...');
-  const expectedVersion = '3.0.0';
+  console.log('\n[1/5] Checking Unified Version Alignment across Codebase (v3.1.0)...');
+  const expectedVersion = '3.1.0';
 
   // 1. VERSION file
   const versionFile = path.join(ROOT_DIR, 'VERSION');
@@ -229,7 +229,7 @@ function checkFrontendAssets() {
 
 function main() {
   console.log('='.repeat(70));
-  console.log('🚀 MyAgent v3.0.0 Enterprise Pre-Flight Build Verification');
+  console.log('🚀 MyAgent v3.1.0 Enterprise Pre-Flight Build Verification');
   console.log('='.repeat(70));
 
   checkVersionAlignment();
@@ -244,7 +244,7 @@ function main() {
     ERRORS.forEach(err => console.log(`   • ${err}`));
     process.exit(1);
   } else {
-    console.log('\x1b[32m✅ ALL CHECKS PASSED (100% READY FOR v3.0.0 PRODUCTION ROLLOUT)\x1b[0m');
+    console.log('\x1b[32m✅ ALL CHECKS PASSED (100% READY FOR v3.1.0 PRODUCTION ROLLOUT)\x1b[0m');
     console.log('Target Server: http://192.168.9.9:3399 | Backend: http://192.168.9.9:8000');
     console.log('='.repeat(70));
     process.exit(0);

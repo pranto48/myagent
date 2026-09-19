@@ -1,7 +1,7 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 3.0.0
+ * Project: MyAgent | Version: 3.1.0
  * ============================================================================== */
 
 // Main Application Logic, Mobile Drawer, Chat Streaming & UI Interactions
@@ -857,6 +857,7 @@ async function sendMessage() {
 
   let assistantContent = '';
   let citations = [];
+  let thoughtContent = '';
 
   try {
     const headers = typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' };
@@ -899,7 +900,13 @@ async function sendMessage() {
             const data = JSON.parse(jsonStr);
             if (data.type === 'sources') {
               citations = data.sources || [];
+            } else if (data.type === 'thought') {
+              thoughtContent += data.thought;
+              updateAssistantThought(assistantBubble, thoughtContent, true);
             } else if (data.type === 'tool_call') {
+              if (thoughtContent) {
+                updateAssistantThought(assistantBubble, thoughtContent, false);
+              }
               const callingLabel = typeof t === 'function' ? t('calling_tool', 'টুল কল করা হচ্ছে:') : 'টুল কল করা হচ্ছে:';
               assistantContent += `\n\n⚙️ *[${callingLabel} **${data.name}**...]*\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
@@ -908,6 +915,9 @@ async function sendMessage() {
               assistantContent += `\n> 💡 **[${data.name} ${resLabel}]:**\n> \`\`\`\n> ${escapeHtml(data.result).slice(0, 500)}\n> \`\`\`\n\n`;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'token') {
+              if (thoughtContent) {
+                updateAssistantThought(assistantBubble, thoughtContent, false);
+              }
               assistantContent += data.token;
               updateAssistantMessage(assistantBubble, assistantContent, true);
             } else if (data.type === 'memory_saved') {
@@ -929,7 +939,10 @@ async function sendMessage() {
       }
     }
 
-    // Finalize assistant message
+    // Finalize assistant message and reasoning box
+    if (thoughtContent) {
+      updateAssistantThought(assistantBubble, thoughtContent, false);
+    }
     const doneFallback = typeof getAppLanguage === 'function' && getAppLanguage() === 'en' ? 'Response completed.' : 'উত্তর প্রক্রিয়া সম্পন্ন হয়েছে।';
     updateAssistantMessage(assistantBubble, assistantContent || doneFallback, false, citations);
     conversationHistory.push({ role: 'assistant', content: assistantContent });
@@ -959,6 +972,72 @@ async function sendMessage() {
     }
     attachChatEventListeners();
     input.focus();
+  }
+}
+
+function toggleReasoning(btn) {
+  if (!btn) return;
+  const container = btn.closest('.reasoning-container');
+  if (container) {
+    container.classList.toggle('collapsed');
+    container.dataset.manuallyOpened = container.classList.contains('collapsed') ? '' : 'true';
+  }
+}
+
+function updateAssistantThought(messageEl, thoughtText, isThinking = false) {
+  if (!messageEl || !thoughtText) return;
+  const bubble = messageEl.querySelector('.message-bubble');
+  if (!bubble) return;
+
+  let container = bubble.querySelector('.reasoning-container');
+  const isEn = typeof getAppLanguage === 'function' && getAppLanguage() === 'en';
+  const headingText = typeof t === 'function' ? t('thought_heading', isEn ? 'AI Reasoning & Thinking Process' : 'এআই চিন্তাভাবনা ও যুক্তিপ্রক্রিয়া') : (isEn ? 'AI Reasoning & Thinking Process' : 'এআই চিন্তাভাবনা ও যুক্তিপ্রক্রিয়া');
+  const statusActive = typeof t === 'function' ? t('thought_status_thinking', isEn ? 'Thinking...' : 'চিন্তা করছে...') : (isEn ? 'Thinking...' : 'চিন্তা করছে...');
+  const statusDone = typeof t === 'function' ? t('thought_status_done', isEn ? 'Reasoning completed' : 'যুক্তি বিশ্লেষণ সম্পন্ন') : (isEn ? 'Reasoning completed' : 'যুক্তি বিশ্লেষণ সম্পন্ন');
+
+  if (!container) {
+    container = document.createElement('div');
+    container.className = `reasoning-container ${isThinking ? 'active-thinking' : 'collapsed'}`;
+    container.innerHTML = `
+      <button type="button" class="reasoning-toggle" onclick="toggleReasoning(this)">
+        <div class="reasoning-header-left">
+          <span class="reasoning-brain-icon">🧠</span>
+          <span class="reasoning-title">${escapeHtml(headingText)}</span>
+        </div>
+        <div class="reasoning-header-right">
+          <span class="reasoning-badge ${isThinking ? 'active' : 'done'}">${isThinking ? '⚡ ' + escapeHtml(statusActive) : '✓ ' + escapeHtml(statusDone)}</span>
+          <span class="reasoning-arrow">▼</span>
+        </div>
+      </button>
+      <div class="reasoning-body">
+        <div class="reasoning-text">${renderMarkdown(thoughtText)}</div>
+      </div>
+    `;
+    const messageText = bubble.querySelector('.message-text');
+    if (messageText) {
+      bubble.insertBefore(container, messageText);
+    } else {
+      bubble.prepend(container);
+    }
+  } else {
+    if (isThinking) {
+      container.classList.add('active-thinking');
+      container.classList.remove('collapsed');
+    } else {
+      container.classList.remove('active-thinking');
+      if (!container.dataset.manuallyOpened) {
+        container.classList.add('collapsed');
+      }
+    }
+    const badge = container.querySelector('.reasoning-badge');
+    if (badge) {
+      badge.className = `reasoning-badge ${isThinking ? 'active' : 'done'}`;
+      badge.innerHTML = isThinking ? '⚡ ' + escapeHtml(statusActive) : '✓ ' + escapeHtml(statusDone);
+    }
+    const textEl = container.querySelector('.reasoning-text');
+    if (textEl) {
+      textEl.innerHTML = renderMarkdown(thoughtText);
+    }
   }
 }
 

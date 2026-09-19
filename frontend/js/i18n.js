@@ -1,7 +1,7 @@
 /* ==============================================================================
  * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
  * Made By Arif (https://arifmahmud.com/)
- * Project: MyAgent | Version: 3.0.0
+ * Project: MyAgent | Version: 3.1.0
  * ============================================================================== */
 
 // Internationalization (i18n) Engine: Strictly English & Bangla (Only 2 Languages)
@@ -9,7 +9,7 @@
 const I18N_TRANSLATIONS = {
   bn: {
     // Brand & App
-    app_title: "MyAgent v3.0.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স",
+    app_title: "MyAgent v3.1.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স",
     app_description: "ডকারাইজড কোম্পানি এআই এজেন্ট, পারসিসটেন্ট মেমোরি, অ্যাডমিন ড্যাশবোর্ড ও বিগ ডাটা অ্যানালিটিক্স",
 
     // Login Overlay
@@ -128,6 +128,13 @@ const I18N_TRANSLATIONS = {
     default_attach_prompt: "অনুগ্রহ করে সংযুক্ত ফাইলগুলো বিশ্লেষণ করে বিস্তারিত সারসংক্ষেপ ও অন্তর্দৃষ্টি তুলে ধরুন।",
     calling_tool: "টুল কল করা হচ্ছে:",
     tool_result: "ফলাফল",
+    thought_heading: "এআই চিন্তাভাবনা ও যুক্তিপ্রক্রিয়া",
+    thought_status_thinking: "চিন্তা করছে...",
+    thought_status_done: "যুক্তি বিশ্লেষণ সম্পন্ন",
+    thought_toggle_expand: "চিন্তাভাবনা দেখুন",
+    thought_toggle_collapse: "লুকান",
+    tool_status_running: "টুল এক্সিকিউট হচ্ছে...",
+    tool_status_completed: "টুল সম্পন্ন",
     error_prefix: "ত্রুটি:",
     stopped_by_user: "ব্যবহারকারী কর্তৃক উত্তর তৈরি থামানো হয়েছে",
     server_error_prefix: "সার্ভার সমস্যা:",
@@ -714,7 +721,7 @@ const I18N_TRANSLATIONS = {
 
   en: {
     // Brand & App
-    app_title: "MyAgent v3.0.0 - Enterprise Company AI Agent & Analytics",
+    app_title: "MyAgent v3.1.0 - Enterprise Company AI Agent & Analytics",
     app_description: "Dockerized Company AI Agent, Persistent Memory, Admin Dashboard & Big Data Analytics",
 
     // Login Overlay
@@ -833,6 +840,13 @@ const I18N_TRANSLATIONS = {
     default_attach_prompt: "Please analyze the attached files and provide a comprehensive summary and key actionable insights.",
     calling_tool: "Calling tool:",
     tool_result: "Result",
+    thought_heading: "AI Reasoning & Thinking Process",
+    thought_status_thinking: "Thinking...",
+    thought_status_done: "Reasoning completed",
+    thought_toggle_expand: "View thinking",
+    thought_toggle_collapse: "Collapse",
+    tool_status_running: "Executing tool...",
+    tool_status_completed: "Tool completed",
     error_prefix: "Error:",
     stopped_by_user: "Generation stopped by user",
     server_error_prefix: "Server error:",

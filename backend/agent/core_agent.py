@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import asyncio
@@ -110,15 +111,45 @@ class CompanyAIAgent:
 
         return False
 
+    @staticmethod
+    def _decompose_query(query: str) -> List[str]:
+        """Decomposes a multi-part user query into 1-3 focused sub-queries for higher recall."""
+        clean = query.strip()
+        if len(clean) < 18:
+            return [clean]
+
+        delimiters = [r'\band\b', r'\bএবং\b', r'\bও\b', r'\bএছাড়াও\b', r'\balso\b', r'\?', r'।', r'\n']
+        pattern = '|'.join(delimiters)
+        raw_parts = re.split(pattern, clean, flags=re.IGNORECASE)
+        sub_queries = [p.strip() for p in raw_parts if len(p.strip()) > 6]
+        if len(sub_queries) > 1:
+            return [clean] + sub_queries[:2]
+        return [clean]
+
     def _prepare_rag_context(self, prompt: str, user_role: str = "admin", has_attachments: bool = False, language: str = "bn") -> tuple[str, List[SourceCitation]]:
-        """Queries super-fast hybrid memory (< 10ms) and builds augmented prompt and citation list with DLS."""
+        """Queries super-fast hybrid memory (< 10ms) using sub-query RRF and builds augmented prompt with DLS."""
         # 1. Skip RAG completely for greetings and casual pleasantries
         if self.is_conversational_greeting(prompt):
             logger.info(f"Conversational greeting detected for '{prompt}', skipping RAG retrieval.")
             return prompt, []
 
         rag_top_k = max(settings.TOP_K_RESULTS, 6)
-        hits = self.vector_store.super_fast_search(query=prompt, top_k=rag_top_k, user_role=user_role)
+        sub_queries = self._decompose_query(prompt)
+        all_hits = []
+        seen_hit_ids = set()
+
+        for q in sub_queries:
+            sub_hits = self.vector_store.super_fast_search(query=q, top_k=rag_top_k, user_role=user_role)
+            for r_idx, h in enumerate(sub_hits):
+                hid = h.get("id") or str(h.get("content", ""))[:50]
+                if hid not in seen_hit_ids:
+                    seen_hit_ids.add(hid)
+                    rrf_score = float(h.get("score", 0.0)) + (1.0 / (60 + r_idx))
+                    h["rrf_score"] = rrf_score
+                    all_hits.append(h)
+
+        all_hits.sort(key=lambda x: x.get("rrf_score", x.get("score", 0.0)), reverse=True)
+        hits = all_hits[:rag_top_k]
         sources: List[SourceCitation] = []
 
         context_blocks = []
@@ -194,6 +225,70 @@ class CompanyAIAgent:
             query=prompt
         )
         return augmented_prompt, sources
+
+    @staticmethod
+    def _extract_text_tool_calls(text: str, turn: int) -> List[Dict[str, Any]]:
+        """
+        Robust multi-syntax parser for local models that output tool calls as text.
+        Supports:
+        1. Action: <tool_name>\nAction Input: <json/str>
+        2. Markdown JSON codeblocks with "action"/"tool"
+        3. XML-like <tool_call><name>...</name><arguments>...</arguments></tool_call>
+        4. Function calls e.g. tool_name(arg1=val1, ...)
+        """
+        calls = []
+        if not text:
+            return calls
+
+        # Format 1: Action: ... \n Action Input: ...
+        if "Action:" in text and "Action Input:" in text:
+            try:
+                lines = text.splitlines()
+                act_name = ""
+                act_input = ""
+                for line in lines:
+                    if line.strip().startswith("Action:"):
+                        act_name = line.replace("Action:", "").strip()
+                    elif line.strip().startswith("Action Input:"):
+                        act_input = line.replace("Action Input:", "").strip()
+                if act_name:
+                    calls.append({
+                        "id": f"call_react_act_{turn}_{len(calls)}",
+                        "name": act_name,
+                        "arguments": act_input or "{}"
+                    })
+            except Exception:
+                pass
+
+        # Format 2: Markdown JSON codeblock containing {"action": "...", "action_input": {...}}
+        json_pattern = re.compile(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', re.IGNORECASE)
+        for match in json_pattern.finditer(text):
+            try:
+                data = json.loads(match.group(1))
+                tool_name = data.get("action") or data.get("tool") or data.get("name")
+                if tool_name and isinstance(tool_name, str):
+                    args = data.get("action_input") or data.get("args") or data.get("parameters") or data.get("arguments") or {}
+                    calls.append({
+                        "id": f"call_react_json_{turn}_{len(calls)}",
+                        "name": tool_name.strip(),
+                        "arguments": json.dumps(args) if isinstance(args, dict) else str(args)
+                    })
+            except Exception:
+                pass
+
+        # Format 3: Tag format: <tool_call><name>(.*?)</name><arguments>(.*?)</arguments></tool_call>
+        tag_pattern = re.compile(r'<tool_call>\s*<name>(.*?)</name>\s*<arguments>(.*?)</arguments>\s*</tool_call>', re.DOTALL | re.IGNORECASE)
+        for match in tag_pattern.finditer(text):
+            t_name = match.group(1).strip()
+            t_args = match.group(2).strip()
+            if t_name:
+                calls.append({
+                    "id": f"call_react_tag_{turn}_{len(calls)}",
+                    "name": t_name,
+                    "arguments": t_args or "{}"
+                })
+
+        return calls
 
     async def stream_chat(
         self,
@@ -329,7 +424,20 @@ class CompanyAIAgent:
             system_content += "\n\nCRITICAL LANGUAGE DIRECTIVE: The user has selected Bangla as their preferred interface language. Generate all your final responses, insights, analyses, and citations in natural, professional, and elegant Bangla (বাংলা)."
 
         # Add tool usage instructions into system prompt for models without native function calling
-        system_content += "\n\nAVAILABLE TOOLS: You have access to built-in tools (query_company_memory, python_runner, analyze_big_data, generate_data_report, read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr, fs_list_files, sqlite_query, system_info) and any connected MCP tools. NOTE: Do not search for other companies on the web. Only company internal memory and files are permitted for company operations. You may call tools using tool_calls or structured text: Action: <tool_name>\nAction Input: <json_arguments>"
+        system_content += (
+            "\n\nAVAILABLE TOOLS: You have access to the following built-in tools and any connected MCP tools:\n"
+            "- query_company_memory(query, top_k): Search internal company memory.\n"
+            "- python_runner(code): Run Python code with pandas (pd), numpy (np), datetime, statistics, and load_dataset(filename).\n"
+            "- analyze_big_data(filepath, query_type): Aggregations, summaries, and correlations on CSV/Excel/JSON.\n"
+            "- smart_data_summarizer(filepath): In-depth statistical profile, null checks, and KPI summary of tabular datasets.\n"
+            "- cross_document_comparator(doc1_path, doc2_path, topic): Compare two internal documents or policies.\n"
+            "- visual_chart_generator(chart_type, title, data_labels, data_values): Render ASCII/Unicode bar charts, gauges, sparklines.\n"
+            "- generate_data_report(title, report_markdown, filename): Save executive markdown report.\n"
+            "- read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr: Multi-format readers.\n"
+            "- fs_list_files, fs_read_file, fs_write_file, sqlite_query, system_info, web_search, web_scrape.\n\n"
+            "MULTI-STEP REASONING: Plan complex tasks step by step. You may call tools iteratively. If a tool reports an error, analyze the error and retry with corrected code/arguments. "
+            "To execute a tool via text if function calling is unavailable, use: Action: <tool_name>\nAction Input: <json_or_args> or ```json {\"action\": \"<tool_name>\", \"action_input\": {...}} ```"
+        )
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -342,8 +450,8 @@ class CompanyAIAgent:
 
         tools_schema = await AgentTools.get_all_tools_schema()
 
-        # Tool calling loop (up to 3 tool turns)
-        max_tool_turns = 3
+        # Multi-turn autonomous tool execution loop (up to 5 iterative reasoning turns)
+        max_tool_turns = 5
         for turn in range(max_tool_turns):
             try:
                 # First attempt with tools parameter
@@ -376,9 +484,9 @@ class CompanyAIAgent:
                                     "👋 **Hello! I am MyAgent AI** — your enterprise intelligence and productivity assistant.\n\n"
                                     "How can I help you today? Here are my core capabilities:\n\n"
                                     "- 📁 **Multi-format File Analysis:** PDF, Word (DOCX), Excel spreadsheets, and Image OCR reading.\n"
-                                    "- 📊 **Big Data & Table Summary:** Business dataset statistics and trend analysis.\n"
+                                    "- 📊 **Big Data & Table Summary:** Business dataset statistics, smart profiling, and trend analysis.\n"
                                     "- 🔍 **Company Knowledge Base Search:** Instantly retrieve internal policies, documents, and files.\n"
-                                    "- ⚡ **Automated Executive Reports:** Generate deep reviews and action plans in one click.\n\n"
+                                    "- ⚡ **Automated Executive Reports & Charts:** Generate deep reviews and visualizations in one click.\n\n"
                                     "Feel free to ask a question or attach a file to begin analysis!"
                                 )
                             else:
@@ -386,9 +494,9 @@ class CompanyAIAgent:
                                     "👋 **হ্যালো! আমি MyAgent AI** — আপনার এন্টারপ্রাইজ ইন্টেলিজেন্স ও প্রোডাক্টিভিটি অ্যাসিস্ট্যান্ট।\n\n"
                                     "আমি আপনাকে কীভাবে সাহায্য করতে পারি? আমার প্রধান ক্ষমতা ও সুবিধাগুলো:\n\n"
                                     "- 📁 **মাল্টি-ফরম্যাট ফাইল বিশ্লেষণ:** PDF, Word (DOCX), Excel স্প্রেডশিট ও ইমেজ OCR পাঠ।\n"
-                                    "- 📊 **বিগ ডেটা ও টেবিল সামারি:** ব্যবসায়িক ডেটাসেট পরিসংখ্যান ও ট্রেন্ড বিশ্লেষণ।\n"
+                                    "- 📊 **বিগ ডেটা ও টেবিল সামারি:** ব্যবসায়িক ডেটাসেট পরিসংখ্যান, স্মার্ট প্রোফাইলিং ও ট্রেন্ড বিশ্লেষণ।\n"
                                     "- 🔍 **কোম্পানি নলেজবেস অনুসন্ধান:** অভ্যন্তরীণ পলিসি, ডকুমেন্ট ও ফাইল তাৎক্ষণিক খুঁজে বের করা।\n"
-                                    "- ⚡ **অটোমেটেড এক্সিকিউটিভ রিপোর্ট:** এক ক্লিকে গভীর পর্যালোচনা ও অ্যাকশন প্ল্যান তৈরি।\n\n"
+                                    "- ⚡ **অটোমেটেড এক্সিকিউটিভ রিপোর্ট ও চার্ট:** এক ক্লিকে গভীর পর্যালোচনা ও অ্যাকশন প্ল্যান তৈরি।\n\n"
                                     "আপনার প্রয়োজনীয় প্রশ্নটি লিখুন অথবা ফাইল আপলোড করে বিশ্লেষণ শুরু করুন!"
                                 )
                         elif sources:
@@ -400,7 +508,7 @@ class CompanyAIAgent:
                                 )
                                 for s in sources:
                                     fallback_reply += f"> **📄 {s.source} (Page {s.page}):**\n> {s.content}\n\n"
-                                fallback_reply += f"💡 *For AI-generated synthesis, please ensure the LM Studio / LLM server is running (`{settings.LLM_BASE_URL}`) or configure an active server in System Settings (⚙️).*"
+                                    fallback_reply += f"💡 *For AI-generated synthesis, please ensure the LM Studio / LLM server is running (`{settings.LLM_BASE_URL}`) or configure an active server in System Settings (⚙️).*"
                             else:
                                 fallback_reply = (
                                     f"⚠️ **[এলএলএম সার্ভার অফলাইন - মেমোরি নলেজ রেসপন্স]**\n\n"
@@ -409,7 +517,7 @@ class CompanyAIAgent:
                                 )
                                 for s in sources:
                                     fallback_reply += f"> **📄 {s.source} (পৃষ্ঠা {s.page}):**\n> {s.content}\n\n"
-                                fallback_reply += f"💡 *এআই মডেলের মাধ্যমে আরও বিশদ উত্তরের জন্য অনুগ্রহ করে LM Studio সার্ভারটি চালু করুন (`192.168.20.10:1234`) অথবা সিস্টেম সেটিংস (⚙️) থেকে সক্রিয় কোনো সার্ভার সেট করুন।*"
+                                    fallback_reply += f"💡 *এআই মডেলের মাধ্যমে আরও বিশদ উত্তরের জন্য অনুগ্রহ করে LM Studio সার্ভারটি চালু করুন (`192.168.20.10:1234`) অথবা সিস্টেম সেটিংস (⚙️) থেকে সক্রিয় কোনো সার্ভার সেট করুন।*"
                         else:
                             if language == "en":
                                 fallback_reply = (
@@ -433,7 +541,6 @@ class CompanyAIAgent:
                                     f"2. LM Studio-তে **'Serve on Local Network'** অন রাখুন যাতে অন্য ডিভাইস বা ডকার সার্ভার (`192.168.9.9`) থেকে সংযোগ গ্রহণ করতে পারে।\n"
                                     f"3. অথবা অ্যাডমিন প্যানেলের **সিস্টেম সেটিংস (⚙️)** থেকে সক্রিয় কোনো সার্ভার URL সেট করুন।"
                                 )
-                        # Stream fallback reply smoothly
                         for word in fallback_reply.split(" "):
                             yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
                             await asyncio.sleep(0.015)
@@ -443,9 +550,10 @@ class CompanyAIAgent:
                         yield f"data: {json.dumps({'type': 'error', 'error': f'LLM Server Error: {err_str}'})}\n\n"
                         return
 
-            tool_calls_detected = []
-            current_tool_call = {"id": "", "name": "", "arguments": ""}
+            # Tool calls mapping by index to avoid concatenating multiple parallel tools
+            tool_calls_map: Dict[int, Dict[str, Any]] = {}
             full_assistant_message = ""
+            in_thought_mode = False
 
             try:
                 async for chunk in stream:
@@ -453,88 +561,96 @@ class CompanyAIAgent:
                         continue
                     delta = chunk.choices[0].delta
 
-                    # Handle native OpenAI tool calling
+                    # Handle native OpenAI tool calling (parallel-safe)
                     if hasattr(delta, "tool_calls") and delta.tool_calls:
                         for tc in delta.tool_calls:
+                            idx = getattr(tc, "index", 0)
+                            if idx not in tool_calls_map:
+                                tool_calls_map[idx] = {
+                                    "id": tc.id or f"call_{idx}",
+                                    "name": "",
+                                    "arguments": ""
+                                }
                             if tc.id:
-                                current_tool_call["id"] = tc.id
+                                tool_calls_map[idx]["id"] = tc.id
                             if tc.function and tc.function.name:
-                                current_tool_call["name"] += tc.function.name
+                                tool_calls_map[idx]["name"] += tc.function.name
                             if tc.function and tc.function.arguments:
-                                current_tool_call["arguments"] += tc.function.arguments
+                                tool_calls_map[idx]["arguments"] += tc.function.arguments
 
-                    # Regular token delta
+                    # Regular token delta with live thought streaming support (<think> tags)
                     if delta and delta.content:
                         token = delta.content
                         full_assistant_message += token
-                        token_payload = json.dumps({"type": "token", "token": token})
-                        yield f"data: {token_payload}\n\n"
 
-                # Check if native tool was invoked
-                if current_tool_call["name"]:
-                    tool_calls_detected.append(current_tool_call)
+                        if "<think>" in token:
+                            in_thought_mode = True
+                            parts = token.split("<think>", 1)
+                            if parts[0]:
+                                yield f"data: {json.dumps({'type': 'token', 'token': parts[0]})}\n\n"
+                            if len(parts) > 1 and parts[1]:
+                                yield f"data: {json.dumps({'type': 'thought', 'thought': parts[1]})}\n\n"
+                            continue
+                        elif "</think>" in token:
+                            in_thought_mode = False
+                            parts = token.split("</think>", 1)
+                            if parts[0]:
+                                yield f"data: {json.dumps({'type': 'thought', 'thought': parts[0]})}\n\n"
+                            if len(parts) > 1 and parts[1]:
+                                yield f"data: {json.dumps({'type': 'token', 'token': parts[1]})}\n\n"
+                            continue
 
-                # ReAct fallback check in text output (e.g. Action: web_search \n Action Input: {...})
-                if not tool_calls_detected and "Action:" in full_assistant_message and "Action Input:" in full_assistant_message:
-                    try:
-                        lines = full_assistant_message.splitlines()
-                        act_name = ""
-                        act_input_str = ""
-                        for line in lines:
-                            if line.strip().startswith("Action:"):
-                                act_name = line.replace("Action:", "").strip()
-                            elif line.strip().startswith("Action Input:"):
-                                act_input_str = line.replace("Action Input:", "").strip()
-                        if act_name:
-                            tool_calls_detected.append({
-                                "id": f"call_react_{turn}",
-                                "name": act_name,
-                                "arguments": act_input_str or "{}"
-                            })
-                    except Exception as pe:
-                        logger.debug(f"ReAct parse notice: {pe}")
+                        if in_thought_mode:
+                            yield f"data: {json.dumps({'type': 'thought', 'thought': token})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
-                # If no tools called, we are done
+                tool_calls_detected = [tc for tc in tool_calls_map.values() if tc.get("name")]
+
+                # Fallback ReAct check in text output using multi-syntax parser
+                if not tool_calls_detected:
+                    tool_calls_detected = self._extract_text_tool_calls(full_assistant_message, turn)
+
+                # If no tools were called, stream done event and finish
                 if not tool_calls_detected:
                     yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
                     return
 
-                # Execute discovered tools
+                # Execute all detected tools
                 for tc in tool_calls_detected:
-                    fn_name = tc["name"]
+                    fn_name = tc["name"].strip()
                     try:
                         fn_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
                     except Exception:
-                        fn_args = {"query": tc["arguments"]} if "search" in fn_name else {}
+                        raw_args = tc.get("arguments", "")
+                        fn_args = {"query": raw_args} if ("search" in fn_name or "query" in fn_name) else {"code": raw_args} if "python" in fn_name else {}
 
                     # Notify frontend that tool execution started
-                    tool_call_payload = json.dumps({
-                        "type": "tool_call",
-                        "name": fn_name,
-                        "args": fn_args
-                    })
-                    yield f"data: {tool_call_payload}\n\n"
+                    yield f"data: {json.dumps({'type': 'tool_call', 'name': fn_name, 'args': fn_args})}\n\n"
 
                     # Execute tool locally or via MCP
                     tool_output = await AgentTools.dispatch_tool(fn_name, fn_args)
 
-                    # Notify frontend of tool output
-                    tool_res_payload = json.dumps({
-                        "type": "tool_result",
-                        "name": fn_name,
-                        "result": tool_output[:1200] if len(tool_output) > 1200 else tool_output
-                    })
-                    yield f"data: {tool_res_payload}\n\n"
+                    # Notify frontend of tool result
+                    yield f"data: {json.dumps({'type': 'tool_result', 'name': fn_name, 'result': tool_output[:1500] if len(tool_output) > 1500 else tool_output})}\n\n"
 
-                    # Append to conversation messages for next LLM iteration
+                    # Append to conversation messages with self-healing feedback on error
                     messages.append({
                         "role": "assistant",
                         "content": f"[Invoked tool {fn_name} with arguments: {json.dumps(fn_args)}]"
                     })
-                    messages.append({
-                        "role": "user",
-                        "content": f"[Tool Observation from {fn_name}]:\n{tool_output}\n\nPlease synthesize this tool observation and continue answering the user's question."
-                    })
+
+                    is_error = tool_output.startswith(("Error", "Python Execution Error", "Big Data analysis error", "Chart generator error")) or "not found" in tool_output.lower()
+                    if is_error:
+                        messages.append({
+                            "role": "user",
+                            "content": f"[Tool Error from {fn_name}]:\n{tool_output}\n\nPlease analyze what caused this error, adjust the arguments or code, and re-try the tool execution or provide a clear resolution."
+                        })
+                    else:
+                        messages.append({
+                            "role": "user",
+                            "content": f"[Tool Observation from {fn_name}]:\n{tool_output}\n\nPlease synthesize this tool observation and continue answering the user's question."
+                        })
 
             except Exception as e:
                 logger.error(f"Error during LLM stream processing: {e}")

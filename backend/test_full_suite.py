@@ -1,7 +1,7 @@
 # ==============================================================================
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
-# Project: MyAgent | Version: 3.0.0
+# Project: MyAgent | Version: 3.1.0
 # Comprehensive Enterprise Test Suite
 # ==============================================================================
 
@@ -26,9 +26,17 @@ from security.dlp import DLPEngine, _luhn_checksum_valid
 from security.firewall import PromptFirewall
 from memory.document_loader import DocumentProcessor
 from memory.chat_session_store import ChatSessionStore
+from agent.tools import (
+    python_runner,
+    smart_data_summarizer,
+    cross_document_comparator,
+    visual_chart_generator,
+    dispatch_tool
+)
+from agent.core_agent import _extract_text_tool_calls
 
 class TestMyAgentFullSuite(unittest.TestCase):
-    """Full-coverage verification test suite for MyAgent Enterprise v3.0.0."""
+    """Full-coverage verification test suite for MyAgent Enterprise v3.1.0."""
 
     def test_01_configuration_and_branding(self):
         """Validates configuration parameters, default ports, and admin credentials."""
@@ -182,9 +190,98 @@ class TestMyAgentFullSuite(unittest.TestCase):
         self.assertTrue(len(bn_keys) >= 300, f"Expected 300+ i18n keys, found {len(bn_keys)}")
         print(f"✅ [Pass] Bilingual i18n dictionary parity verified ({len(bn_keys)} keys, 0 missing).")
 
+    def test_09_python_sandbox_and_data_science_libraries(self):
+        """Tests python_runner sandbox with safe mathematical, statistics, and datetime globals."""
+        code = (
+            "import math, statistics\n"
+            "data = [12, 18, 25, 30, 42, 55]\n"
+            "mean_val = statistics.mean(data)\n"
+            "std_val = statistics.stdev(data)\n"
+            "hypot_val = math.hypot(3, 4)\n"
+            "print(f'Mean: {mean_val:.2f}, Stdev: {std_val:.2f}, Hypot: {hypot_val}')"
+        )
+        res = python_runner(code)
+        self.assertIn("Mean: 30.33", res)
+        self.assertIn("Hypot: 5.0", res)
+        print("✅ [Pass] Python sandbox execution with statistics and math libraries verified.")
+
+    def test_10_smart_data_summarizer_and_visual_charts(self):
+        """Tests tabular dataset profiling and visual ASCII/Unicode chart generator."""
+        import tempfile
+        # 1. Test smart_data_summarizer on temporary CSV
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
+            f.write("Department,Employees,Budget_BDT\nIT,15,450000\nHR,8,180000\nMarketing,12,320000\nFinance,6,210000\n")
+            temp_csv = f.name
+
+        try:
+            summary = smart_data_summarizer(temp_csv)
+            self.assertIn("Dataset Profiling Report", summary)
+            self.assertIn("Employees", summary)
+            self.assertIn("Budget_BDT", summary)
+            print("✅ [Pass] Smart Data Summarizer statistical profiling verified.")
+        finally:
+            if os.path.exists(temp_csv):
+                os.remove(temp_csv)
+
+        # 2. Test visual_chart_generator
+        chart = visual_chart_generator(
+            chart_type="bar",
+            title="Department Budgets",
+            data_labels=["IT", "HR", "Marketing", "Finance"],
+            data_values=[450000, 180000, 320000, 210000]
+        )
+        self.assertIn("Department Budgets", chart)
+        self.assertIn("█", chart)
+        print("✅ [Pass] Visual Chart Generator horizontal bar chart verified.")
+
+    def test_11_cross_document_comparator(self):
+        """Tests semantic cross-document comparison tool."""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f1:
+            f1.write("Annual Leave Policy 2025: All employees get 20 days paid annual leave and 10 days sick leave.\nWorking hours are 9 AM to 6 PM.")
+            p1 = f1.name
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f2:
+            f2.write("Annual Leave Policy 2026: All employees get 24 days paid annual leave and 12 days sick leave.\nRemote work allowed on Thursdays.")
+            p2 = f2.name
+
+        try:
+            comp_res = cross_document_comparator(p1, p2, topic="Leave policy comparison")
+            self.assertIn("Cross-Document Comparative Analysis", comp_res)
+            self.assertIn("Leave policy comparison", comp_res)
+            print("✅ [Pass] Cross Document Comparator validated.")
+        finally:
+            for p in [p1, p2]:
+                if os.path.exists(p):
+                    os.remove(p)
+
+    def test_12_react_text_tool_call_parser(self):
+        """Tests fallback text tool parsing for local models (ReAct, JSON markdown block, XML)."""
+        # Test ReAct pattern
+        react_text = 'I need to check the data.\nAction: python_runner\nAction Input: {"code": "print(2 + 2)"}\n'
+        calls = _extract_text_tool_calls(react_text, turn=1)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["name"], "python_runner")
+        self.assertEqual(calls[0]["args"]["code"], "print(2 + 2)")
+
+        # Test markdown JSON codeblock pattern
+        json_text = '```json\n{"action": "web_search", "action_input": {"query": "OpenAI docs"}}\n```'
+        calls_json = _extract_text_tool_calls(json_text, turn=2)
+        self.assertEqual(len(calls_json), 1)
+        self.assertEqual(calls_json[0]["name"], "web_search")
+        self.assertEqual(calls_json[0]["args"]["query"], "OpenAI docs")
+
+        # Test XML pattern
+        xml_text = '<tool_call><name>visual_chart_generator</name><arguments>{"title": "Test"}</arguments></tool_call>'
+        calls_xml = _extract_text_tool_calls(xml_text, turn=3)
+        self.assertEqual(len(calls_xml), 1)
+        self.assertEqual(calls_xml[0]["name"], "visual_chart_generator")
+
+        print("✅ [Pass] ReAct / Local LLM text tool-call parser (Action, JSON, XML) verified.")
+
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🚀 Running MyAgent v3.0.0 Enterprise Test Suite")
+    print("🚀 Running MyAgent v3.1.0 Enterprise Test Suite")
     print("=" * 70)
     unittest.main(verbosity=2)
