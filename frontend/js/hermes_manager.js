@@ -10,6 +10,11 @@
 let hermesLogsAutoScroll = true;
 let hermesPairingTimer = null;
 let hermesActiveFilter = 'ALL';
+let hermesFsCurrentPath = '/opt/data';
+let hermesSessionsData = null;
+let hermesCurrentSessionFilter = 'chats';
+let hermesCurrentSessionSource = 'any';
+let hermesCurrentSessionView = 'overview';
 
 // ------------------------------------------------------------------------------
 // Helper: Authenticated fetch wrapper
@@ -27,7 +32,433 @@ async function hermesFetch(url, options = {}) {
 }
 
 // ==============================================================================
-// 1. FILES MODULE
+// 0. SESSIONS MODULE (Matching Screenshot 1)
+// ==============================================================================
+async function loadHermesSessions() {
+  const badgeCount = document.getElementById('hermes-sessions-badge-count');
+  const kpiTotal = document.getElementById('hermes-kpi-total-sess');
+  const kpiActive = document.getElementById('hermes-kpi-active-sess');
+  const kpiArchived = document.getElementById('hermes-kpi-archived-sess');
+  const kpiMessages = document.getElementById('hermes-kpi-messages-sess');
+  const kpiSources = document.getElementById('hermes-kpi-sources-sess');
+  const platformsContainer = document.getElementById('hermes-connected-platforms-list');
+  const recentSessionsContainer = document.getElementById('hermes-recent-sessions-list');
+
+  if (platformsContainer) platformsContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:10px;">লোড হচ্ছে...</div>';
+  if (recentSessionsContainer) recentSessionsContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:10px;">লোড হচ্ছে...</div>';
+
+  try {
+    const res = await hermesFetch('/api/sessions/overview');
+    const data = await res.json();
+    if (!data.success) throw new Error('Failed to load sessions');
+    hermesSessionsData = data;
+
+    if (badgeCount) badgeCount.innerText = data.active_in_store || data.total || 0;
+    if (kpiTotal) kpiTotal.innerText = data.total || 0;
+    if (kpiActive) kpiActive.innerText = data.active_in_store || 0;
+    if (kpiArchived) kpiArchived.innerText = data.archived || 0;
+    if (kpiMessages) kpiMessages.innerText = data.messages || 0;
+    if (kpiSources) kpiSources.innerText = data.sources || 1;
+
+    renderHermesPlatforms(data.connected_platforms || []);
+    renderHermesRecentSessions();
+  } catch (err) {
+    console.error('Error loading hermes sessions:', err);
+    if (platformsContainer) platformsContainer.innerHTML = '<div style="color:var(--rose-glow); font-size:0.85rem;">প্ল্যাটফর্ম লোড ব্যর্থ হয়েছে।</div>';
+    if (recentSessionsContainer) recentSessionsContainer.innerHTML = '<div style="color:var(--rose-glow); font-size:0.85rem;">সেশন লোড ব্যর্থ হয়েছে।</div>';
+  }
+}
+
+function renderHermesPlatforms(platforms) {
+  const container = document.getElementById('hermes-connected-platforms-list');
+  if (!container) return;
+  if (!platforms || platforms.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">কোনো সক্রিয় প্ল্যাটফর্ম পাওয়া যায়নি।</div>';
+    return;
+  }
+  container.innerHTML = platforms.map(p => `
+    <div class="hermes-platform-row">
+      <div class="hermes-plat-left">
+        <span class="hermes-plat-icon">📶</span>
+        <div>
+          <div class="hermes-plat-title">${escapeHtml(p.name)}</div>
+          <div class="hermes-plat-sub">Last update: ${escapeHtml(p.last_update)}</div>
+        </div>
+      </div>
+      <div class="hermes-status-pill">${escapeHtml(p.status || 'Connected')}</div>
+    </div>
+  `).join('');
+}
+
+function renderHermesRecentSessions() {
+  const container = document.getElementById('hermes-recent-sessions-list');
+  if (!container || !hermesSessionsData) return;
+
+  let list = hermesSessionsData.recent_sessions || [];
+
+  // Filter by Type
+  if (hermesCurrentSessionFilter === 'automation') {
+    list = list.filter(s => s.is_archived || s.source === 'automation');
+  } else if (hermesCurrentSessionFilter === 'chats') {
+    list = list.filter(s => !s.is_archived);
+  }
+
+  // Filter by Source
+  if (hermesCurrentSessionSource !== 'any') {
+    list = list.filter(s => s.source === hermesCurrentSessionSource);
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:12px; text-align:center;">কোনো সেশন পাওয়া যায়নি।</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(s => `
+    <div class="hermes-session-card" onclick="openSessionDirectly('${escapeHtml(s.id)}')">
+      <div>
+        <div class="hermes-sess-title">${escapeHtml(s.title || 'Untitled Session')}</div>
+        <div class="hermes-sess-meta">${escapeHtml(s.model)} · ${s.msg_count} msgs · ${escapeHtml(s.updated_at || 'just now')}</div>
+        <div class="hermes-sess-snippet">${escapeHtml(s.snippet || '')}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="hermes-tui-badge" onclick="event.stopPropagation(); openSessionDirectly('${escapeHtml(s.id)}')">
+          💾 TUI
+        </button>
+        <button type="button" class="hermes-action-icon-btn danger" onclick="event.stopPropagation(); deleteHermesSession('${escapeHtml(s.id)}')">
+          🗑️
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setHermesSessionFilter(type, btn) {
+  hermesCurrentSessionFilter = type;
+  const parent = document.getElementById('hermes-sess-type-group');
+  if (parent) {
+    parent.querySelectorAll('.hermes-filter-btn').forEach(b => b.classList.remove('active'));
+  }
+  if (btn) btn.classList.add('active');
+  renderHermesRecentSessions();
+}
+
+function filterHermesSessionsBySource(src) {
+  hermesCurrentSessionSource = src;
+  renderHermesRecentSessions();
+}
+
+function setHermesSessionView(view, btn) {
+  hermesCurrentSessionView = view;
+  const parent = document.getElementById('hermes-sess-view-group');
+  if (parent) {
+    parent.querySelectorAll('.hermes-filter-btn').forEach(b => b.classList.remove('active'));
+  }
+  if (btn) btn.classList.add('active');
+  renderHermesRecentSessions();
+}
+
+function openSessionDirectly(sessionId) {
+  if (typeof switchSession === 'function') {
+    switchSession(sessionId);
+  }
+  if (typeof switchTab === 'function') {
+    switchTab('chat');
+  }
+}
+
+async function deleteHermesSession(sessionId) {
+  if (!confirm('এই সেশনটি সম্পূর্ণ মুছে ফেলতে চান?')) return;
+  try {
+    const res = await hermesFetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showToast === 'function') showToast('সেশন মুছে ফেলা হয়েছে', 'info');
+      loadHermesSessions();
+      if (typeof loadSessionList === 'function') loadSessionList();
+    }
+  } catch (err) {
+    alert('Failed to delete session');
+  }
+}
+
+function openPruneSessionsModal() {
+  const m = document.getElementById('hermes-prune-sessions-modal');
+  if (m) m.style.display = 'flex';
+}
+function closePruneSessionsModal() {
+  const m = document.getElementById('hermes-prune-sessions-modal');
+  if (m) m.style.display = 'none';
+}
+async function executePruneSessions(e) {
+  e.preventDefault();
+  const days = parseInt(document.getElementById('prune-sess-days').value) || 30;
+  const emptyOnly = document.getElementById('prune-sess-empty-only').checked;
+
+  try {
+    const res = await hermesFetch('/api/sessions/prune', {
+      method: 'POST',
+      body: JSON.stringify({ days, empty_only: emptyOnly })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closePruneSessionsModal();
+      loadHermesSessions();
+      if (typeof loadSessionList === 'function') loadSessionList();
+      if (typeof showToast === 'function') showToast(`সফলভাবে ${data.pruned_count}টি সেশন প্রুন করা হয়েছে`, 'success');
+    }
+  } catch (err) {
+    alert('Failed to prune sessions');
+  }
+}
+
+function openImportSessionsModal() {
+  const m = document.getElementById('hermes-import-sessions-modal');
+  if (m) m.style.display = 'flex';
+}
+function closeImportSessionsModal() {
+  const m = document.getElementById('hermes-import-sessions-modal');
+  if (m) m.style.display = 'none';
+}
+function handleImportSessionFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const txtArea = document.getElementById('import-sessions-json');
+    if (txtArea) txtArea.value = evt.target.result;
+  };
+  reader.readAsText(file);
+}
+async function executeImportSessions(e) {
+  e.preventDefault();
+  const raw = document.getElementById('import-sessions-json').value.trim();
+  if (!raw) return;
+  try {
+    const payload = JSON.parse(raw);
+    const res = await hermesFetch('/api/sessions/import', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeImportSessionsModal();
+      loadHermesSessions();
+      if (typeof loadSessionList === 'function') loadSessionList();
+      if (typeof showToast === 'function') showToast(`সফলভাবে ${data.imported_count}টি সেশন ইমপোর্ট হয়েছে`, 'success');
+    }
+  } catch (err) {
+    alert('Invalid JSON format or import error');
+  }
+}
+
+// ==============================================================================
+// 1. FILESYSTEM EXPLORER (Matching Screenshot 2: Files /opt/data)
+// ==============================================================================
+async function loadHermesFilesExplorer(targetPath) {
+  if (targetPath) hermesFsCurrentPath = targetPath;
+  const path = hermesFsCurrentPath || '/opt/data';
+
+  const badge = document.getElementById('hermes-fs-header-badge');
+  const pathDisplay = document.getElementById('hermes-fs-current-path');
+  const dropPath = document.getElementById('hermes-fs-drop-path');
+  const upBtn = document.getElementById('hermes-fs-up-btn');
+  const tableBody = document.getElementById('hermes-fs-table-body');
+
+  if (badge) badge.innerText = path;
+  if (pathDisplay) pathDisplay.innerText = path;
+  if (dropPath) dropPath.innerText = path;
+
+  if (tableBody) {
+    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color:var(--text-muted);">${typeof t === 'function' ? t('hermes_loading') : 'লোড হচ্ছে...'}</td></tr>`;
+  }
+
+  try {
+    const res = await hermesFetch(`/api/hermes/fs/list?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Failed to list directory');
+
+    if (upBtn) {
+      upBtn.style.display = data.parent_path ? 'inline-flex' : 'none';
+      upBtn.setAttribute('data-parent-path', data.parent_path || '');
+    }
+
+    if (!data.items || data.items.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color:var(--text-muted);">${typeof t === 'function' ? t('hermes_files_empty') : 'কোনো ফাইল বা ফোল্ডার পাওয়া যায়নি।'}</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = data.items.map(item => `
+      <tr class="hermes-row">
+        <td>
+          <div class="hermes-row-name" onclick="${item.is_dir ? `loadHermesFilesExplorer('${escapeHtml(item.virtual_path)}')` : `downloadOrPreviewFsFile('${escapeHtml(item.virtual_path)}')`}">
+            <span class="${item.is_dir ? 'hermes-folder-icon' : 'hermes-file-icon'}">${item.is_dir ? '📁' : '📄'}</span>
+            <span>${escapeHtml(item.name)}</span>
+          </div>
+        </td>
+        <td style="font-family:'Fira Code', monospace; color:var(--text-muted); font-size:0.8rem;">${escapeHtml(item.size)}</td>
+        <td style="color:var(--text-secondary); font-size:0.8rem;">${escapeHtml(item.modified)}</td>
+        <td style="text-align:right;">
+          ${item.is_dir ? `
+            <button type="button" class="hermes-action-icon-btn" title="Open Folder" onclick="loadHermesFilesExplorer('${escapeHtml(item.virtual_path)}')">📁</button>
+          ` : `
+            <button type="button" class="hermes-action-icon-btn" title="Download File" onclick="downloadOrPreviewFsFile('${escapeHtml(item.virtual_path)}')">⬇️</button>
+          `}
+          <button type="button" class="hermes-action-icon-btn danger" title="Delete" onclick="deleteHermesFsItem('${escapeHtml(path)}', '${escapeHtml(item.name)}', ${item.is_dir})">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading filesystem:', err);
+    if (tableBody) {
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4" style="color:var(--rose-glow);">${typeof t === 'function' ? t('hermes_error_load') : 'ফাইলসিস্টেম লোড করতে ব্যর্থ হয়েছে।'}</td></tr>`;
+    }
+  }
+}
+
+function navigateHermesFsUp() {
+  const upBtn = document.getElementById('hermes-fs-up-btn');
+  const parentPath = upBtn ? upBtn.getAttribute('data-parent-path') : null;
+  if (parentPath) {
+    loadHermesFilesExplorer(parentPath);
+  }
+}
+
+function triggerHermesFsUpload() {
+  const input = document.getElementById('hermes-fs-file-input');
+  if (input) input.click();
+}
+
+async function handleHermesFsFileSelected(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+  await uploadFilesToFs(files);
+  e.target.value = '';
+}
+
+function handleHermesFsDragOver(e) {
+  e.preventDefault();
+  const dropzone = document.getElementById('hermes-fs-dropzone');
+  if (dropzone) dropzone.classList.add('drag-active');
+}
+
+function handleHermesFsDragLeave(e) {
+  e.preventDefault();
+  const dropzone = document.getElementById('hermes-fs-dropzone');
+  if (dropzone) dropzone.classList.remove('drag-active');
+}
+
+async function handleHermesFsDrop(e) {
+  e.preventDefault();
+  const dropzone = document.getElementById('hermes-fs-dropzone');
+  if (dropzone) dropzone.classList.remove('drag-active');
+
+  const files = e.dataTransfer.files;
+  if (files && files.length > 0) {
+    await uploadFilesToFs(files);
+  }
+}
+
+async function uploadFilesToFs(files) {
+  const path = hermesFsCurrentPath || '/opt/data';
+  const token = localStorage.getItem('myagent_token');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', path);
+
+    try {
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/hermes/fs/upload', {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof showToast === 'function') showToast(`${file.name} আপলোড সম্পন্ন`, 'success');
+      }
+    } catch (err) {
+      console.error('File upload failed:', err);
+      alert(`Upload failed for ${file.name}`);
+    }
+  }
+  loadHermesFilesExplorer();
+}
+
+function openHermesCreateFsItemModal() {
+  const modal = document.getElementById('hermes-create-fs-modal');
+  const pathInput = document.getElementById('hermes-create-fs-path');
+  const nameInput = document.getElementById('hermes-create-fs-name');
+  if (pathInput) pathInput.value = hermesFsCurrentPath || '/opt/data';
+  if (nameInput) nameInput.value = '';
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeHermesCreateFsItemModal() {
+  const modal = document.getElementById('hermes-create-fs-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function executeHermesCreateFsItem(e) {
+  e.preventDefault();
+  const path = document.getElementById('hermes-create-fs-path').value.trim();
+  const type = document.getElementById('hermes-create-fs-type').value;
+  const name = document.getElementById('hermes-create-fs-name').value.trim();
+
+  if (!name) return;
+
+  try {
+    const res = await hermesFetch('/api/hermes/fs/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        path,
+        name,
+        is_directory: type === 'folder'
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeHermesCreateFsItemModal();
+      loadHermesFilesExplorer();
+      if (typeof showToast === 'function') showToast(`${name} তৈরি করা হয়েছে`, 'success');
+    } else {
+      alert(data.message || 'Failed to create item');
+    }
+  } catch (err) {
+    alert('Create request failed');
+  }
+}
+
+async function deleteHermesFsItem(path, name, isDir) {
+  const msg = isDir ? `আপনি কি ফোল্ডার '${name}' এবং এর ভেতরের সবকিছু মুছে ফেলতে চান?` : `আপনি কি '${name}' মুছে ফেলতে চান?`;
+  if (!confirm(msg)) return;
+
+  try {
+    const res = await hermesFetch('/api/hermes/fs/delete', {
+      method: 'DELETE',
+      body: JSON.stringify({ path, name })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadHermesFilesExplorer();
+      if (typeof showToast === 'function') showToast(`${name} মুছে ফেলা হয়েছে`, 'info');
+    }
+  } catch (err) {
+    alert('Delete request failed');
+  }
+}
+
+function downloadOrPreviewFsFile(virtualPath) {
+  const url = `/api/hermes/fs/download?path=${encodeURIComponent(virtualPath)}`;
+  window.open(url, '_blank');
+}
+
+// ==============================================================================
+// 1. FILES MODULE (Vector Ingested Overview)
 // ==============================================================================
 async function loadHermesFiles() {
   const container = document.getElementById('hermes-files-table-body');
@@ -336,63 +767,212 @@ async function saveNewHermesCron(e) {
 }
 
 // ==============================================================================
-// 4. SKILLS MODULE
 // ==============================================================================
+// 4. SKILLS MODULE (Matching Hermes Agent Skills Hub Screenshot)
+// ==============================================================================
+let hermesSkillsState = {
+  allSkills: [],
+  categories: {},
+  filters: { all: 53, toolsets: 29, browse_hub: 0 },
+  activeFilter: 'all',
+  activeCategory: 'all',
+  searchQuery: ''
+};
+
 async function loadHermesSkills() {
-  const grid = document.getElementById('hermes-skills-grid');
-  if (!grid) return;
+  const listPane = document.getElementById('hermes-skills-list-pane');
+  if (!listPane) return;
+
+  listPane.innerHTML = `<div style="padding:28px; text-align:center; color:#64748b;">${typeof t === 'function' ? t('hermes_loading') : 'লোড হচ্ছে...'}</div>`;
 
   try {
-    const res = await hermesFetch('/api/hermes/skills');
-    const data = await res.json();
-    if (!data.success) return;
+    let url = `/api/hermes/skills?filter_type=${encodeURIComponent(hermesSkillsState.activeFilter)}`;
+    if (hermesSkillsState.activeCategory && hermesSkillsState.activeCategory !== 'all') {
+      url += `&category=${encodeURIComponent(hermesSkillsState.activeCategory)}`;
+    }
+    if (hermesSkillsState.searchQuery) {
+      url += `&search=${encodeURIComponent(hermesSkillsState.searchQuery)}`;
+    }
 
-    grid.innerHTML = data.skills.map(s => `
-      <div class="hermes-card skill-card ${s.is_enabled ? 'active-skill' : 'disabled-skill'}">
-        <div class="skill-header">
-          <div class="skill-icon-badge">${s.icon || '📦'}</div>
-          <div style="flex:1;">
-            <div class="skill-title">${escapeHtml(s.name)}</div>
-            <div class="skill-cat">${escapeHtml(s.category.toUpperCase())} ${s.is_system ? '• BUILT-IN' : ''}</div>
-          </div>
-          <label class="hermes-switch">
-            <input type="checkbox" ${s.is_enabled ? 'checked' : ''} onchange="toggleHermesSkill('${s.id}')">
-            <span class="slider round"></span>
-          </label>
-        </div>
-        <p class="skill-desc">${escapeHtml(s.description)}</p>
-        <div class="skill-instructions-preview">
-          <code>${escapeHtml(s.instructions.substring(0, 110))}...</code>
-        </div>
-        <div class="skill-footer">
-          <div class="skill-triggers">
-            ${(s.triggers || []).map(tr => `<span class="trigger-pill">${escapeHtml(tr)}</span>`).join('')}
-          </div>
-          ${!s.is_system ? `<button class="btn-icon-danger" onclick="deleteHermesSkill('${s.id}')">🗑️</button>` : ''}
-        </div>
-      </div>
-    `).join('');
+    const res = await hermesFetch(url);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Failed to fetch skills');
+
+    hermesSkillsState.allSkills = data.skills || [];
+    if (data.categories) hermesSkillsState.categories = data.categories;
+    if (data.filters) hermesSkillsState.filters = data.filters;
+
+    // 1. Update Subtitle
+    const subTitle = document.getElementById('hermes-skills-enabled-subtitle');
+    if (subTitle) {
+      subTitle.innerText = `${data.enabled_skills || 0}/${data.total_skills || 0} enabled`;
+    }
+
+    // 2. Update Filter counts
+    const countAll = document.getElementById('hermes-filter-count-all');
+    if (countAll) countAll.innerText = `(${data.filters?.all ?? 53})`;
+    const countToolsets = document.getElementById('hermes-filter-count-toolsets');
+    if (countToolsets) countToolsets.innerText = `(${data.filters?.toolsets ?? 29})`;
+
+    // 3. Render Categories sidebar
+    renderHermesSkillsCategories(hermesSkillsState.categories);
+
+    // 4. Update Active Header
+    const activeIcon = document.getElementById('hermes-active-cat-icon');
+    const activeTitle = document.getElementById('hermes-active-cat-title');
+    const paneCount = document.getElementById('hermes-skills-pane-count');
+    if (activeTitle) {
+      activeTitle.innerText = hermesSkillsState.activeCategory === 'all' 
+        ? (hermesSkillsState.activeFilter === 'toolsets' ? 'TOOLSETS' : (hermesSkillsState.activeFilter === 'browse_hub' ? 'BROWSE HUB' : 'ALL'))
+        : hermesSkillsState.activeCategory.toUpperCase();
+    }
+    if (activeIcon) {
+      activeIcon.innerText = hermesSkillsState.activeFilter === 'toolsets' ? '🔧' : '⬡';
+    }
+    if (paneCount) {
+      paneCount.innerText = `${hermesSkillsState.allSkills.length} skills`;
+    }
+
+    // 5. Render Skills Rows
+    renderHermesSkillsRows(hermesSkillsState.allSkills);
   } catch (err) {
-    console.error('Error loading skills:', err);
+    console.error('Error loading hermes skills:', err);
+    listPane.innerHTML = `<div style="padding:28px; text-align:center; color:#f43f5e;">${typeof t === 'function' ? t('hermes_error_load') : 'স্কিল লোড করতে সমস্যা হয়েছে।'}</div>`;
   }
 }
 
-async function toggleHermesSkill(skillId) {
+function renderHermesSkillsCategories(catMap) {
+  const catList = document.getElementById('hermes-skills-cat-list');
+  if (!catList) return;
+
+  const categoriesOrder = [
+    "Autonomous AI Agents",
+    "Creative",
+    "Email",
+    "Media",
+    "Note Taking",
+    "Productivity",
+    "Research",
+    "Social Media",
+    "Software Development",
+    "Web"
+  ];
+
+  catList.innerHTML = categoriesOrder.map(cat => {
+    const count = catMap[cat] ?? 0;
+    const isActive = hermesSkillsState.activeCategory.toLowerCase() === cat.toLowerCase();
+    return `
+      <button type="button" class="hermes-cat-row-btn ${isActive ? 'active' : ''}" onclick="setHermesSkillCategory('${escapeHtml(cat)}', this)">
+        <span>${escapeHtml(cat)}</span>
+        <span class="cat-count">${count}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function renderHermesSkillsRows(skills) {
+  const listPane = document.getElementById('hermes-skills-list-pane');
+  if (!listPane) return;
+
+  if (!skills || skills.length === 0) {
+    listPane.innerHTML = `<div style="padding:40px; text-align:center; color:#64748b;">কোনো স্কিল পাওয়া যায়নি।</div>`;
+    return;
+  }
+
+  listPane.innerHTML = skills.map(s => {
+    const isEnabled = s.is_enabled === 1 || s.is_enabled === true;
+    return `
+      <div class="hermes-skill-entry-row" id="skill-row-${s.id}">
+        <div class="hermes-skill-tile-box ${isEnabled ? '' : 'disabled'}" onclick="toggleHermesSkillTile('${s.id}')" title="${isEnabled ? 'Disable skill' : 'Enable skill'}">
+          <div class="tile-inner"></div>
+        </div>
+        <div class="hermes-skill-entry-body" onclick="openSkillDetailModal('${s.id}')" style="cursor:pointer;">
+          <div class="hermes-skill-entry-name">
+            <span>${escapeHtml(s.name)}</span>
+            ${s.is_toolset ? '<span style="font-size:0.68rem; padding:1px 5px; border-radius:3px; background:rgba(56,189,248,0.12); color:#38bdf8; font-weight:500;">TOOLSET</span>' : ''}
+          </div>
+          <div class="hermes-skill-entry-desc">${escapeHtml(s.description)}</div>
+        </div>
+        <button type="button" class="hermes-skill-edit-btn" onclick="editHermesSkill('${s.id}')" title="Edit skill">
+          ✏️
+        </button>
+        ${!s.is_system ? `<button type="button" class="hermes-action-icon-btn danger" onclick="deleteHermesSkill('${s.id}')" title="Delete">🗑️</button>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function setHermesSkillFilter(filterType, btnEl) {
+  hermesSkillsState.activeFilter = filterType;
+  hermesSkillsState.activeCategory = 'all';
+
+  document.querySelectorAll('.hermes-skill-filter-item').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  document.querySelectorAll('.hermes-cat-row-btn').forEach(b => b.classList.remove('active'));
+
+  loadHermesSkills();
+}
+
+function setHermesSkillCategory(catName, btnEl) {
+  hermesSkillsState.activeCategory = catName;
+  hermesSkillsState.activeFilter = 'all';
+
+  document.querySelectorAll('.hermes-skill-filter-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.hermes-cat-row-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+
+  loadHermesSkills();
+}
+
+function handleHermesSkillsSearch(query) {
+  hermesSkillsState.searchQuery = query.trim();
+  loadHermesSkills();
+}
+
+async function toggleHermesSkillTile(skillId) {
   try {
-    await hermesFetch(`/api/hermes/skills/${skillId}/toggle`, { method: 'PUT' });
-    loadHermesSkills();
+    const res = await hermesFetch(`/api/hermes/skills/${skillId}/toggle`, { method: 'PUT' });
+    const data = await res.json();
+    if (data.success) {
+      loadHermesSkills();
+    }
   } catch (err) {
     console.error(err);
   }
 }
 
-async function deleteHermesSkill(skillId) {
-  if (!confirm(typeof t === 'function' ? t('hermes_confirm_delete_skill') : 'এই স্কিলটি মুছে ফেলতে চান?')) return;
+function openHermesLearnSkillModal() {
+  const modal = document.getElementById('hermes-learn-skill-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeHermesLearnSkillModal() {
+  const modal = document.getElementById('hermes-learn-skill-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function executeHermesLearnSkill(e) {
+  e.preventDefault();
+  const source_url = document.getElementById('hermes-learn-url').value.trim();
+  const name = document.getElementById('hermes-learn-name').value.trim();
+  const description = document.getElementById('hermes-learn-desc').value.trim();
+  const category = document.getElementById('hermes-learn-cat').value;
+
   try {
-    await hermesFetch(`/api/hermes/skills/${skillId}`, { method: 'DELETE' });
-    loadHermesSkills();
+    const res = await hermesFetch('/api/hermes/skills/learn', {
+      method: 'POST',
+      body: JSON.stringify({ source_url, name, description, category })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeHermesLearnSkillModal();
+      loadHermesSkills();
+      if (typeof showToast === 'function') showToast(`নতুন স্কিল '${data.name}' সংযুক্ত হয়েছে`, 'success');
+    } else {
+      alert(data.message || 'Failed to learn skill');
+    }
   } catch (err) {
-    alert('Failed to delete skill');
+    alert('Learn skill request failed');
   }
 }
 
@@ -412,6 +992,7 @@ async function saveNewHermesSkill(e) {
   const description = document.getElementById('skill-input-desc').value.trim();
   const icon = document.getElementById('skill-input-icon').value.trim() || '📦';
   const category = document.getElementById('skill-input-cat').value;
+  const is_toolset = document.getElementById('skill-input-is-toolset') ? document.getElementById('skill-input-is-toolset').checked : false;
   const instructions = document.getElementById('skill-input-inst').value.trim();
   const triggersRaw = document.getElementById('skill-input-triggers').value.trim();
   const triggers = triggersRaw ? triggersRaw.split(',').map(s => s.trim()) : [];
@@ -419,7 +1000,7 @@ async function saveNewHermesSkill(e) {
   try {
     const res = await hermesFetch('/api/hermes/skills', {
       method: 'POST',
-      body: JSON.stringify({ name, description, icon, category, instructions, triggers })
+      body: JSON.stringify({ name, description, icon, category, instructions, triggers, is_toolset })
     });
     const data = await res.json();
     if (data.success) {
@@ -429,6 +1010,37 @@ async function saveNewHermesSkill(e) {
     }
   } catch (err) {
     alert('Failed to save skill');
+  }
+}
+
+async function deleteHermesSkill(skillId) {
+  if (!confirm(typeof t === 'function' ? t('hermes_confirm_delete_skill') : 'এই স্কিলটি মুছে ফেলতে চান?')) return;
+  try {
+    await hermesFetch(`/api/hermes/skills/${skillId}`, { method: 'DELETE' });
+    loadHermesSkills();
+  } catch (err) {
+    alert('Failed to delete skill');
+  }
+}
+
+function openSkillDetailModal(skillId) {
+  const skill = hermesSkillsState.allSkills.find(s => s.id === skillId);
+  if (!skill) return;
+  alert(`Skill: ${skill.name}\nCategory: ${skill.category}\nToolset: ${skill.is_toolset ? 'Yes' : 'No'}\n\n${skill.description}\n\nInstructions:\n${skill.instructions || 'Standard operation instructions.'}`);
+}
+
+function editHermesSkill(skillId) {
+  openSkillDetailModal(skillId);
+}
+
+function openSkillAssistantPrompt() {
+  if (typeof switchTab === 'function') {
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+      input.value = "Tell me about available Hermes Agent skills and how I can utilize them for autonomous automation.";
+      input.focus();
+    }
   }
 }
 
@@ -922,7 +1534,16 @@ window.closeNewCronModal = closeNewCronModal;
 window.saveNewHermesCron = saveNewHermesCron;
 
 window.loadHermesSkills = loadHermesSkills;
-window.toggleHermesSkill = toggleHermesSkill;
+window.setHermesSkillFilter = setHermesSkillFilter;
+window.setHermesSkillCategory = setHermesSkillCategory;
+window.handleHermesSkillsSearch = handleHermesSkillsSearch;
+window.toggleHermesSkillTile = toggleHermesSkillTile;
+window.openHermesLearnSkillModal = openHermesLearnSkillModal;
+window.closeHermesLearnSkillModal = closeHermesLearnSkillModal;
+window.executeHermesLearnSkill = executeHermesLearnSkill;
+window.openSkillAssistantPrompt = openSkillAssistantPrompt;
+window.openSkillDetailModal = openSkillDetailModal;
+window.editHermesSkill = editHermesSkill;
 window.deleteHermesSkill = deleteHermesSkill;
 window.openNewSkillModal = openNewSkillModal;
 window.closeNewSkillModal = closeNewSkillModal;
@@ -955,3 +1576,32 @@ window.deleteHermesProfile = deleteHermesProfile;
 window.openNewProfileModal = openNewProfileModal;
 window.closeNewProfileModal = closeNewProfileModal;
 window.saveNewHermesProfile = saveNewHermesProfile;
+
+// Hermes Sessions Module
+window.loadHermesSessions = loadHermesSessions;
+window.openPruneSessionsModal = openPruneSessionsModal;
+window.closePruneSessionsModal = closePruneSessionsModal;
+window.executePruneSessions = executePruneSessions;
+window.openImportSessionsModal = openImportSessionsModal;
+window.closeImportSessionsModal = closeImportSessionsModal;
+window.handleImportSessionFile = handleImportSessionFile;
+window.executeImportSessions = executeImportSessions;
+window.setHermesSessionFilter = setHermesSessionFilter;
+window.filterHermesSessionsBySource = filterHermesSessionsBySource;
+window.setHermesSessionView = setHermesSessionView;
+window.openSessionDirectly = openSessionDirectly;
+window.deleteHermesSession = deleteHermesSession;
+
+// Hermes Filesystem Explorer (/opt/data)
+window.loadHermesFilesExplorer = loadHermesFilesExplorer;
+window.navigateHermesFsUp = navigateHermesFsUp;
+window.triggerHermesFsUpload = triggerHermesFsUpload;
+window.handleHermesFsFileSelected = handleHermesFsFileSelected;
+window.handleHermesFsDragOver = handleHermesFsDragOver;
+window.handleHermesFsDragLeave = handleHermesFsDragLeave;
+window.handleHermesFsDrop = handleHermesFsDrop;
+window.openHermesCreateFsItemModal = openHermesCreateFsItemModal;
+window.closeHermesCreateFsItemModal = closeHermesCreateFsItemModal;
+window.executeHermesCreateFsItem = executeHermesCreateFsItem;
+window.deleteHermesFsItem = deleteHermesFsItem;
+window.downloadOrPreviewFsFile = downloadOrPreviewFsFile;

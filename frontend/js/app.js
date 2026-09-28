@@ -352,7 +352,7 @@ function toggleMobileSidebar() {
 // Tab Switching across all views (including Hermes Suite, Full-Page Admin & Settings)
 function switchTab(tabName) {
   const tabs = [
-    'chat', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
+    'chat', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
     'channels', 'webhooks', 'pairing', 'profiles', 
     'admin', 'dashboard', 'reports', 'users', 'knowledge', 'security', 'backup', 'settings'
   ];
@@ -379,6 +379,7 @@ function switchTab(tabName) {
 
   const tabTitles = {
     chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+    sessions: { title: 'tab_sessions_title', desc: 'tab_sessions_desc' },
     files: { title: 'tab_files_title', desc: 'tab_files_desc' },
     models: { title: 'tab_models_title', desc: 'tab_models_desc' },
     logs: { title: 'tab_logs_title', desc: 'tab_logs_desc' },
@@ -406,7 +407,11 @@ function switchTab(tabName) {
   }
 
   // Hermes Module Loaders
-  if (tabName === 'files' && typeof loadHermesFiles === 'function') loadHermesFiles();
+  if (tabName === 'sessions' && typeof loadHermesSessions === 'function') loadHermesSessions();
+  else if (tabName === 'files') {
+    if (typeof loadHermesFilesExplorer === 'function') loadHermesFilesExplorer();
+    else if (typeof loadHermesFiles === 'function') loadHermesFiles();
+  }
   else if (tabName === 'logs' && typeof loadHermesLogs === 'function') loadHermesLogs();
   else if (tabName === 'cron' && typeof loadHermesCron === 'function') loadHermesCron();
   else if (tabName === 'skills' && typeof loadHermesSkills === 'function') loadHermesSkills();
