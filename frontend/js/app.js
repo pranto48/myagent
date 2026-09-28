@@ -349,9 +349,13 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all views (including Full-Page Admin & Settings)
+// Tab Switching across all views (including Hermes Suite, Full-Page Admin & Settings)
 function switchTab(tabName) {
-  const tabs = ['chat', 'admin', 'dashboard', 'reports', 'users', 'knowledge', 'models', 'mcp', 'security', 'backup', 'settings'];
+  const tabs = [
+    'chat', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
+    'channels', 'webhooks', 'pairing', 'profiles', 
+    'admin', 'dashboard', 'reports', 'users', 'knowledge', 'security', 'backup', 'settings'
+  ];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
     const btn = document.getElementById(`nav-${t}-btn`);
@@ -375,12 +379,21 @@ function switchTab(tabName) {
 
   const tabTitles = {
     chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+    files: { title: 'tab_files_title', desc: 'tab_files_desc' },
+    models: { title: 'tab_models_title', desc: 'tab_models_desc' },
+    logs: { title: 'tab_logs_title', desc: 'tab_logs_desc' },
+    cron: { title: 'tab_cron_title', desc: 'tab_cron_desc' },
+    skills: { title: 'tab_skills_title', desc: 'tab_skills_desc' },
+    plugins: { title: 'tab_plugins_title', desc: 'tab_plugins_desc' },
+    mcp: { title: 'tab_mcp_title', desc: 'tab_mcp_desc' },
+    channels: { title: 'tab_channels_title', desc: 'tab_channels_desc' },
+    webhooks: { title: 'tab_webhooks_title', desc: 'tab_webhooks_desc' },
+    pairing: { title: 'tab_pairing_title', desc: 'tab_pairing_desc' },
+    profiles: { title: 'tab_profiles_title', desc: 'tab_profiles_desc' },
     admin: { title: 'tab_admin_title', desc: 'tab_admin_desc' },
     dashboard: { title: 'tab_dash_title', desc: 'tab_dash_desc' },
     users: { title: 'tab_users_title', desc: 'tab_users_desc' },
     knowledge: { title: 'tab_kb_title', desc: 'tab_kb_desc' },
-    models: { title: 'tab_models_title', desc: 'tab_models_desc' },
-    mcp: { title: 'tab_mcp_title', desc: 'tab_mcp_desc' },
     security: { title: 'tab_sec_title', desc: 'tab_sec_desc' },
     backup: { title: 'tab_backup_title', desc: 'tab_backup_desc' },
     reports: { title: 'tab_reports_title', desc: 'tab_reports_desc' },
@@ -392,7 +405,18 @@ function switchTab(tabName) {
     if (topbarDesc) topbarDesc.innerText = typeof t === 'function' ? t(tabTitles[tabName].desc) : '';
   }
 
-  if (tabName === 'admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
+  // Hermes Module Loaders
+  if (tabName === 'files' && typeof loadHermesFiles === 'function') loadHermesFiles();
+  else if (tabName === 'logs' && typeof loadHermesLogs === 'function') loadHermesLogs();
+  else if (tabName === 'cron' && typeof loadHermesCron === 'function') loadHermesCron();
+  else if (tabName === 'skills' && typeof loadHermesSkills === 'function') loadHermesSkills();
+  else if (tabName === 'plugins' && typeof loadHermesPlugins === 'function') loadHermesPlugins();
+  else if (tabName === 'channels' && typeof loadHermesChannels === 'function') loadHermesChannels();
+  else if (tabName === 'webhooks' && typeof loadHermesWebhooks === 'function') loadHermesWebhooks();
+  else if (tabName === 'pairing' && typeof loadHermesPairing === 'function') loadHermesPairing();
+  else if (tabName === 'profiles' && typeof loadHermesProfiles === 'function') loadHermesProfiles();
+  // Existing View Loaders
+  else if (tabName === 'admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
   else if (tabName === 'dashboard') {
     if (typeof loadDashboardFull === 'function') loadDashboardFull();
     else if (typeof loadDashboardMetrics === 'function') loadDashboardMetrics();
@@ -411,6 +435,7 @@ function switchTab(tabName) {
     else if (typeof loadSettings === 'function') loadSettings();
   }
 }
+
 
 // Memory Toggle
 function toggleMemoryUsage() {

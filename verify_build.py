@@ -28,13 +28,13 @@ def log_warn(msg):
     print(f"  [WARN] {msg}")
 
 def check_version_alignment():
-    print("\n[1/5] Checking Unified Version Alignment across Codebase (v3.0.0)...")
-    expected_version = "3.0.0"
+    print("\n[1/5] Checking Unified Version Alignment across Codebase (v3.1.0)...")
+    expected_version = "3.1.0"
 
     # 1. VERSION file
     version_file = ROOT_DIR / "VERSION"
     if version_file.exists():
-        val = version_file.read_text(encoding="utf-8").strip()
+        val = version_file.read_text(encoding="utf-8-sig").strip()
         if val == expected_version:
             log_pass(f"VERSION file contains exact version: {val}")
         else:
@@ -45,7 +45,7 @@ def check_version_alignment():
     # 2. backend/config.py
     cfg_file = ROOT_DIR / "backend" / "config.py"
     if cfg_file.exists():
-        txt = cfg_file.read_text(encoding="utf-8")
+        txt = cfg_file.read_text(encoding="utf-8-sig")
         if f"Version: {expected_version}" in txt:
             log_pass(f"backend/config.py header version verified (v{expected_version})")
         else:
@@ -54,7 +54,7 @@ def check_version_alignment():
     # 3. backend/main.py
     main_file = ROOT_DIR / "backend" / "main.py"
     if main_file.exists():
-        txt = main_file.read_text(encoding="utf-8")
+        txt = main_file.read_text(encoding="utf-8-sig")
         if f'version="{expected_version}"' in txt and f'v{expected_version}' in txt:
             log_pass(f"backend/main.py FastAPI app and lifespan log verified (v{expected_version})")
         else:
@@ -63,7 +63,7 @@ def check_version_alignment():
     # 4. frontend/index.html
     html_file = ROOT_DIR / "frontend" / "index.html"
     if html_file.exists():
-        txt = html_file.read_text(encoding="utf-8")
+        txt = html_file.read_text(encoding="utf-8-sig")
         if f"v{expected_version}</span>" in txt:
             log_pass(f"frontend/index.html version badge verified (v{expected_version})")
         else:
@@ -72,7 +72,7 @@ def check_version_alignment():
     # 5. docker-compose.yml
     dc_file = ROOT_DIR / "docker-compose.yml"
     if dc_file.exists():
-        txt = dc_file.read_text(encoding="utf-8")
+        txt = dc_file.read_text(encoding="utf-8-sig")
         if f"Version: {expected_version}" in txt:
             log_pass(f"docker-compose.yml version verified (v{expected_version})")
         else:
@@ -83,7 +83,7 @@ def check_version_alignment():
     deploy_ps = ROOT_DIR / "deploy.ps1"
     for script in (deploy_sh, deploy_ps):
         if script.exists():
-            txt = script.read_text(encoding="utf-8")
+            txt = script.read_text(encoding="utf-8-sig")
             if f"Version: {expected_version}" in txt:
                 log_pass(f"{script.name} version verified (v{expected_version})")
             else:
@@ -98,7 +98,7 @@ def check_python_syntax():
     parsed_count = 0
     for py_file in py_files:
         try:
-            code = py_file.read_text(encoding="utf-8")
+            code = py_file.read_text(encoding="utf-8-sig")
             ast.parse(code, filename=str(py_file))
             parsed_count += 1
         except SyntaxError as e:
@@ -160,7 +160,8 @@ def check_api_routers():
     required_routers = [
         "auth.py", "chat.py", "documents.py", "memory.py", "settings.py",
         "sessions.py", "users.py", "dashboard.py", "models_mgmt.py",
-        "mcp_router.py", "security_router.py", "backup.py", "reports.py"
+        "mcp_router.py", "security_router.py", "backup.py", "reports.py",
+        "hermes_router.py"
     ]
     routers_dir = ROOT_DIR / "backend" / "routers"
     for r in required_routers:
@@ -191,7 +192,8 @@ def check_frontend_assets():
         "js/app.js", "js/auth.js", "js/i18n.js", "js/dashboard.js",
         "js/user_manager.js", "js/model_manager.js", "js/memory_manager.js",
         "js/mcp_manager.js", "js/security_manager.js", "js/backup_manager.js",
-        "js/admin_manager.js", "js/settings.js", "js/reports_manager.js"
+        "js/admin_manager.js", "js/settings.js", "js/reports_manager.js",
+        "js/hermes_manager.js"
     ]
     for item in required_frontend:
         target = frontend_dir / item
@@ -203,7 +205,7 @@ def check_frontend_assets():
 
 def main():
     print("=" * 70)
-    print("🚀 MyAgent v3.0.0 Enterprise Pre-Flight Build Verification")
+    print("🚀 MyAgent v3.1.0 Enterprise Pre-Flight Build Verification")
     print("=" * 70)
 
     check_version_alignment()
@@ -219,7 +221,7 @@ def main():
             print(f"   • {err}")
         sys.exit(1)
     else:
-        print("✅ ALL CHECKS PASSED (100% READY FOR v3.0.0 PRODUCTION ROLLOUT)")
+        print("✅ ALL CHECKS PASSED (100% READY FOR v3.1.0 PRODUCTION ROLLOUT)")
         print(f"Target Server: http://192.168.9.9:3399 | Backend: http://192.168.9.9:8000")
         print("=" * 70)
         sys.exit(0)

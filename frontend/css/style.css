@@ -5576,3 +5576,349 @@ body.light-theme .reasoning-body,
   color: #475569;
 }
 
+/* ==============================================================================
+   Hermes Agent Operational Suite Styling
+   (FILES, MODELS, LOGS, CRON, SKILLS, PLUGINS, MCP, CHANNELS, WEBHOOKS, PAIRING, PROFILES)
+   ============================================================================== */
+.hermes-btn {
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  color: #94a3b8;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hermes-btn svg {
+  width: 19px;
+  height: 19px;
+  stroke: #cbd5e1;
+  stroke-width: 1.8;
+  transition: stroke 0.2s ease, transform 0.2s ease;
+}
+
+.hermes-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+}
+
+.hermes-btn:hover svg {
+  stroke: #38bdf8;
+  transform: scale(1.08);
+}
+
+.hermes-btn.active {
+  background: rgba(6, 182, 212, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+}
+
+.hermes-btn.active svg {
+  stroke: #38bdf8;
+}
+
+.hermes-nav-divider {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 6px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hermes-nav-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Hermes Workspace View Container */
+.hermes-view-layout {
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.hermes-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.hermes-title h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hermes-title p {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.hermes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.hermes-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.hermes-card:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(6, 182, 212, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Switch Component */
+.hermes-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.hermes-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.hermes-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(51, 65, 85, 0.8);
+  transition: .3s;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hermes-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+.hermes-switch input:checked + .slider {
+  background-color: var(--cyan-glow);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+.hermes-switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Log Console */
+.hermes-console-wrapper {
+  background: #04070a;
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.hermes-console-toolbar {
+  background: rgba(15, 23, 42, 0.9);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hermes-filter-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hermes-filter-btn.active {
+  background: rgba(6, 182, 212, 0.2);
+  color: var(--cyan-glow);
+  border-color: var(--cyan-glow);
+}
+
+.hermes-console {
+  height: 520px;
+  overflow-y: auto;
+  padding: 14px 18px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  background: #04070a;
+}
+
+.hermes-log-entry {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.hermes-log-entry .log-ts {
+  color: #64748b;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.hermes-log-entry .log-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.hermes-log-entry.info .log-badge { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.hermes-log-entry.agent .log-badge { background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+.hermes-log-entry.success .log-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.hermes-log-entry.warn .log-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.hermes-log-entry.error .log-badge { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+.hermes-log-entry .log-mod {
+  color: #a5b4fc;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.hermes-log-entry .log-msg {
+  color: #e2e8f0;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Pairing PIN Display */
+.hermes-pin-box {
+  background: radial-gradient(circle at center, rgba(6, 182, 212, 0.15) 0%, rgba(15, 23, 42, 0.8) 70%);
+  border: 2px dashed rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.hermes-pin-code {
+  font-family: 'Outfit', sans-serif;
+  font-size: 3.2rem;
+  font-weight: 800;
+  letter-spacing: 12px;
+  color: #38bdf8;
+  text-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
+}
+
+.btn-sm-action-cyber {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: var(--cyan-glow);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-sm-action-cyber:hover {
+  background: rgba(6, 182, 212, 0.2);
+  color: #ffffff;
+  border-color: var(--cyan-glow);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+}
+
+.btn-sm-action-cyber.danger {
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #fb7185;
+}
+
+.btn-sm-action-cyber.danger:hover {
+  background: rgba(244, 63, 94, 0.2);
+  color: #ffffff;
+}
+
+.hermes-tag {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.hermes-row td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.badge-online {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.badge-idle {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.trigger-pill {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+}
+
+

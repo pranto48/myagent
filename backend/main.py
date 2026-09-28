@@ -26,7 +26,9 @@ from routers import (
     models_mgmt_router,
     mcp_router,
     security_router,
-    backup_router
+    backup_router,
+    hermes_router,
+    init_hermes_db
 ) 
 from routers.reports import router as reports_router
 from models.schemas import SystemStatusResponse
@@ -59,7 +61,8 @@ async def lifespan(app: FastAPI):
         m_db = await MCPStore.get_db()
         await m_db.close()
         await SecurityAuditStore().init_db()
-        logger.info(f"Persistent databases and security audit trail initialized at {settings.SESSION_DB_PATH}")
+        await init_hermes_db()
+        logger.info(f"Persistent databases, Hermes engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
 
@@ -68,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",
-    description="Enterprise AI Agent with Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
+    description="Enterprise AI Agent with Hermes Operational Suite, Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
     version="3.1.0",
     lifespan=lifespan
 )
@@ -96,18 +99,19 @@ app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(memory_router)
 app.include_router(settings_router)
+app.include_router(hermes_router)
 
 @app.get("/api/version")
 async def get_version():
     """Returns official project version and branding information."""
     return {
-        "version": "3.0.0",
+        "version": "3.1.0",
         "company": "IT support BD",
         "company_url": "https://itsupport.com.bd",
         "author": "Arif",
         "author_url": "https://arifmahmud.com/",
         "web_port": settings.WEB_PORT,
-        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0"
+        "copyright": "Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.1.0"
     }
 
 @app.get("/api/health")
@@ -115,7 +119,7 @@ async def health_check():
     """Health check endpoint for Docker container monitoring."""
     return {
         "status": "healthy",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "service": "myagent-backend",
         "web_port": settings.WEB_PORT
     }
