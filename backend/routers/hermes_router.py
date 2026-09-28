@@ -218,7 +218,7 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
     # 1. Seed Skills (Hermes 53 Standard Suite matching exact screenshot numbers)
     async with db.execute("SELECT COUNT(*) as cnt FROM hermes_skills") as cursor:
         row = await cursor.fetchone()
-        if not row or row["cnt"] < 53:
+        if not row or row["cnt"] < 60:
             await db.execute("DELETE FROM hermes_skills WHERE is_system = 1")
             
             hermes_53_skills = [
@@ -293,7 +293,16 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("skill_graphql_val", "graphql-schema-validator", "Validate GraphQL schema mutations, queries, and type resolvers.", "🕸️", "Software Development", "Validate GraphQL schemas, deprecation directives, and query depth limits.", "[\"graphql\", \"api\"]", 0, 1, 1, now_str),
 
                 # Web (1 skill, 1 toolset)
-                ("skill_web_scraping", "web-scraping-crawler", "Extract structured DOM data from dynamic web pages with headless browser.", "🕸️", "Web", "Crawl web applications, execute JavaScript, and extract structured JSON schemas.", "[\"scrape\", \"crawler\"]", 1, 1, 1, now_str)
+                ("skill_web_scraping", "web-scraping-crawler", "Extract structured DOM data from dynamic web pages with headless browser.", "🕸️", "Web", "Crawl web applications, execute JavaScript, and extract structured JSON schemas.", "[\"scrape\", \"crawler\"]", 1, 1, 1, now_str),
+
+                # Enterprise Agent Skills (New Advanced Suite)
+                ("skill_docker_fleet", "docker-fleet-orchestrator", "Manage multi-container Docker fleets, inspect Portainer logs, and auto-heal failed containers.", "🐳", "Autonomous AI Agents", "Inspect container metrics, monitor restart loops, and redeploy healthy images across Docker nodes.", "[\"docker\", \"portainer\", \"container\"]", 1, 1, 1, now_str),
+                ("skill_cloud_dr_backup", "cloud-dr-backup-manager", "Automate encrypted snapshots to Cloudflare R2 / S3 with point-in-time recovery.", "☁️", "Productivity", "Trigger atomic DB vacuums, bundle volume archives, and stream encrypted blobs to Cloudflare R2.", "[\"backup\", \"r2\", \"disaster-recovery\"]", 1, 1, 1, now_str),
+                ("skill_net_telemetry", "network-telemetry-diagnostics", "Diagnose MTU, DNS resolution, port health, and firewall rule anomalies.", "📡", "Software Development", "Run latency benchmarks, verify listening socket states, and inspect egress firewall policies.", "[\"network\", \"dns\", \"ports\"]", 1, 1, 1, now_str),
+                ("skill_db_optimizer", "database-query-optimizer", "Analyze SQLite/MySQL query execution plans, indexes, and eliminate deadlocks.", "🗄️", "Software Development", "Audit SQLite WAL fragmentation, analyze EXPLAIN QUERY PLAN, and generate composite index recommendations.", "[\"db\", \"sql\", \"optimize\"]", 1, 1, 1, now_str),
+                ("skill_sec_compliance", "security-compliance-scanner", "Continuous audit for OWASP vulnerabilities, leaked API tokens, and DLP leaks.", "🛡️", "Autonomous AI Agents", "Scan prompt payloads, file attachments, and server configs for credential disclosures and injection vectors.", "[\"security\", \"audit\", \"cve\"]", 1, 1, 1, now_str),
+                ("skill_exec_intel", "executive-intelligence-synthesizer", "Distill cross-platform metrics, Git commits, and logs into executive briefings.", "📊", "Research", "Aggregate telemetry from Git, database stats, and error logs into formatted Markdown executive summaries.", "[\"executive\", \"briefing\", \"report\"]", 1, 1, 1, now_str),
+                ("skill_it_ticket_auto", "it-support-ticket-automator", "Auto-triage IT Support BD tickets, assign severity, and trigger automated remediations.", "🎫", "Productivity", "Parse incoming customer support requests, assign priority labels, and invoke targeted resolution runbooks.", "[\"ticket\", \"support\", \"helpdesk\"]", 1, 1, 1, now_str)
             ]
             await db.executemany("""
                 INSERT INTO hermes_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
@@ -575,7 +584,7 @@ async def list_skills(
         # Check if DB has 53 skills, if not re-seed
         async with db.execute("SELECT COUNT(*) as cnt FROM hermes_skills") as cursor:
             row = await cursor.fetchone()
-            if not row or row["cnt"] < 53:
+            if not row or row["cnt"] < 60:
                 await _seed_hermes_defaults(db)
 
         # All skills for metadata computation
