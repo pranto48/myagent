@@ -5577,10 +5577,10 @@ body.light-theme .reasoning-body,
 }
 
 /* ==============================================================================
-   Hermes Agent Operational Suite Styling
+   Autonomous Operations Suite Styling
    (FILES, MODELS, LOGS, CRON, SKILLS, PLUGINS, MCP, CHANNELS, WEBHOOKS, PAIRING, PROFILES)
    ============================================================================== */
-.hermes-btn {
+.ops-btn {
   text-transform: uppercase;
   font-size: 0.78rem;
   font-weight: 600;
@@ -5594,7 +5594,7 @@ body.light-theme .reasoning-body,
   gap: 12px;
 }
 
-.hermes-btn svg {
+.ops-btn svg {
   width: 19px;
   height: 19px;
   stroke: #cbd5e1;
@@ -5602,28 +5602,28 @@ body.light-theme .reasoning-body,
   transition: stroke 0.2s ease, transform 0.2s ease;
 }
 
-.hermes-btn:hover {
+.ops-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #f8fafc;
 }
 
-.hermes-btn:hover svg {
+.ops-btn:hover svg {
   stroke: #38bdf8;
   transform: scale(1.08);
 }
 
-.hermes-btn.active {
+.ops-btn.active {
   background: rgba(6, 182, 212, 0.12);
   color: #38bdf8;
   border: 1px solid rgba(6, 182, 212, 0.35);
   box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
 }
 
-.hermes-btn.active svg {
+.ops-btn.active svg {
   stroke: #38bdf8;
 }
 
-.hermes-nav-divider {
+.ops-nav-divider {
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 1.6px;
@@ -5635,15 +5635,15 @@ body.light-theme .reasoning-body,
   gap: 8px;
 }
 
-.hermes-nav-divider::after {
+.ops-nav-divider::after {
   content: '';
   flex: 1;
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Hermes Workspace View Container */
-.hermes-view-layout {
+/* Operations Workspace View Container */
+.ops-view-layout {
   padding: 24px;
   max-width: 1280px;
   margin: 0 auto;
@@ -5653,7 +5653,7 @@ body.light-theme .reasoning-body,
   animation: fadeIn 0.25s ease-out;
 }
 
-.hermes-header-banner {
+.ops-header-banner {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -5665,7 +5665,7 @@ body.light-theme .reasoning-body,
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
-.hermes-title h3 {
+.ops-title h3 {
   font-size: 1.35rem;
   font-weight: 700;
   display: flex;
@@ -5673,19 +5673,19 @@ body.light-theme .reasoning-body,
   gap: 10px;
 }
 
-.hermes-title p {
+.ops-title p {
   font-size: 0.82rem;
   color: var(--text-secondary);
   margin-top: 4px;
 }
 
-.hermes-grid {
+.ops-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
 }
 
-.hermes-card {
+.ops-card {
   background: rgba(15, 23, 42, 0.65);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -5698,27 +5698,27 @@ body.light-theme .reasoning-body,
   overflow: hidden;
 }
 
-.hermes-card:hover {
+.ops-card:hover {
   border-color: rgba(6, 182, 212, 0.4);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(6, 182, 212, 0.1);
   transform: translateY(-2px);
 }
 
 /* Switch Component */
-.hermes-switch {
+.ops-switch {
   position: relative;
   display: inline-block;
   width: 44px;
   height: 24px;
 }
 
-.hermes-switch input {
+.ops-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.hermes-switch .slider {
+.ops-switch .slider {
   position: absolute;
   cursor: pointer;
   inset: 0;
@@ -5728,7 +5728,7 @@ body.light-theme .reasoning-body,
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.hermes-switch .slider:before {
+.ops-switch .slider:before {
   position: absolute;
   content: "";
   height: 18px;
@@ -5740,17 +5740,17 @@ body.light-theme .reasoning-body,
   border-radius: 50%;
 }
 
-.hermes-switch input:checked + .slider {
+.ops-switch input:checked + .slider {
   background-color: var(--cyan-glow);
   box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
 }
 
-.hermes-switch input:checked + .slider:before {
+.ops-switch input:checked + .slider:before {
   transform: translateX(20px);
 }
 
 /* Log Console */
-.hermes-console-wrapper {
+.ops-console-wrapper {
   background: #04070a;
   border: 1px solid rgba(6, 182, 212, 0.25);
   border-radius: var(--radius-lg);
@@ -5758,7 +5758,7 @@ body.light-theme .reasoning-body,
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
-.hermes-console-toolbar {
+.ops-console-toolbar {
   background: rgba(15, 23, 42, 0.9);
   padding: 10px 16px;
   display: flex;
@@ -5769,7 +5769,7 @@ body.light-theme .reasoning-body,
   flex-wrap: wrap;
 }
 
-.hermes-filter-btn {
+.ops-filter-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-secondary);
@@ -5781,13 +5781,13 @@ body.light-theme .reasoning-body,
   transition: all 0.2s ease;
 }
 
-.hermes-filter-btn.active {
+.ops-filter-btn.active {
   background: rgba(6, 182, 212, 0.2);
   color: var(--cyan-glow);
   border-color: var(--cyan-glow);
 }
 
-.hermes-console {
+.ops-console {
   height: 520px;
   overflow-y: auto;
   padding: 14px 18px;
@@ -5797,7 +5797,7 @@ body.light-theme .reasoning-body,
   background: #04070a;
 }
 
-.hermes-log-entry {
+.ops-log-entry {
   display: flex;
   gap: 10px;
   padding: 3px 0;
@@ -5805,13 +5805,13 @@ body.light-theme .reasoning-body,
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-.hermes-log-entry .log-ts {
+.ops-log-entry .log-ts {
   color: #64748b;
   font-size: 0.72rem;
   white-space: nowrap;
 }
 
-.hermes-log-entry .log-badge {
+.ops-log-entry .log-badge {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 4px;
@@ -5819,26 +5819,26 @@ body.light-theme .reasoning-body,
   text-transform: uppercase;
 }
 
-.hermes-log-entry.info .log-badge { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
-.hermes-log-entry.agent .log-badge { background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
-.hermes-log-entry.success .log-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-.hermes-log-entry.warn .log-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-.hermes-log-entry.error .log-badge { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+.ops-log-entry.info .log-badge { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.ops-log-entry.agent .log-badge { background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+.ops-log-entry.success .log-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.ops-log-entry.warn .log-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.ops-log-entry.error .log-badge { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
 
-.hermes-log-entry .log-mod {
+.ops-log-entry .log-mod {
   color: #a5b4fc;
   font-weight: 600;
   font-size: 0.75rem;
 }
 
-.hermes-log-entry .log-msg {
+.ops-log-entry .log-msg {
   color: #e2e8f0;
   flex: 1;
   word-break: break-word;
 }
 
 /* Pairing PIN Display */
-.hermes-pin-box {
+.ops-pin-box {
   background: radial-gradient(circle at center, rgba(6, 182, 212, 0.15) 0%, rgba(15, 23, 42, 0.8) 70%);
   border: 2px dashed rgba(6, 182, 212, 0.4);
   border-radius: var(--radius-lg);
@@ -5850,7 +5850,7 @@ body.light-theme .reasoning-body,
   gap: 12px;
 }
 
-.hermes-pin-code {
+.ops-pin-code {
   font-family: 'Outfit', sans-serif;
   font-size: 3.2rem;
   font-weight: 800;
@@ -5888,7 +5888,7 @@ body.light-theme .reasoning-body,
   color: #ffffff;
 }
 
-.hermes-tag {
+.ops-tag {
   background: rgba(255, 255, 255, 0.06);
   padding: 2px 8px;
   border-radius: 4px;
@@ -5897,7 +5897,7 @@ body.light-theme .reasoning-body,
   color: var(--text-secondary);
 }
 
-.hermes-row td {
+.ops-row td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -5922,11 +5922,11 @@ body.light-theme .reasoning-body,
 }
 
 /* ==============================================================================
- * Hermes Agent Sessions & Files View System (Pixel-Perfect from Screenshots)
+ * Autonomous Operations Sessions & Files View System (Pixel-Perfect from Screenshots)
  * ============================================================================== */
 
 /* Main View Container */
-.hermes-screen-container {
+.ops-screen-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -5938,7 +5938,7 @@ body.light-theme .reasoning-body,
 }
 
 /* Header with Title and Outline Button */
-.hermes-top-header {
+.ops-top-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -5946,13 +5946,13 @@ body.light-theme .reasoning-body,
   padding-bottom: 14px;
 }
 
-.hermes-title-group {
+.ops-title-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.hermes-screen-title {
+.ops-screen-title {
   font-family: 'Cinzel', 'Outfit', Georgia, serif;
   font-size: 1.5rem;
   font-weight: 700;
@@ -5961,7 +5961,7 @@ body.light-theme .reasoning-body,
   margin: 0;
 }
 
-.hermes-badge-box {
+.ops-badge-box {
   border: 1px solid rgba(241, 231, 208, 0.3);
   padding: 2px 8px;
   border-radius: 3px;
@@ -5970,7 +5970,7 @@ body.light-theme .reasoning-body,
   font-family: 'Fira Code', monospace;
 }
 
-.hermes-outline-btn {
+.ops-outline-btn {
   background: transparent;
   border: 1px solid rgba(241, 231, 208, 0.35);
   color: #f1e7d0;
@@ -5985,12 +5985,12 @@ body.light-theme .reasoning-body,
   font-weight: 500;
 }
 
-.hermes-outline-btn:hover {
+.ops-outline-btn:hover {
   border-color: #f1e7d0;
   background: rgba(241, 231, 208, 0.06);
 }
 
-.hermes-refresh-btn {
+.ops-refresh-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #cbd5e1;
@@ -6004,44 +6004,44 @@ body.light-theme .reasoning-body,
   transition: all 0.2s;
 }
 
-.hermes-refresh-btn:hover {
+.ops-refresh-btn:hover {
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.4);
   transform: rotate(90deg);
 }
 
 /* Sessions KPI Bar */
-.hermes-kpi-bar {
+.ops-kpi-bar {
   display: flex;
   align-items: center;
   gap: 36px;
   padding: 8px 0 16px 0;
 }
 
-.hermes-kpi-item {
+.ops-kpi-item {
   display: flex;
   flex-direction: column;
 }
 
-.hermes-kpi-val {
+.ops-kpi-val {
   font-size: 1.25rem;
   font-weight: 700;
   color: #ffffff;
   line-height: 1.2;
 }
 
-.hermes-kpi-val.highlight-green {
+.ops-kpi-val.highlight-green {
   color: #22c55e;
 }
 
-.hermes-kpi-lbl {
+.ops-kpi-lbl {
   font-size: 0.75rem;
   color: #64748b;
   margin-top: 2px;
 }
 
 /* Filter Toolbar */
-.hermes-filter-toolbar {
+.ops-filter-toolbar {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -6049,14 +6049,14 @@ body.light-theme .reasoning-body,
   padding-bottom: 8px;
 }
 
-.hermes-btn-group {
+.ops-btn-group {
   display: inline-flex;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
   overflow: hidden;
 }
 
-.hermes-filter-btn {
+.ops-filter-btn {
   background: transparent;
   border: none;
   color: #94a3b8;
@@ -6066,21 +6066,21 @@ body.light-theme .reasoning-body,
   transition: all 0.15s ease;
 }
 
-.hermes-filter-btn:not(:last-child) {
+.ops-filter-btn:not(:last-child) {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.hermes-filter-btn:hover {
+.ops-filter-btn:hover {
   color: #f1e7d0;
 }
 
-.hermes-filter-btn.active {
+.ops-filter-btn.active {
   background: #f1e7d0;
   color: #061513;
   font-weight: 600;
 }
 
-.hermes-dropdown-btn {
+.ops-dropdown-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #cbd5e1;
@@ -6093,12 +6093,12 @@ body.light-theme .reasoning-body,
   gap: 8px;
 }
 
-.hermes-dropdown-btn:hover {
+.ops-dropdown-btn:hover {
   border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* Sections */
-.hermes-section-block {
+.ops-section-block {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   padding: 18px;
@@ -6108,7 +6108,7 @@ body.light-theme .reasoning-body,
   gap: 14px;
 }
 
-.hermes-sec-header {
+.ops-sec-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6121,7 +6121,7 @@ body.light-theme .reasoning-body,
 }
 
 /* Connected Platform Item */
-.hermes-platform-row {
+.ops-platform-row {
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(2, 20, 17, 0.7);
   border-radius: 5px;
@@ -6131,31 +6131,31 @@ body.light-theme .reasoning-body,
   align-items: center;
 }
 
-.hermes-plat-left {
+.ops-plat-left {
   display: flex;
   align-items: center;
   gap: 14px;
 }
 
-.hermes-plat-icon {
+.ops-plat-icon {
   color: #10b981;
   font-size: 1.2rem;
 }
 
-.hermes-plat-title {
+.ops-plat-title {
   font-weight: 600;
   color: #f1e7d0;
   font-size: 0.88rem;
   font-family: 'Fira Code', monospace;
 }
 
-.hermes-plat-sub {
+.ops-plat-sub {
   color: #64748b;
   font-size: 0.76rem;
   margin-top: 2px;
 }
 
-.hermes-status-pill {
+.ops-status-pill {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #34d399;
@@ -6168,7 +6168,7 @@ body.light-theme .reasoning-body,
   gap: 6px;
 }
 
-.hermes-status-pill::before {
+.ops-status-pill::before {
   content: "";
   display: inline-block;
   width: 6px;
@@ -6179,7 +6179,7 @@ body.light-theme .reasoning-body,
 }
 
 /* Recent Session Item */
-.hermes-session-card {
+.ops-session-card {
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(2, 20, 17, 0.7);
   border-radius: 5px;
@@ -6191,31 +6191,31 @@ body.light-theme .reasoning-body,
   cursor: pointer;
 }
 
-.hermes-session-card:hover {
+.ops-session-card:hover {
   border-color: rgba(241, 231, 208, 0.3);
   background: rgba(4, 25, 21, 0.9);
 }
 
-.hermes-sess-title {
+.ops-sess-title {
   color: #f1e7d0;
   font-size: 0.92rem;
   font-weight: 600;
   margin-bottom: 3px;
 }
 
-.hermes-sess-meta {
+.ops-sess-meta {
   color: #64748b;
   font-size: 0.76rem;
   font-family: 'Fira Code', monospace;
 }
 
-.hermes-sess-snippet {
+.ops-sess-snippet {
   color: #94a3b8;
   font-size: 0.8rem;
   margin-top: 4px;
 }
 
-.hermes-tui-badge {
+.ops-tui-badge {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #cbd5e1;
@@ -6228,34 +6228,34 @@ body.light-theme .reasoning-body,
   gap: 6px;
 }
 
-.hermes-tui-badge:hover {
+.ops-tui-badge:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
 /* Files System View Styling (from Screenshot 2) */
-.hermes-files-path-bar {
+.ops-files-path-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
 }
 
-.hermes-path-display {
+.ops-path-display {
   font-family: 'Fira Code', monospace;
   font-size: 0.95rem;
   color: #f1e7d0;
   font-weight: 500;
 }
 
-.hermes-files-actions {
+.ops-files-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 /* Dropzone */
-.hermes-dropzone {
+.ops-dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   background: rgba(2, 20, 17, 0.5);
@@ -6267,18 +6267,18 @@ body.light-theme .reasoning-body,
   cursor: pointer;
 }
 
-.hermes-dropzone.drag-active {
+.ops-dropzone.drag-active {
   border-color: #38bdf8;
   background: rgba(6, 182, 212, 0.08);
 }
 
-.hermes-drop-left {
+.ops-drop-left {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-.hermes-drop-icon {
+.ops-drop-icon {
   font-size: 1.6rem;
   color: #cbd5e1;
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -6290,21 +6290,21 @@ body.light-theme .reasoning-body,
   justify-content: center;
 }
 
-.hermes-drop-title {
+.ops-drop-title {
   font-size: 0.9rem;
   font-weight: 700;
   color: #f1e7d0;
   letter-spacing: 0.5px;
 }
 
-.hermes-drop-path {
+.ops-drop-path {
   font-size: 0.76rem;
   color: #64748b;
   font-family: 'Fira Code', monospace;
   margin-top: 2px;
 }
 
-.hermes-choose-files-btn {
+.ops-choose-files-btn {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -6315,18 +6315,18 @@ body.light-theme .reasoning-body,
 }
 
 /* File Explorer Table */
-.hermes-fs-table-wrap {
+.ops-fs-table-wrap {
   width: 100%;
   overflow-x: auto;
 }
 
-.hermes-fs-table {
+.ops-fs-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 }
 
-.hermes-fs-table th {
+.ops-fs-table th {
   padding: 10px 14px;
   color: #64748b;
   font-size: 0.75rem;
@@ -6336,18 +6336,18 @@ body.light-theme .reasoning-body,
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.hermes-fs-table td {
+.ops-fs-table td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 0.85rem;
   color: #cbd5e1;
 }
 
-.hermes-fs-table tr:hover td {
+.ops-fs-table tr:hover td {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.hermes-row-name {
+.ops-row-name {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -6357,19 +6357,19 @@ body.light-theme .reasoning-body,
   cursor: pointer;
 }
 
-.hermes-row-name:hover {
+.ops-row-name:hover {
   color: #38bdf8;
 }
 
-.hermes-folder-icon {
+.ops-folder-icon {
   color: #f59e0b;
 }
 
-.hermes-file-icon {
+.ops-file-icon {
   color: #38bdf8;
 }
 
-.hermes-action-icon-btn {
+.ops-action-icon-btn {
   background: transparent;
   border: none;
   cursor: pointer;
@@ -6379,25 +6379,25 @@ body.light-theme .reasoning-body,
   transition: all 0.15s;
 }
 
-.hermes-action-icon-btn:hover {
+.ops-action-icon-btn:hover {
   color: #ffffff;
 }
 
-.hermes-action-icon-btn.danger {
+.ops-action-icon-btn.danger {
   color: #fb7185;
 }
 
-.hermes-action-icon-btn.danger:hover {
+.ops-action-icon-btn.danger:hover {
   color: #f43f5e;
   transform: scale(1.15);
 }
 
 /* ==============================================================================
- * Hermes Agent Skills System (Pixel-Perfect from Attached Screenshot)
+ * Autonomous Operations Skills System (Pixel-Perfect from Attached Screenshot)
  * ============================================================================== */
 
 /* Top Header Elements */
-.hermes-skills-subtitle-green {
+.ops-skills-subtitle-green {
   color: #22c55e;
   font-size: 0.85rem;
   font-family: 'Fira Code', monospace;
@@ -6405,7 +6405,7 @@ body.light-theme .reasoning-body,
   margin-left: 10px;
 }
 
-.hermes-search-bar {
+.ops-search-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -6417,18 +6417,18 @@ body.light-theme .reasoning-body,
   transition: all 0.2s;
 }
 
-.hermes-search-bar:focus-within {
+.ops-search-bar:focus-within {
   border-color: #f1e7d0;
   background: rgba(0, 0, 0, 0.7);
   box-shadow: 0 0 10px rgba(241, 231, 208, 0.15);
 }
 
-.hermes-search-bar .search-icon {
+.ops-search-bar .search-icon {
   font-size: 0.85rem;
   color: #94a3b8;
 }
 
-.hermes-search-bar input {
+.ops-search-bar input {
   background: transparent;
   border: none;
   color: #ffffff;
@@ -6437,12 +6437,12 @@ body.light-theme .reasoning-body,
   width: 100%;
 }
 
-.hermes-search-bar input::placeholder {
+.ops-search-bar input::placeholder {
   color: #64748b;
 }
 
 /* 2-Column Split Layout */
-.hermes-skills-layout {
+.ops-skills-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
   gap: 24px;
@@ -6451,14 +6451,14 @@ body.light-theme .reasoning-body,
 }
 
 /* Left Sidebar */
-.hermes-skills-sidebar {
+.ops-skills-sidebar {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   padding-right: 18px;
   display: flex;
   flex-direction: column;
 }
 
-.hermes-skills-pane-title {
+.ops-skills-pane-title {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 1.2px;
@@ -6469,13 +6469,13 @@ body.light-theme .reasoning-body,
   align-items: center;
 }
 
-.hermes-skills-nav-group {
+.ops-skills-nav-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.hermes-skill-filter-item {
+.ops-skill-filter-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -6491,45 +6491,45 @@ body.light-theme .reasoning-body,
   transition: all 0.15s ease;
 }
 
-.hermes-skill-filter-item:hover {
+.ops-skill-filter-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: #ffffff;
 }
 
-.hermes-skill-filter-item.active {
+.ops-skill-filter-item.active {
   background: #f1e7d0 !important;
   color: #040d0c !important;
   font-weight: 600;
 }
 
-.hermes-skill-filter-item .filter-item-left {
+.ops-skill-filter-item .filter-item-left {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.hermes-skill-filter-item .filter-icon {
+.ops-skill-filter-item .filter-icon {
   font-size: 0.95rem;
 }
 
-.hermes-skill-filter-item.active .filter-icon {
+.ops-skill-filter-item.active .filter-icon {
   color: #040d0c;
 }
 
-.hermes-skill-filter-item .filter-count {
+.ops-skill-filter-item .filter-count {
   font-size: 0.8rem;
   font-family: 'Fira Code', monospace;
   opacity: 0.85;
 }
 
 /* Categories List */
-.hermes-skills-categories-list {
+.ops-skills-categories-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.hermes-cat-row-btn {
+.ops-cat-row-btn {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -6544,35 +6544,35 @@ body.light-theme .reasoning-body,
   text-align: left;
 }
 
-.hermes-cat-row-btn:hover {
+.ops-cat-row-btn:hover {
   background: rgba(255, 255, 255, 0.04);
   color: #f1e7d0;
 }
 
-.hermes-cat-row-btn.active {
+.ops-cat-row-btn.active {
   color: #f1e7d0;
   font-weight: 600;
   background: rgba(241, 231, 208, 0.08);
 }
 
-.hermes-cat-row-btn .cat-count {
+.ops-cat-row-btn .cat-count {
   font-family: 'Fira Code', monospace;
   font-size: 0.8rem;
   color: #64748b;
 }
 
-.hermes-cat-row-btn.active .cat-count {
+.ops-cat-row-btn.active .cat-count {
   color: #f1e7d0;
 }
 
 /* Right Main Pane */
-.hermes-skills-main-pane {
+.ops-skills-main-pane {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.hermes-skills-sub-header {
+.ops-skills-sub-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -6580,18 +6580,18 @@ body.light-theme .reasoning-body,
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.hermes-active-cat-display {
+.ops-active-cat-display {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.hermes-active-cat-display .cat-icon {
+.ops-active-cat-display .cat-icon {
   font-size: 1.1rem;
   color: #f1e7d0;
 }
 
-.hermes-active-cat-display .cat-title {
+.ops-active-cat-display .cat-title {
   font-family: 'Cinzel', Georgia, serif;
   font-size: 1.15rem;
   font-weight: 700;
@@ -6599,20 +6599,20 @@ body.light-theme .reasoning-body,
   letter-spacing: 0.5px;
 }
 
-.hermes-skills-actions-group {
+.ops-skills-actions-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
 /* Skills Cards / Rows */
-.hermes-skills-rows-list {
+.ops-skills-rows-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.hermes-skill-entry-row {
+.ops-skill-entry-row {
   display: flex;
   align-items: flex-start;
   gap: 16px;
@@ -6623,12 +6623,12 @@ body.light-theme .reasoning-body,
   position: relative;
 }
 
-.hermes-skill-entry-row:hover {
+.ops-skill-entry-row:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
 /* Square Tile / Toggle on Left matching screenshot */
-.hermes-skill-tile-box {
+.ops-skill-tile-box {
   width: 22px;
   height: 22px;
   background: #f1e7d0;
@@ -6642,31 +6642,31 @@ body.light-theme .reasoning-body,
   transition: all 0.15s ease;
 }
 
-.hermes-skill-tile-box.disabled {
+.ops-skill-tile-box.disabled {
   background: #1e293b;
   border: 1px solid #475569;
 }
 
-.hermes-skill-tile-box .tile-inner {
+.ops-skill-tile-box .tile-inner {
   width: 10px;
   height: 10px;
   background: #040d0c;
   border-radius: 1px;
 }
 
-.hermes-skill-tile-box.disabled .tile-inner {
+.ops-skill-tile-box.disabled .tile-inner {
   display: none;
 }
 
 /* Skill Content */
-.hermes-skill-entry-body {
+.ops-skill-entry-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.hermes-skill-entry-name {
+.ops-skill-entry-name {
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.95rem;
   font-weight: 700;
@@ -6677,13 +6677,13 @@ body.light-theme .reasoning-body,
   gap: 8px;
 }
 
-.hermes-skill-entry-desc {
+.ops-skill-entry-desc {
   font-size: 0.8rem;
   color: #94a3b8;
   line-height: 1.45;
 }
 
-.hermes-skill-edit-btn {
+.ops-skill-edit-btn {
   background: transparent;
   border: none;
   color: #475569;
@@ -6694,18 +6694,18 @@ body.light-theme .reasoning-body,
   padding: 4px;
 }
 
-.hermes-skill-entry-row:hover .hermes-skill-edit-btn {
+.ops-skill-entry-row:hover .ops-skill-edit-btn {
   opacity: 1;
   color: #cbd5e1;
 }
 
-.hermes-skill-edit-btn:hover {
+.ops-skill-edit-btn:hover {
   color: #f1e7d0;
   transform: scale(1.1);
 }
 
 /* Floating Agent Pill Button (Bottom Right) */
-.hermes-floating-agent-btn {
+.ops-floating-agent-btn {
   position: fixed;
   bottom: 24px;
   right: 28px;
@@ -6723,7 +6723,7 @@ body.light-theme .reasoning-body,
   transition: all 0.2s ease;
 }
 
-.hermes-floating-agent-btn:hover {
+.ops-floating-agent-btn:hover {
   background: #0369a1;
   transform: scale(1.08);
 }

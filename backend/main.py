@@ -27,8 +27,8 @@ from routers import (
     mcp_router,
     security_router,
     backup_router,
-    hermes_router,
-    init_hermes_db
+    ops_router,
+    init_ops_db
 ) 
 from routers.reports import router as reports_router
 from models.schemas import SystemStatusResponse
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
         m_db = await MCPStore.get_db()
         await m_db.close()
         await SecurityAuditStore().init_db()
-        await init_hermes_db()
+        await init_ops_db()
         logger.info(f"Persistent databases, Autonomous Agent engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
@@ -99,7 +99,7 @@ app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(memory_router)
 app.include_router(settings_router)
-app.include_router(hermes_router)
+app.include_router(ops_router)
 
 @app.get("/api/version")
 async def get_version():

@@ -27,7 +27,7 @@ async def list_sessions():
 
 @router.get("/overview")
 async def get_sessions_overview(user=Depends(get_current_user)):
-    """Returns telemetry overview for Hermes Sessions view matching connected platforms and recent sessions."""
+    """Returns telemetry overview for Sessions view matching connected platforms and recent sessions."""
     return await ChatSessionStore.get_sessions_overview()
 
 @router.post("")

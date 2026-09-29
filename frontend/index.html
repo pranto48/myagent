@@ -9,6 +9,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>MyAgent v3.1.0 - এন্টারপ্রাইজ কোম্পানি এআই এজেন্ট ও অ্যানালিটিক্স প্ল্যাটফর্ম</title>
+  <meta name="theme-color" content="#0f172a">
+  <meta name="color-scheme" content="dark light">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="application-name" content="MyAgent Enterprise">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <meta name="description" content="ডকারাইজড কোম্পানি এআই এজেন্ট, পারসিসটেন্ট মেমোরি, অ্যাডমিন ড্যাশবোর্ড ও বিগ ডাটা অ্যানালিটিক্স (সার্ভার ১৯২.১৬৮.৯.৯:৩৩৯৯)">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="css/style.css">
@@ -124,12 +132,12 @@
           <span data-i18n="nav_chat">এআই চ্যাট (Chat)</span>
         </button>
 
-        <div class="hermes-nav-divider">
-          <span data-i18n="hermes_suite_header">AUTONOMOUS SUITE</span>
+        <div class="ops-nav-divider">
+          <span data-i18n="ops_suite_header">AUTONOMOUS SUITE</span>
         </div>
 
         <!-- SESSIONS -->
-        <button class="nav-btn hermes-btn" id="nav-sessions-btn" onclick="switchTab('sessions')">
+        <button class="nav-btn ops-btn" id="nav-sessions-btn" onclick="switchTab('sessions')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
@@ -137,7 +145,7 @@
         </button>
 
         <!-- 1. FILES -->
-        <button class="nav-btn hermes-btn" id="nav-files-btn" onclick="switchTab('files')">
+        <button class="nav-btn ops-btn" id="nav-files-btn" onclick="switchTab('files')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
           </svg>
@@ -145,7 +153,7 @@
         </button>
 
         <!-- 2. MODELS -->
-        <button class="nav-btn hermes-btn" id="nav-models-btn" onclick="switchTab('models')">
+        <button class="nav-btn ops-btn" id="nav-models-btn" onclick="switchTab('models')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <rect x="4" y="4" width="16" height="16" rx="2"/>
             <rect x="8" y="8" width="8" height="8" rx="1"/>
@@ -155,7 +163,7 @@
         </button>
 
         <!-- 3. LOGS -->
-        <button class="nav-btn hermes-btn" id="nav-logs-btn" onclick="switchTab('logs')">
+        <button class="nav-btn ops-btn" id="nav-logs-btn" onclick="switchTab('logs')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
@@ -163,7 +171,7 @@
         </button>
 
         <!-- 4. CRON -->
-        <button class="nav-btn hermes-btn" id="nav-cron-btn" onclick="switchTab('cron')">
+        <button class="nav-btn ops-btn" id="nav-cron-btn" onclick="switchTab('cron')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <circle cx="12" cy="12" r="9"/>
             <path stroke-linecap="round" d="M12 7v5l3 3"/>
@@ -172,7 +180,7 @@
         </button>
 
         <!-- 5. SKILLS -->
-        <button class="nav-btn hermes-btn" id="nav-skills-btn" onclick="switchTab('skills')">
+        <button class="nav-btn ops-btn" id="nav-skills-btn" onclick="switchTab('skills')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
           </svg>
@@ -180,7 +188,7 @@
         </button>
 
         <!-- 6. PLUGINS -->
-        <button class="nav-btn hermes-btn" id="nav-plugins-btn" onclick="switchTab('plugins')">
+        <button class="nav-btn ops-btn" id="nav-plugins-btn" onclick="switchTab('plugins')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 001 1 2 2 0 110 4 1 1 0 00-1 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1 2 2 0 10-4 0 1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1 2 2 0 110-4 1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/>
           </svg>
@@ -188,7 +196,7 @@
         </button>
 
         <!-- 7. MCP -->
-        <button class="nav-btn hermes-btn" id="nav-mcp-btn" onclick="switchTab('mcp')">
+        <button class="nav-btn ops-btn" id="nav-mcp-btn" onclick="switchTab('mcp')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v4m6-4v4m-8 4h10a2 2 0 012 2v3a5 5 0 01-5 5h-4a5 5 0 01-5-5v-3a2 2 0 012-2zm5 10v3"/>
           </svg>
@@ -196,7 +204,7 @@
         </button>
 
         <!-- 8. CHANNELS -->
-        <button class="nav-btn hermes-btn" id="nav-channels-btn" onclick="switchTab('channels')">
+        <button class="nav-btn ops-btn" id="nav-channels-btn" onclick="switchTab('channels')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.828a5 5 0 010-7.072m7.072 0a5 5 0 010 7.072M12 12h.01"/>
           </svg>
@@ -204,7 +212,7 @@
         </button>
 
         <!-- 9. WEBHOOKS -->
-        <button class="nav-btn hermes-btn" id="nav-webhooks-btn" onclick="switchTab('webhooks')">
+        <button class="nav-btn ops-btn" id="nav-webhooks-btn" onclick="switchTab('webhooks')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10a2 2 0 012 2v1m0 4v1a2 2 0 01-2 2H7m5-9v10M7 7a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 114 0 2 2 0 01-4 0zM7 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 114 0 2 2 0 01-4 0z"/>
           </svg>
@@ -212,7 +220,7 @@
         </button>
 
         <!-- 10. PAIRING -->
-        <button class="nav-btn hermes-btn" id="nav-pairing-btn" onclick="switchTab('pairing')">
+        <button class="nav-btn ops-btn" id="nav-pairing-btn" onclick="switchTab('pairing')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
           </svg>
@@ -220,14 +228,14 @@
         </button>
 
         <!-- 11. PROFILES -->
-        <button class="nav-btn hermes-btn" id="nav-profiles-btn" onclick="switchTab('profiles')">
+        <button class="nav-btn ops-btn" id="nav-profiles-btn" onclick="switchTab('profiles')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
           </svg>
           <span data-i18n="nav_profiles">PROFILES</span>
         </button>
 
-        <div class="hermes-nav-divider">
+        <div class="ops-nav-divider">
           <span data-i18n="admin_suite_header">ADMIN & ANALYTICS</span>
         </div>
 
@@ -1840,56 +1848,56 @@
         </div>
       </section>
 
-      <!-- Hermes View: SESSIONS (Matching Screenshot 1) -->
+      <!-- Ops View: SESSIONS (Matching Screenshot 1) -->
       <section class="tab-view" id="view-sessions">
-        <div class="hermes-screen-container">
+        <div class="ops-screen-container">
           <!-- Top Header -->
-          <div class="hermes-top-header">
-            <div class="hermes-title-group">
-              <h2 class="hermes-screen-title" data-i18n="hermes_sessions_title">Sessions</h2>
-              <span class="hermes-badge-box" id="hermes-sessions-badge-count">1</span>
+          <div class="ops-top-header">
+            <div class="ops-title-group">
+              <h2 class="ops-screen-title" data-i18n="ops_sessions_title">Sessions</h2>
+              <span class="ops-badge-box" id="ops-sessions-badge-count">1</span>
             </div>
-            <button type="button" class="hermes-outline-btn" onclick="openPruneSessionsModal()">
-              <span>🗑</span> <span data-i18n="hermes_btn_prune_sessions">Prune old sessions</span>
+            <button type="button" class="ops-outline-btn" onclick="openPruneSessionsModal()">
+              <span>🗑</span> <span data-i18n="ops_btn_prune_sessions">Prune old sessions</span>
             </button>
           </div>
 
           <!-- KPI Summary Bar -->
-          <div class="hermes-kpi-bar">
-            <div class="hermes-kpi-item">
-              <span class="hermes-kpi-val" id="hermes-kpi-total-sess">1</span>
-              <span class="hermes-kpi-lbl" data-i18n="hermes_kpi_total">Total</span>
+          <div class="ops-kpi-bar">
+            <div class="ops-kpi-item">
+              <span class="ops-kpi-val" id="ops-kpi-total-sess">1</span>
+              <span class="ops-kpi-lbl" data-i18n="ops_kpi_total">Total</span>
             </div>
-            <div class="hermes-kpi-item">
-              <span class="hermes-kpi-val highlight-green" id="hermes-kpi-active-sess">1</span>
-              <span class="hermes-kpi-lbl" data-i18n="hermes_kpi_active_store">Active in store</span>
+            <div class="ops-kpi-item">
+              <span class="ops-kpi-val highlight-green" id="ops-kpi-active-sess">1</span>
+              <span class="ops-kpi-lbl" data-i18n="ops_kpi_active_store">Active in store</span>
             </div>
-            <div class="hermes-kpi-item">
-              <span class="hermes-kpi-val" id="hermes-kpi-archived-sess">0</span>
-              <span class="hermes-kpi-lbl" data-i18n="hermes_kpi_archived">Archived</span>
+            <div class="ops-kpi-item">
+              <span class="ops-kpi-val" id="ops-kpi-archived-sess">0</span>
+              <span class="ops-kpi-lbl" data-i18n="ops_kpi_archived">Archived</span>
             </div>
-            <div class="hermes-kpi-item">
-              <span class="hermes-kpi-val" id="hermes-kpi-messages-sess">6</span>
-              <span class="hermes-kpi-lbl" data-i18n="hermes_kpi_messages">Messages</span>
+            <div class="ops-kpi-item">
+              <span class="ops-kpi-val" id="ops-kpi-messages-sess">6</span>
+              <span class="ops-kpi-lbl" data-i18n="ops_kpi_messages">Messages</span>
             </div>
-            <div class="hermes-kpi-item">
-              <span class="hermes-kpi-val" id="hermes-kpi-sources-sess">1</span>
-              <span class="hermes-kpi-lbl" data-i18n="hermes_kpi_sources">Sources</span>
+            <div class="ops-kpi-item">
+              <span class="ops-kpi-val" id="ops-kpi-sources-sess">1</span>
+              <span class="ops-kpi-lbl" data-i18n="ops_kpi_sources">Sources</span>
             </div>
           </div>
 
           <!-- Filter & Action Toolbar -->
-          <div class="hermes-filter-toolbar">
+          <div class="ops-filter-toolbar">
             <!-- Filter Group: Chats / Automation / All -->
-            <div class="hermes-btn-group" id="hermes-sess-type-group">
-              <button type="button" class="hermes-filter-btn active" onclick="setHermesSessionFilter('chats', this)" data-i18n="hermes_btn_chats">Chats</button>
-              <button type="button" class="hermes-filter-btn" onclick="setHermesSessionFilter('automation', this)" data-i18n="hermes_btn_automation">Automation</button>
-              <button type="button" class="hermes-filter-btn" onclick="setHermesSessionFilter('all', this)" data-i18n="hermes_btn_all">All</button>
+            <div class="ops-btn-group" id="ops-sess-type-group">
+              <button type="button" class="ops-filter-btn active" onclick="setOpsSessionFilter('chats', this)" data-i18n="ops_btn_chats">Chats</button>
+              <button type="button" class="ops-filter-btn" onclick="setOpsSessionFilter('automation', this)" data-i18n="ops_btn_automation">Automation</button>
+              <button type="button" class="ops-filter-btn" onclick="setOpsSessionFilter('all', this)" data-i18n="ops_btn_all">All</button>
             </div>
 
             <!-- Chat Source Dropdown -->
             <div style="position:relative;">
-              <select id="hermes-source-select" class="hermes-dropdown-btn" onchange="filterHermesSessionsBySource(this.value)">
+              <select id="ops-source-select" class="ops-dropdown-btn" onchange="filterOpsSessionsBySource(this.value)">
                 <option value="any">≡ Any chat source</option>
                 <option value="api_server">api_server</option>
                 <option value="webchat_ui">webchat_ui</option>
@@ -1898,209 +1906,209 @@
             </div>
 
             <!-- View Segment: Overview / History -->
-            <div class="hermes-btn-group" id="hermes-sess-view-group">
-              <button type="button" class="hermes-filter-btn active" onclick="setHermesSessionView('overview', this)" data-i18n="hermes_btn_overview">Overview</button>
-              <button type="button" class="hermes-filter-btn" onclick="setHermesSessionView('history', this)" data-i18n="hermes_btn_history">History</button>
+            <div class="ops-btn-group" id="ops-sess-view-group">
+              <button type="button" class="ops-filter-btn active" onclick="setOpsSessionView('overview', this)" data-i18n="ops_btn_overview">Overview</button>
+              <button type="button" class="ops-filter-btn" onclick="setOpsSessionView('history', this)" data-i18n="ops_btn_history">History</button>
             </div>
 
             <!-- Import Action Button -->
-            <button type="button" class="hermes-outline-btn" onclick="openImportSessionsModal()">
-              <span>⭡</span> <span data-i18n="hermes_btn_import_sessions">Import sessions</span>
+            <button type="button" class="ops-outline-btn" onclick="openImportSessionsModal()">
+              <span>⭡</span> <span data-i18n="ops_btn_import_sessions">Import sessions</span>
             </button>
           </div>
 
           <!-- Section 1: CONNECTED PLATFORMS -->
-          <div class="hermes-section-block">
-            <h3 class="hermes-sec-header">
-              <span>((•))</span> <span data-i18n="hermes_sec_connected_platforms">CONNECTED PLATFORMS</span>
+          <div class="ops-section-block">
+            <h3 class="ops-sec-header">
+              <span>((•))</span> <span data-i18n="ops_sec_connected_platforms">CONNECTED PLATFORMS</span>
             </h3>
-            <div id="hermes-connected-platforms-list" style="display:flex; flex-direction:column; gap:10px;">
+            <div id="ops-connected-platforms-list" style="display:flex; flex-direction:column; gap:10px;">
               <!-- Rendered dynamically via JS -->
             </div>
           </div>
 
           <!-- Section 2: RECENT SESSIONS -->
-          <div class="hermes-section-block">
-            <h3 class="hermes-sec-header">
-              <span>🕒</span> <span data-i18n="hermes_sec_recent_sessions">RECENT SESSIONS</span>
+          <div class="ops-section-block">
+            <h3 class="ops-sec-header">
+              <span>🕒</span> <span data-i18n="ops_sec_recent_sessions">RECENT SESSIONS</span>
             </h3>
-            <div id="hermes-recent-sessions-list" style="display:flex; flex-direction:column; gap:10px;">
+            <div id="ops-recent-sessions-list" style="display:flex; flex-direction:column; gap:10px;">
               <!-- Rendered dynamically via JS -->
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: FILES (Matching Screenshot 2) -->
+      <!-- Ops View: FILES (Matching Screenshot 2) -->
       <section class="tab-view" id="view-files">
-        <div class="hermes-screen-container">
+        <div class="ops-screen-container">
           <!-- Top Header -->
-          <div class="hermes-top-header">
-            <div class="hermes-title-group">
-              <h2 class="hermes-screen-title" data-i18n="hermes_files_header">Files</h2>
-              <span class="hermes-badge-box" id="hermes-fs-header-badge">/opt/data</span>
+          <div class="ops-top-header">
+            <div class="ops-title-group">
+              <h2 class="ops-screen-title" data-i18n="ops_files_header">Files</h2>
+              <span class="ops-badge-box" id="ops-fs-header-badge">/opt/data</span>
             </div>
-            <button type="button" class="hermes-refresh-btn" onclick="loadHermesFilesExplorer()" title="Refresh / রিফ্রেশ">
+            <button type="button" class="ops-refresh-btn" onclick="loadOpsFilesExplorer()" title="Refresh / রিফ্রেশ">
               <span>⟳</span>
             </button>
           </div>
 
           <!-- Current Path & Actions Bar -->
-          <div class="hermes-files-path-bar">
+          <div class="ops-files-path-bar">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span class="hermes-path-display" id="hermes-fs-current-path">/opt/data</span>
-              <button type="button" class="btn-sm-action-cyber" id="hermes-fs-up-btn" style="display:none;" onclick="navigateHermesFsUp()">📁 ⬆️ <span data-i18n="hermes_btn_up">Up</span></button>
+              <span class="ops-path-display" id="ops-fs-current-path">/opt/data</span>
+              <button type="button" class="btn-sm-action-cyber" id="ops-fs-up-btn" style="display:none;" onclick="navigateOpsFsUp()">📁 ⬆️ <span data-i18n="ops_btn_up">Up</span></button>
             </div>
-            <div class="hermes-files-actions">
-              <button type="button" class="hermes-outline-btn" onclick="triggerHermesFsUpload()">
-                <span>⭡</span> <span data-i18n="hermes_btn_upload">UPLOAD</span>
+            <div class="ops-files-actions">
+              <button type="button" class="ops-outline-btn" onclick="triggerOpsFsUpload()">
+                <span>⭡</span> <span data-i18n="ops_btn_upload">UPLOAD</span>
               </button>
-              <button type="button" class="hermes-outline-btn" onclick="openHermesCreateFsItemModal()">
-                <span>+</span> <span data-i18n="hermes_btn_create_fs">CREATE</span>
+              <button type="button" class="ops-outline-btn" onclick="openOpsCreateFsItemModal()">
+                <span>+</span> <span data-i18n="ops_btn_create_fs">CREATE</span>
               </button>
             </div>
           </div>
 
           <!-- Drag and Drop Zone -->
-          <div class="hermes-dropzone" id="hermes-fs-dropzone" ondragover="handleHermesFsDragOver(event)" ondragleave="handleHermesFsDragLeave(event)" ondrop="handleHermesFsDrop(event)" onclick="triggerHermesFsUpload()">
-            <div class="hermes-drop-left">
-              <div class="hermes-drop-icon">⭡</div>
+          <div class="ops-dropzone" id="ops-fs-dropzone" ondragover="handleOpsFsDragOver(event)" ondragleave="handleOpsFsDragLeave(event)" ondrop="handleOpsFsDrop(event)" onclick="triggerOpsFsUpload()">
+            <div class="ops-drop-left">
+              <div class="ops-drop-icon">⭡</div>
               <div>
-                <div class="hermes-drop-title" data-i18n="hermes_drop_files_here">DROP FILES HERE</div>
-                <div class="hermes-drop-path" id="hermes-fs-drop-path">/opt/data</div>
+                <div class="ops-drop-title" data-i18n="ops_drop_files_here">DROP FILES HERE</div>
+                <div class="ops-drop-path" id="ops-fs-drop-path">/opt/data</div>
               </div>
             </div>
-            <div class="hermes-choose-files-btn" data-i18n="hermes_choose_files">CHOOSE FILES</div>
-            <input type="file" id="hermes-fs-file-input" style="display:none;" multiple onchange="handleHermesFsFileSelected(event)">
+            <div class="ops-choose-files-btn" data-i18n="ops_choose_files">CHOOSE FILES</div>
+            <input type="file" id="ops-fs-file-input" style="display:none;" multiple onchange="handleOpsFsFileSelected(event)">
           </div>
 
           <!-- Filesystem Table -->
-          <div class="hermes-fs-table-wrap">
-            <table class="hermes-fs-table">
+          <div class="ops-fs-table-wrap">
+            <table class="ops-fs-table">
               <thead>
                 <tr>
-                  <th data-i18n="hermes_th_fs_name">NAME</th>
-                  <th data-i18n="hermes_th_fs_size">SIZE</th>
-                  <th data-i18n="hermes_th_fs_modified">MODIFIED</th>
-                  <th style="text-align:right;" data-i18n="hermes_th_fs_actions">ACTIONS</th>
+                  <th data-i18n="ops_th_fs_name">NAME</th>
+                  <th data-i18n="ops_th_fs_size">SIZE</th>
+                  <th data-i18n="ops_th_fs_modified">MODIFIED</th>
+                  <th style="text-align:right;" data-i18n="ops_th_fs_actions">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody id="hermes-fs-table-body">
-                <tr><td colspan="4" class="text-center py-4" style="color:var(--text-muted);" data-i18n="hermes_loading">লোড হচ্ছে...</td></tr>
+              <tbody id="ops-fs-table-body">
+                <tr><td colspan="4" class="text-center py-4" style="color:var(--text-muted);" data-i18n="ops_loading">লোড হচ্ছে...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: LOGS -->
+      <!-- Ops View: LOGS -->
       <section class="tab-view" id="view-logs">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>📄</span> <span data-i18n="hermes_logs_title">লাইভ সিস্টেম ও এজেন্ট অডিট লগস (System Telemetry & Logs)</span></h3>
-              <p data-i18n="hermes_logs_desc">রিয়েল-টাইম এআই ডিসিশন ট্রেইল, সিকিউরিটি অডিট ইভেন্টস ও সিস্টেম ট্রেস কনসোল</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>📄</span> <span data-i18n="ops_logs_title">লাইভ সিস্টেম ও এজেন্ট অডিট লগস (System Telemetry & Logs)</span></h3>
+              <p data-i18n="ops_logs_desc">রিয়েল-টাইম এআই ডিসিশন ট্রেইল, সিকিউরিটি অডিট ইভেন্টস ও সিস্টেম ট্রেস কনসোল</p>
             </div>
             <div style="display:flex; gap:8px;">
-              <button class="btn-sm-action-cyber" onclick="downloadHermesLogs()" data-i18n="hermes_btn_download_logs">⬇️ লগস ডাউনলোড</button>
-              <button class="btn-sm-action-cyber danger" onclick="clearHermesLogs()" data-i18n="hermes_btn_clear_logs">🗑️ ক্লিয়ার লগস</button>
+              <button class="btn-sm-action-cyber" onclick="downloadOpsLogs()" data-i18n="ops_btn_download_logs">⬇️ লগস ডাউনলোড</button>
+              <button class="btn-sm-action-cyber danger" onclick="clearOpsLogs()" data-i18n="ops_btn_clear_logs">🗑️ ক্লিয়ার লগস</button>
             </div>
           </div>
 
-          <div class="hermes-console-wrapper">
-            <div class="hermes-console-toolbar">
+          <div class="ops-console-wrapper">
+            <div class="ops-console-toolbar">
               <div style="display:flex; gap:6px; align-items:center;">
-                <span style="font-size:0.75rem; color:var(--text-muted); margin-right:4px;" data-i18n="hermes_filter_level">লেভেল:</span>
-                <button type="button" class="hermes-filter-btn active" data-level="ALL" onclick="setHermesLogFilter('ALL')">ALL</button>
-                <button type="button" class="hermes-filter-btn" data-level="INFO" onclick="setHermesLogFilter('INFO')">INFO</button>
-                <button type="button" class="hermes-filter-btn" data-level="AI_AGENT" onclick="setHermesLogFilter('AI_AGENT')">AI_AGENT</button>
-                <button type="button" class="hermes-filter-btn" data-level="SUCCESS" onclick="setHermesLogFilter('SUCCESS')">SUCCESS</button>
-                <button type="button" class="hermes-filter-btn" data-level="WARN" onclick="setHermesLogFilter('WARN')">WARN</button>
-                <button type="button" class="hermes-filter-btn" data-level="ERROR" onclick="setHermesLogFilter('ERROR')">ERROR</button>
+                <span style="font-size:0.75rem; color:var(--text-muted); margin-right:4px;" data-i18n="ops_filter_level">লেভেল:</span>
+                <button type="button" class="ops-filter-btn active" data-level="ALL" onclick="setOpsLogFilter('ALL')">ALL</button>
+                <button type="button" class="ops-filter-btn" data-level="INFO" onclick="setOpsLogFilter('INFO')">INFO</button>
+                <button type="button" class="ops-filter-btn" data-level="AI_AGENT" onclick="setOpsLogFilter('AI_AGENT')">AI_AGENT</button>
+                <button type="button" class="ops-filter-btn" data-level="SUCCESS" onclick="setOpsLogFilter('SUCCESS')">SUCCESS</button>
+                <button type="button" class="ops-filter-btn" data-level="WARN" onclick="setOpsLogFilter('WARN')">WARN</button>
+                <button type="button" class="ops-filter-btn" data-level="ERROR" onclick="setOpsLogFilter('ERROR')">ERROR</button>
               </div>
               <div style="display:flex; gap:10px; align-items:center;">
-                <input type="text" id="hermes-logs-search" placeholder="🔍 সার্চ লগস..." style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:4px; padding:4px 8px; font-size:0.75rem;" oninput="loadHermesLogs()" data-i18n-placeholder="hermes_ph_search_logs">
-                <button type="button" class="hermes-filter-btn active" id="btn-hermes-autoscroll" onclick="toggleHermesLogAutoScroll()">⚡ Auto-Scroll ON</button>
-                <button type="button" class="btn-sm-action-cyber" onclick="loadHermesLogs()">🔄</button>
+                <input type="text" id="ops-logs-search" placeholder="🔍 সার্চ লগস..." style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:4px; padding:4px 8px; font-size:0.75rem;" oninput="loadOpsLogs()" data-i18n-placeholder="ops_ph_search_logs">
+                <button type="button" class="ops-filter-btn active" id="btn-ops-autoscroll" onclick="toggleOpsLogAutoScroll()">⚡ Auto-Scroll ON</button>
+                <button type="button" class="btn-sm-action-cyber" onclick="loadOpsLogs()">🔄</button>
               </div>
             </div>
-            <div class="hermes-console" id="hermes-logs-console">
-              <div class="hermes-log-line muted">> Initializing live telemetry stream...</div>
+            <div class="ops-console" id="ops-logs-console">
+              <div class="ops-log-line muted">> Initializing live telemetry stream...</div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: CRON -->
+      <!-- Ops View: CRON -->
       <section class="tab-view" id="view-cron">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>⏱️</span> <span data-i18n="hermes_cron_title">অটোনোমাস ক্রন ও শিডিউল্ড জবস (Cron Scheduler)</span></h3>
-              <p data-i18n="hermes_cron_desc">পর্যায়ক্রমিক কোম্পানি রিপোর্ট জেনারেশন, ব্যাকগ্রাউন্ড মেমোরি ভ্যাকুয়াম ও সিস্টেম অটোমেশন</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>⏱️</span> <span data-i18n="ops_cron_title">অটোনোমাস ক্রন ও শিডিউল্ড জবস (Cron Scheduler)</span></h3>
+              <p data-i18n="ops_cron_desc">পর্যায়ক্রমিক কোম্পানি রিপোর্ট জেনারেশন, ব্যাকগ্রাউন্ড মেমোরি ভ্যাকুয়াম ও সিস্টেম অটোমেশন</p>
             </div>
             <button class="btn-primary" onclick="openNewCronModal()">
-              <span>+</span> <span data-i18n="hermes_btn_add_cron">নতুন ক্রন জব যোগ করুন</span>
+              <span>+</span> <span data-i18n="ops_btn_add_cron">নতুন ক্রন জব যোগ করুন</span>
             </button>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:14px;" id="hermes-cron-jobs-list">
+          <div style="display:flex; flex-direction:column; gap:14px;" id="ops-cron-jobs-list">
             <!-- Rendered by JS -->
           </div>
 
-          <div class="hermes-card" style="margin-top:10px;">
+          <div class="ops-card" style="margin-top:10px;">
             <div style="font-weight:700; font-size:0.9rem; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-              <span data-i18n="hermes_cron_history_title">🕒 এক্সিকিউশন ইতিহাস (Cron History Log)</span>
-              <button class="btn-sm-action-cyber" onclick="loadHermesCron()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+              <span data-i18n="ops_cron_history_title">🕒 এক্সিকিউশন ইতিহাস (Cron History Log)</span>
+              <button class="btn-sm-action-cyber" onclick="loadOpsCron()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
             </div>
-            <div id="hermes-cron-history-list" style="display:flex; flex-direction:column; gap:8px;">
+            <div id="ops-cron-history-list" style="display:flex; flex-direction:column; gap:8px;">
               <!-- History items -->
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: SKILLS (Matching Screenshot) -->
+      <!-- Ops View: SKILLS (Matching Screenshot) -->
       <section class="tab-view" id="view-skills">
-        <div class="hermes-screen-container">
+        <div class="ops-screen-container">
           <!-- Top Header -->
-          <div class="hermes-top-header">
-            <div class="hermes-title-group">
-              <h2 class="hermes-screen-title" data-i18n="hermes_skills_title">Skills</h2>
-              <span class="hermes-skills-subtitle-green" id="hermes-skills-enabled-subtitle">53/53 enabled</span>
+          <div class="ops-top-header">
+            <div class="ops-title-group">
+              <h2 class="ops-screen-title" data-i18n="ops_skills_title">Skills</h2>
+              <span class="ops-skills-subtitle-green" id="ops-skills-enabled-subtitle">53/53 enabled</span>
             </div>
-            <div class="hermes-search-bar">
+            <div class="ops-search-bar">
               <span class="search-icon">🔍</span>
-              <input type="text" id="hermes-skills-search-input" placeholder="Search..." data-i18n-placeholder="hermes_skills_search_ph" oninput="handleHermesSkillsSearch(this.value)">
+              <input type="text" id="ops-skills-search-input" placeholder="Search..." data-i18n-placeholder="ops_skills_search_ph" oninput="handleOpsSkillsSearch(this.value)">
             </div>
           </div>
 
           <!-- 2-Column Split Layout -->
-          <div class="hermes-skills-layout">
+          <div class="ops-skills-layout">
             <!-- Left Navigation Sidebar: Filters & Categories -->
-            <aside class="hermes-skills-sidebar">
+            <aside class="ops-skills-sidebar">
               <!-- Filters Section -->
-              <div class="hermes-skills-pane-title">
-                <span style="font-size:0.8rem; margin-right:4px;">Y</span> <span data-i18n="hermes_filters_label">FILTERS</span>
+              <div class="ops-skills-pane-title">
+                <span style="font-size:0.8rem; margin-right:4px;">Y</span> <span data-i18n="ops_filters_label">FILTERS</span>
               </div>
-              <div class="hermes-skills-nav-group">
-                <button type="button" class="hermes-skill-filter-item active" id="hermes-filter-btn-all" onclick="setHermesSkillFilter('all', this)">
+              <div class="ops-skills-nav-group">
+                <button type="button" class="ops-skill-filter-item active" id="ops-filter-btn-all" onclick="setOpsSkillFilter('all', this)">
                   <div class="filter-item-left">
                     <span class="filter-icon">⬡</span>
                     <span class="filter-name">ALL</span>
                   </div>
-                  <span class="filter-count" id="hermes-filter-count-all">(53)</span>
+                  <span class="filter-count" id="ops-filter-count-all">(53)</span>
                 </button>
 
-                <button type="button" class="hermes-skill-filter-item" id="hermes-filter-btn-toolsets" onclick="setHermesSkillFilter('toolsets', this)">
+                <button type="button" class="ops-skill-filter-item" id="ops-filter-btn-toolsets" onclick="setOpsSkillFilter('toolsets', this)">
                   <div class="filter-item-left">
                     <span class="filter-icon">🔧</span>
                     <span class="filter-name">TOOLSETS</span>
                   </div>
-                  <span class="filter-count" id="hermes-filter-count-toolsets">(29)</span>
+                  <span class="filter-count" id="ops-filter-count-toolsets">(29)</span>
                 </button>
 
-                <button type="button" class="hermes-skill-filter-item" id="hermes-filter-btn-browse" onclick="setHermesSkillFilter('browse_hub', this)">
+                <button type="button" class="ops-skill-filter-item" id="ops-filter-btn-browse" onclick="setOpsSkillFilter('browse_hub', this)">
                   <div class="filter-item-left">
                     <span class="filter-icon">🔍</span>
                     <span class="filter-name">BROWSE HUB</span>
@@ -2109,167 +2117,167 @@
               </div>
 
               <!-- Categories Section -->
-              <div class="hermes-skills-pane-title" style="margin-top:24px;">
-                <span data-i18n="hermes_categories_label">CATEGORIES</span>
+              <div class="ops-skills-pane-title" style="margin-top:24px;">
+                <span data-i18n="ops_categories_label">CATEGORIES</span>
               </div>
-              <div class="hermes-skills-categories-list" id="hermes-skills-cat-list">
+              <div class="ops-skills-categories-list" id="ops-skills-cat-list">
                 <!-- Dynamically generated with exact screenshot categories & counts -->
               </div>
             </aside>
 
             <!-- Right Main Pane: Skills Cards List -->
-            <main class="hermes-skills-main-pane">
+            <main class="ops-skills-main-pane">
               <!-- Sub Header Bar -->
-              <div class="hermes-skills-sub-header">
-                <div class="hermes-active-cat-display">
-                  <span class="cat-icon" id="hermes-active-cat-icon">⬡</span>
-                  <span class="cat-title" id="hermes-active-cat-title">ALL</span>
+              <div class="ops-skills-sub-header">
+                <div class="ops-active-cat-display">
+                  <span class="cat-icon" id="ops-active-cat-icon">⬡</span>
+                  <span class="cat-title" id="ops-active-cat-title">ALL</span>
                 </div>
-                <div class="hermes-skills-actions-group">
-                  <span class="hermes-badge-box" id="hermes-skills-pane-count">53 skills</span>
-                  <button type="button" class="hermes-outline-btn" onclick="openHermesLearnSkillModal()">
-                    <span>🪄</span> <span data-i18n="hermes_btn_learn_skill">Learn a skill</span>
+                <div class="ops-skills-actions-group">
+                  <span class="ops-badge-box" id="ops-skills-pane-count">53 skills</span>
+                  <button type="button" class="ops-outline-btn" onclick="openOpsLearnSkillModal()">
+                    <span>🪄</span> <span data-i18n="ops_btn_learn_skill">Learn a skill</span>
                   </button>
-                  <button type="button" class="hermes-outline-btn" onclick="openNewSkillModal()">
-                    <span>+</span> <span data-i18n="hermes_btn_new_skill">New skill</span>
+                  <button type="button" class="ops-outline-btn" onclick="openNewSkillModal()">
+                    <span>+</span> <span data-i18n="ops_btn_new_skill">New skill</span>
                   </button>
                 </div>
               </div>
 
               <!-- Skills List Container -->
-              <div class="hermes-skills-rows-list" id="hermes-skills-list-pane">
+              <div class="ops-skills-rows-list" id="ops-skills-list-pane">
                 <!-- Dynamically rendered rows matching screenshot -->
               </div>
             </main>
           </div>
 
           <!-- Floating Skill Agent Help Pill -->
-          <div class="hermes-floating-agent-btn" onclick="openSkillAssistantPrompt()" title="Hermes Agent Skill Helper">
+          <div class="ops-floating-agent-btn" onclick="openSkillAssistantPrompt()" title="Autonomous Operations Agent Skill Helper">
             <span>ℹ️</span>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: PLUGINS -->
+      <!-- Ops View: PLUGINS -->
       <section class="tab-view" id="view-plugins">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>🧩</span> <span data-i18n="hermes_plugins_title">মডুলার সিস্টেম প্লাগইনস (Extensions & Plugins)</span></h3>
-              <p data-i18n="hermes_plugins_desc">ওসিআর রিডার, বিগ ডাটা প্যান্ডাস, ওয়েব স্ক্র্যাপার ও ডকার এক্সটেনশন প্যাকেজ</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>🧩</span> <span data-i18n="ops_plugins_title">মডুলার সিস্টেম প্লাগইনস (Extensions & Plugins)</span></h3>
+              <p data-i18n="ops_plugins_desc">ওসিআর রিডার, বিগ ডাটা প্যান্ডাস, ওয়েব স্ক্র্যাপার ও ডকার এক্সটেনশন প্যাকেজ</p>
             </div>
-            <button class="btn-sm-action-cyber" onclick="loadHermesPlugins()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+            <button class="btn-sm-action-cyber" onclick="loadOpsPlugins()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
           </div>
 
-          <div class="hermes-grid" id="hermes-plugins-grid">
+          <div class="ops-grid" id="ops-plugins-grid">
             <!-- Plugins rendered by JS -->
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: CHANNELS -->
+      <!-- Ops View: CHANNELS -->
       <section class="tab-view" id="view-channels">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>📡</span> <span data-i18n="hermes_channels_title">মাল্টি-প্ল্যাটফর্ম মেসেজিং চ্যানেল (Channels Integration)</span></h3>
-              <p data-i18n="hermes_channels_desc">Telegram, Discord, Slack, WhatsApp, Webchat ও Email এর মাধ্যমে এজেন্টের সাথে সংযোগ</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>📡</span> <span data-i18n="ops_channels_title">মাল্টি-প্ল্যাটফর্ম মেসেজিং চ্যানেল (Channels Integration)</span></h3>
+              <p data-i18n="ops_channels_desc">Telegram, Discord, Slack, WhatsApp, Webchat ও Email এর মাধ্যমে এজেন্টের সাথে সংযোগ</p>
             </div>
-            <button class="btn-sm-action-cyber" onclick="loadHermesChannels()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+            <button class="btn-sm-action-cyber" onclick="loadOpsChannels()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
           </div>
 
-          <div class="hermes-grid" id="hermes-channels-grid">
+          <div class="ops-grid" id="ops-channels-grid">
             <!-- Channels rendered by JS -->
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: WEBHOOKS -->
+      <!-- Ops View: WEBHOOKS -->
       <section class="tab-view" id="view-webhooks">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>🔀</span> <span data-i18n="hermes_webhooks_title">ইনবাউন্ড ও আউটবাউন্ড ওয়েবহুকস (Webhooks Hub)</span></h3>
-              <p data-i18n="hermes_webhooks_desc">বহিরাগত এপিআই ও স্ক্রিপ্ট থেকে এজেন্ট ট্রিগার ও রিয়েল-টাইম ইভেন্ট ব্রডকাস্টার</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>🔀</span> <span data-i18n="ops_webhooks_title">ইনবাউন্ড ও আউটবাউন্ড ওয়েবহুকস (Webhooks Hub)</span></h3>
+              <p data-i18n="ops_webhooks_desc">বহিরাগত এপিআই ও স্ক্রিপ্ট থেকে এজেন্ট ট্রিগার ও রিয়েল-টাইম ইভেন্ট ব্রডকাস্টার</p>
             </div>
             <button class="btn-primary" onclick="openNewWebhookModal()">
-              <span>+</span> <span data-i18n="hermes_btn_add_webhook">নতুন ওয়েবহুক যুক্ত করুন</span>
+              <span>+</span> <span data-i18n="ops_btn_add_webhook">নতুন ওয়েবহুক যুক্ত করুন</span>
             </button>
           </div>
 
-          <div class="hermes-card" style="padding:0; overflow:hidden;">
+          <div class="ops-card" style="padding:0; overflow:hidden;">
             <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:700; font-size:0.9rem;" data-i18n="hermes_webhooks_table_title">কনফিগার করা ওয়েবহুক তালিকা</span>
-              <button class="btn-sm-action-cyber" onclick="loadHermesWebhooks()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+              <span style="font-weight:700; font-size:0.9rem;" data-i18n="ops_webhooks_table_title">কনফিগার করা ওয়েবহুক তালিকা</span>
+              <button class="btn-sm-action-cyber" onclick="loadOpsWebhooks()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
             </div>
             <div style="overflow-x:auto;">
               <table style="width:100%; border-collapse:collapse; font-size:0.85rem; text-align:left;">
                 <thead>
                   <tr style="background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_name">নাম</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_type">ধরন</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_target_url">টার্গেট / এন্ডপয়েন্ট</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_secret">সিক্রেট টোকেন</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_stats">ডেলিভারি</th>
-                    <th style="padding:10px 14px; text-align:right;" data-i18n="hermes_th_actions">অ্যাকশন</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_name">নাম</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_type">ধরন</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_target_url">টার্গেট / এন্ডপয়েন্ট</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_secret">সিক্রেট টোকেন</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_stats">ডেলিভারি</th>
+                    <th style="padding:10px 14px; text-align:right;" data-i18n="ops_th_actions">অ্যাকশন</th>
                   </tr>
                 </thead>
-                <tbody id="hermes-webhooks-table-body">
+                <tbody id="ops-webhooks-table-body">
                   <!-- Rendered by JS -->
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div class="hermes-card">
-            <span style="font-weight:700; font-size:0.9rem;" data-i18n="hermes_webhooks_history_title">📡 সাম্প্রতিক ওয়েবহুক ডেলিভারি লগস</span>
-            <div id="hermes-webhook-logs-list" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+          <div class="ops-card">
+            <span style="font-weight:700; font-size:0.9rem;" data-i18n="ops_webhooks_history_title">📡 সাম্প্রতিক ওয়েবহুক ডেলিভারি লগস</span>
+            <div id="ops-webhook-logs-list" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
               <!-- Webhook Logs -->
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Hermes View: PAIRING -->
+      <!-- Ops View: PAIRING -->
       <section class="tab-view" id="view-pairing">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>🛡️</span> <span data-i18n="hermes_pairing_title">ডিভাইস পেয়ারিং ও ক্লায়েন্ট অথরাইজেশন (Device Pairing)</span></h3>
-              <p data-i18n="hermes_pairing_desc">মোবাইল অ্যাপ, ডেস্কটপ টার্মিনাল ও সাব-এজেন্ট নিরাপদে যুক্ত করার ক্রিপ্টোগ্রাফিক হ্যান্ডশেক</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>🛡️</span> <span data-i18n="ops_pairing_title">ডিভাইস পেয়ারিং ও ক্লায়েন্ট অথরাইজেশন (Device Pairing)</span></h3>
+              <p data-i18n="ops_pairing_desc">মোবাইল অ্যাপ, ডেস্কটপ টার্মিনাল ও সাব-এজেন্ট নিরাপদে যুক্ত করার ক্রিপ্টোগ্রাফিক হ্যান্ডশেক</p>
             </div>
-            <button class="btn-primary" onclick="generateHermesPairingCode()">
-              <span>⚡</span> <span data-i18n="hermes_btn_generate_code">নতুন পেয়ারিং কোড তৈরি করুন</span>
+            <button class="btn-primary" onclick="generateOpsPairingCode()">
+              <span>⚡</span> <span data-i18n="ops_btn_generate_code">নতুন পেয়ারিং কোড তৈরি করুন</span>
             </button>
           </div>
 
-          <div class="hermes-pin-box">
-            <span style="font-size:0.85rem; color:var(--cyan-glow); font-weight:700; text-transform:uppercase; letter-spacing:1px;" data-i18n="hermes_pin_label">ওয়ান-টাইম সিকিউর পেয়ারিং পিন (One-Time PIN)</span>
-            <div class="hermes-pin-code" id="hermes-active-pairing-code">------</div>
-            <div id="hermes-pairing-countdown" style="font-size:0.8rem; color:var(--text-secondary); font-family:'Fira Code', monospace;">কোড তৈরি করতে বাটনে চাপ দিন</div>
-            <p style="max-width:540px; font-size:0.78rem; color:var(--text-muted); margin-top:8px; line-height:1.5;" data-i18n="hermes_pairing_instructions">
+          <div class="ops-pin-box">
+            <span style="font-size:0.85rem; color:var(--cyan-glow); font-weight:700; text-transform:uppercase; letter-spacing:1px;" data-i18n="ops_pin_label">ওয়ান-টাইম সিকিউর পেয়ারিং পিন (One-Time PIN)</span>
+            <div class="ops-pin-code" id="ops-active-pairing-code">------</div>
+            <div id="ops-pairing-countdown" style="font-size:0.8rem; color:var(--text-secondary); font-family:'Fira Code', monospace;">কোড তৈরি করতে বাটনে চাপ দিন</div>
+            <p style="max-width:540px; font-size:0.78rem; color:var(--text-muted); margin-top:8px; line-height:1.5;" data-i18n="ops_pairing_instructions">
               আপনার অনুমোদিত ক্লায়েন্ট ডিভাইসে (Mobile App, CLI Agent, বা Secondary Desktop) এই ৬-সংখ্যার কোডটি ইনপুট করে সিকিউর কানেকশন সম্পন্ন করুন। প্রতিটি কোডের মেয়াদ ৫ মিনিট।
             </p>
           </div>
 
-          <div class="hermes-card" style="padding:0; overflow:hidden;">
+          <div class="ops-card" style="padding:0; overflow:hidden;">
             <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:700; font-size:0.9rem;" data-i18n="hermes_paired_devices_title">অনুমোদিত পেয়ার্ড ডিভাইস তালিকা (Approved Devices)</span>
-              <button class="btn-sm-action-cyber" onclick="loadHermesPairing()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+              <span style="font-weight:700; font-size:0.9rem;" data-i18n="ops_paired_devices_title">অনুমোদিত পেয়ার্ড ডিভাইস তালিকা (Approved Devices)</span>
+              <button class="btn-sm-action-cyber" onclick="loadOpsPairing()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
             </div>
             <div style="overflow-x:auto;">
               <table style="width:100%; border-collapse:collapse; font-size:0.85rem; text-align:left;">
                 <thead>
                   <tr style="background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_device_name">ডিভাইসের নাম</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_platform">প্ল্যাটফর্ম</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_ip">আইপি ঠিকানা</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_paired_date">যুক্ত করার সময়</th>
-                    <th style="padding:10px 14px;" data-i18n="hermes_th_status">স্ট্যাটাস</th>
-                    <th style="padding:10px 14px; text-align:right;" data-i18n="hermes_th_actions">অ্যাকশন</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_device_name">ডিভাইসের নাম</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_platform">প্ল্যাটফর্ম</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_ip">আইপি ঠিকানা</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_paired_date">যুক্ত করার সময়</th>
+                    <th style="padding:10px 14px;" data-i18n="ops_th_status">স্ট্যাটাস</th>
+                    <th style="padding:10px 14px; text-align:right;" data-i18n="ops_th_actions">অ্যাকশন</th>
                   </tr>
                 </thead>
-                <tbody id="hermes-paired-devices-table">
+                <tbody id="ops-paired-devices-table">
                   <!-- Rendered by JS -->
                 </tbody>
               </table>
@@ -2278,20 +2286,20 @@
         </div>
       </section>
 
-      <!-- Hermes View: PROFILES -->
+      <!-- Ops View: PROFILES -->
       <section class="tab-view" id="view-profiles">
-        <div class="hermes-view-layout">
-          <div class="hermes-header-banner">
-            <div class="hermes-title">
-              <h3><span>👥</span> <span data-i18n="hermes_profiles_title">এজেন্ট প্রোফাইল ও পার্সোনা হাব (Agent Profiles & Personas)</span></h3>
-              <p data-i18n="hermes_profiles_desc">বিভিন্ন ডিপার্টমেন্টের জন্য বিশেষায়িত সিস্টেম প্রম্পট, তাপমাত্রা ও মেমোরি স্কোপ কনফিগারেশন</p>
+        <div class="ops-view-layout">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>👥</span> <span data-i18n="ops_profiles_title">এজেন্ট প্রোফাইল ও পার্সোনা হাব (Agent Profiles & Personas)</span></h3>
+              <p data-i18n="ops_profiles_desc">বিভিন্ন ডিপার্টমেন্টের জন্য বিশেষায়িত সিস্টেম প্রম্পট, তাপমাত্রা ও মেমোরি স্কোপ কনফিগারেশন</p>
             </div>
             <button class="btn-primary" onclick="openNewProfileModal()">
-              <span>+</span> <span data-i18n="hermes_btn_add_profile">নতুন পার্সোনা তৈরি করুন</span>
+              <span>+</span> <span data-i18n="ops_btn_add_profile">নতুন পার্সোনা তৈরি করুন</span>
             </button>
           </div>
 
-          <div class="hermes-grid" id="hermes-profiles-grid">
+          <div class="ops-grid" id="ops-profiles-grid">
             <!-- Profiles rendered by JS -->
           </div>
         </div>
@@ -2649,50 +2657,50 @@
     </div>
 
     <!-- ===================================================================== -->
-    <!-- HERMES AGENT MODALS                                                   -->
+    <!-- AUTONOMOUS OPERATIONS SUITE MODALS                                                   -->
     <!-- ===================================================================== -->
 
-    <!-- 1. Hermes File Preview Modal -->
-    <div class="modal-overlay" id="hermes-preview-modal" style="display:none;">
+    <!-- 1. Ops File Preview Modal -->
+    <div class="modal-overlay" id="ops-preview-modal" style="display:none;">
       <div class="modal-card" style="max-width:720px; max-height:85vh; display:flex; flex-direction:column;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">📄</span>
-            <h3 id="hermes-preview-title" style="margin:0; font-size:1.1rem; color:var(--text-primary);">ফাইল প্রিভিউ</h3>
+            <h3 id="ops-preview-title" style="margin:0; font-size:1.1rem; color:var(--text-primary);">ফাইল প্রিভিউ</h3>
           </div>
-          <button type="button" class="modal-close" onclick="closeHermesPreviewModal()">&times;</button>
+          <button type="button" class="modal-close" onclick="closeOpsPreviewModal()">&times;</button>
         </div>
-        <div id="hermes-preview-body" class="modal-body custom-scroll" style="overflow-y:auto; flex:1; padding:15px; display:flex; flex-direction:column; gap:12px;">
+        <div id="ops-preview-body" class="modal-body custom-scroll" style="overflow-y:auto; flex:1; padding:15px; display:flex; flex-direction:column; gap:12px;">
         </div>
         <div class="modal-footer" style="padding:12px 15px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end;">
-          <button type="button" class="btn-secondary" onclick="closeHermesPreviewModal()" data-i18n="btn_close">বন্ধ করুন</button>
+          <button type="button" class="btn-secondary" onclick="closeOpsPreviewModal()" data-i18n="btn_close">বন্ধ করুন</button>
         </div>
       </div>
     </div>
 
-    <!-- 2. Hermes New Cron Job Modal -->
-    <div class="modal-overlay" id="hermes-new-cron-modal" style="display:none;">
+    <!-- 2. Ops New Cron Job Modal -->
+    <div class="modal-overlay" id="ops-new-cron-modal" style="display:none;">
       <div class="modal-card" style="max-width:540px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">⏱️</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_cron_title">নতুন অটোনোমাস ক্রন শিডিউল</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_cron_title">নতুন অটোনোমাস ক্রন শিডিউল</h3>
           </div>
           <button type="button" class="modal-close" onclick="closeNewCronModal()">&times;</button>
         </div>
-        <form onsubmit="saveNewHermesCron(event)">
+        <form onsubmit="saveNewOpsCron(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div class="form-group">
-              <label data-i18n="hermes_cron_label_name">জব বা টাস্কের নাম</label>
+              <label data-i18n="ops_cron_label_name">জব বা টাস্কের নাম</label>
               <input type="text" id="cron-input-name" class="text-input" placeholder="Daily Report Sync" required>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_cron_label_expr">Cron Expression (শিডিউল)</label>
+              <label data-i18n="ops_cron_label_expr">Cron Expression (শিডিউল)</label>
               <input type="text" id="cron-input-expr" class="text-input" placeholder="0 0 * * *" value="0 * * * *" required style="font-family:'Fira Code', monospace;">
-              <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="hermes_cron_expr_hint">উদাহরণ: */15 * * * * (প্রতি ১৫ মিনিটে), 0 0 * * * (প্রতিদিন মধ্যরাতে)</small>
+              <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="ops_cron_expr_hint">উদাহরণ: */15 * * * * (প্রতি ১৫ মিনিটে), 0 0 * * * (প্রতিদিন মধ্যরাতে)</small>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_cron_label_type">টাস্ক টাইপ (Task Type)</label>
+              <label data-i18n="ops_cron_label_type">টাস্ক টাইপ (Task Type)</label>
               <select id="cron-input-type" class="text-input">
                 <option value="system_health">System Health Check</option>
                 <option value="backup_sync">Automated Backup Sync</option>
@@ -2709,33 +2717,33 @@
       </div>
     </div>
 
-    <!-- 3. Hermes Learn Skill Modal -->
-    <div class="modal-overlay" id="hermes-learn-skill-modal" style="display:none;">
+    <!-- 3. Ops Learn Skill Modal -->
+    <div class="modal-overlay" id="ops-learn-skill-modal" style="display:none;">
       <div class="modal-card" style="max-width:560px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">🪄</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_learn_title">Learn a New Skill (স্বয়ংক্রিয় স্কিল সংযোজন)</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_learn_title">Learn a New Skill (স্বয়ংক্রিয় স্কিল সংযোজন)</h3>
           </div>
-          <button type="button" class="modal-close" onclick="closeHermesLearnSkillModal()">&times;</button>
+          <button type="button" class="modal-close" onclick="closeOpsLearnSkillModal()">&times;</button>
         </div>
-        <form onsubmit="executeHermesLearnSkill(event)">
+        <form onsubmit="executeOpsLearnSkill(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div class="form-group">
-              <label data-i18n="hermes_learn_url_label">Repository / Documentation URL (ঐচ্ছিক)</label>
-              <input type="url" id="hermes-learn-url" class="text-input" placeholder="https://github.com/owner/skill-repo or https://api.docs/...">
+              <label data-i18n="ops_learn_url_label">Repository / Documentation URL (ঐচ্ছিক)</label>
+              <input type="url" id="ops-learn-url" class="text-input" placeholder="https://github.com/owner/skill-repo or https://api.docs/...">
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_learn_name_label">স্কিল আইডেন্টিফায়ার (Skill Name)</label>
-              <input type="text" id="hermes-learn-name" class="text-input" placeholder="competitor-news-monitor, my-custom-tool" required>
+              <label data-i18n="ops_learn_name_label">স্কিল আইডেন্টিফায়ার (Skill Name)</label>
+              <input type="text" id="ops-learn-name" class="text-input" placeholder="competitor-news-monitor, my-custom-tool" required>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_learn_desc_label">উদ্দেশ্য ও কাজের বিবরণ (Objective)</label>
-              <textarea id="hermes-learn-desc" class="text-input" rows="3" placeholder="এই স্কিলটি এজেন্টের কী ধরণের সক্ষমতা যোগ করবে এবং কীভাবে টাস্ক এক্সিকিউট করবে..." required></textarea>
+              <label data-i18n="ops_learn_desc_label">উদ্দেশ্য ও কাজের বিবরণ (Objective)</label>
+              <textarea id="ops-learn-desc" class="text-input" rows="3" placeholder="এই স্কিলটি এজেন্টের কী ধরণের সক্ষমতা যোগ করবে এবং কীভাবে টাস্ক এক্সিকিউট করবে..." required></textarea>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_learn_cat_label">ক্যাটাগরি</label>
-              <select id="hermes-learn-cat" class="text-input">
+              <label data-i18n="ops_learn_cat_label">ক্যাটাগরি</label>
+              <select id="ops-learn-cat" class="text-input">
                 <option value="Autonomous AI Agents">Autonomous AI Agents</option>
                 <option value="Creative">Creative</option>
                 <option value="Email">Email</option>
@@ -2750,42 +2758,42 @@
             </div>
           </div>
           <div class="modal-footer" style="padding:14px 18px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end; gap:10px;">
-            <button type="button" class="btn-secondary" onclick="closeHermesLearnSkillModal()" data-i18n="btn_cancel">বাতিল</button>
+            <button type="button" class="btn-secondary" onclick="closeOpsLearnSkillModal()" data-i18n="btn_cancel">বাতিল</button>
             <button type="submit" class="btn-primary" data-i18n="btn_learn_submit">🪄 স্কিল শেখান (Learn Skill)</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- 4. Hermes New Skill Modal -->
-    <div class="modal-overlay" id="hermes-new-skill-modal" style="display:none;">
+    <!-- 4. Ops New Skill Modal -->
+    <div class="modal-overlay" id="ops-new-skill-modal" style="display:none;">
       <div class="modal-card" style="max-width:580px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">🧠</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_skill_title">নতুন এআই স্কিল যুক্ত করুন</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_skill_title">নতুন এআই স্কিল যুক্ত করুন</h3>
           </div>
           <button type="button" class="modal-close" onclick="closeNewSkillModal()">&times;</button>
         </div>
-        <form onsubmit="saveNewHermesSkill(event)">
+        <form onsubmit="saveNewOpsSkill(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div style="display:grid; grid-template-columns: 80px 1fr; gap:12px;">
               <div class="form-group">
-                <label data-i18n="hermes_skill_label_icon">আইকন</label>
+                <label data-i18n="ops_skill_label_icon">আইকন</label>
                 <input type="text" id="skill-input-icon" class="text-input" placeholder="📊" value="✨" style="text-align:center; font-size:1.2rem;">
               </div>
               <div class="form-group">
-                <label data-i18n="hermes_skill_label_name">স্কিলের নাম</label>
+                <label data-i18n="ops_skill_label_name">স্কিলের নাম</label>
                 <input type="text" id="skill-input-name" class="text-input" placeholder="custom-tool-operator" required>
               </div>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_skill_label_desc">সংক্ষিপ্ত বিবরণ</label>
+              <label data-i18n="ops_skill_label_desc">সংক্ষিপ্ত বিবরণ</label>
               <input type="text" id="skill-input-desc" class="text-input" placeholder="বিশেষায়িত কাজের জন্য এজেন্টের এক্সিকিউটেবল সক্ষমতা" required>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div class="form-group">
-                <label data-i18n="hermes_skill_label_cat">ক্যাটাগরি</label>
+                <label data-i18n="ops_skill_label_cat">ক্যাটাগরি</label>
                 <select id="skill-input-cat" class="text-input">
                   <option value="Autonomous AI Agents">Autonomous AI Agents</option>
                   <option value="Creative">Creative</option>
@@ -2802,16 +2810,16 @@
               <div class="form-group" style="display:flex; flex-direction:column; justify-content:center;">
                 <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; margin-top:20px;">
                   <input type="checkbox" id="skill-input-is-toolset" style="width:16px; height:16px;">
-                  <span style="font-size:0.85rem; color:var(--text-secondary);" data-i18n="hermes_skill_is_toolset">Toolset Skill (CLI/API Integration)</span>
+                  <span style="font-size:0.85rem; color:var(--text-secondary);" data-i18n="ops_skill_is_toolset">Toolset Skill (CLI/API Integration)</span>
                 </label>
               </div>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_skill_label_inst">এক্সিকিউশন ইন্সট্রাকশন / প্রম্পট</label>
+              <label data-i18n="ops_skill_label_inst">এক্সিকিউশন ইন্সট্রাকশন / প্রম্পট</label>
               <textarea id="skill-input-inst" class="text-input" rows="3" placeholder="যখন এই স্কিল ট্রিগার হবে তখন এজেন্ট এই কর্মপদ্ধতি অনুসরণ করবে..." required></textarea>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_skill_label_triggers">ট্রিগার কিওয়ার্ডস (কমা দিয়ে আলাদা করুন)</label>
+              <label data-i18n="ops_skill_label_triggers">ট্রিগার কিওয়ার্ডস (কমা দিয়ে আলাদা করুন)</label>
               <input type="text" id="skill-input-triggers" class="text-input" placeholder="code, analyze, report, হিসাব, ডাটা">
             </div>
           </div>
@@ -2823,13 +2831,13 @@
       </div>
     </div>
 
-    <!-- 4. Hermes Channel Config Modal -->
-    <div class="modal-overlay" id="hermes-channel-config-modal" style="display:none;">
+    <!-- 4. Ops Channel Config Modal -->
+    <div class="modal-overlay" id="ops-channel-config-modal" style="display:none;">
       <div class="modal-card" style="max-width:540px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">📡</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);"><span data-i18n="hermes_modal_channel_title">চ্যানেল কনফিগারেশন:</span> <span id="channel-config-name" style="color:var(--emerald-glow);"></span></h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);"><span data-i18n="ops_modal_channel_title">চ্যানেল কনফিগারেশন:</span> <span id="channel-config-name" style="color:var(--emerald-glow);"></span></h3>
           </div>
           <button type="button" class="modal-close" onclick="closeChannelConfigModal()">&times;</button>
         </div>
@@ -2837,20 +2845,20 @@
           <input type="hidden" id="channel-config-id">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div class="form-group">
-              <label data-i18n="hermes_channel_label_token">Bot Token / API Secret Key</label>
+              <label data-i18n="ops_channel_label_token">Bot Token / API Secret Key</label>
               <input type="password" id="channel-config-token" class="text-input" placeholder="••••••••••••••••" style="font-family:'Fira Code', monospace;">
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_channel_label_url">Webhook Target URL / Inbound Endpoint</label>
+              <label data-i18n="ops_channel_label_url">Webhook Target URL / Inbound Endpoint</label>
               <input type="text" id="channel-config-url" class="text-input" placeholder="https://api.telegram.org/bot... or Discord Webhook">
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_channel_label_chatid">Default Chat ID / Channel ID</label>
+              <label data-i18n="ops_channel_label_chatid">Default Chat ID / Channel ID</label>
               <input type="text" id="channel-config-chatid" class="text-input" placeholder="-100123456789">
             </div>
             <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:5px;">
               <input type="checkbox" id="channel-config-enabled" style="accent-color:var(--emerald-accent); width:18px; height:18px; cursor:pointer;">
-              <label for="channel-config-enabled" style="margin:0; cursor:pointer; font-weight:600; color:var(--text-primary);" data-i18n="hermes_channel_label_active">এই চ্যানেলটি সক্রিয় রাখুন (Inbound/Outbound Enabled)</label>
+              <label for="channel-config-enabled" style="margin:0; cursor:pointer; font-weight:600; color:var(--text-primary);" data-i18n="ops_channel_label_active">এই চ্যানেলটি সক্রিয় রাখুন (Inbound/Outbound Enabled)</label>
             </div>
           </div>
           <div class="modal-footer" style="padding:14px 18px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end; gap:10px;">
@@ -2861,31 +2869,31 @@
       </div>
     </div>
 
-    <!-- 5. Hermes New Webhook Modal -->
-    <div class="modal-overlay" id="hermes-new-webhook-modal" style="display:none;">
+    <!-- 5. Ops New Webhook Modal -->
+    <div class="modal-overlay" id="ops-new-webhook-modal" style="display:none;">
       <div class="modal-card" style="max-width:540px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">🔗</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_webhook_title">নতুন এন্টারপ্রাইজ ওয়েবহুক নিবন্ধন</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_webhook_title">নতুন এন্টারপ্রাইজ ওয়েবহুক নিবন্ধন</h3>
           </div>
           <button type="button" class="modal-close" onclick="closeNewWebhookModal()">&times;</button>
         </div>
-        <form onsubmit="saveNewHermesWebhook(event)">
+        <form onsubmit="saveNewOpsWebhook(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div class="form-group">
-              <label data-i18n="hermes_webhook_label_name">ওয়েবহুকের নাম</label>
+              <label data-i18n="ops_webhook_label_name">ওয়েবহুকের নাম</label>
               <input type="text" id="webhook-input-name" class="text-input" placeholder="CRM Lead Alert" required>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_webhook_label_type">ডিরেকশন ও টাইপ (Direction)</label>
+              <label data-i18n="ops_webhook_label_type">ডিরেকশন ও টাইপ (Direction)</label>
               <select id="webhook-input-type" class="text-input">
                 <option value="inbound">Inbound (বাইরের সিস্টেম থেকে এজেন্টে ইভেন্ট গ্রহণ)</option>
                 <option value="outbound">Outbound (এজেন্ট অ্যাক্টিভিটি অন্য সার্ভারে প্রেরণ)</option>
               </select>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_webhook_label_url">টার্গেট ইউআরএল (Target URL - Outbound এর জন্য)</label>
+              <label data-i18n="ops_webhook_label_url">টার্গেট ইউআরএল (Target URL - Outbound এর জন্য)</label>
               <input type="url" id="webhook-input-url" class="text-input" placeholder="https://api.company.com/webhooks/agent">
             </div>
           </div>
@@ -2897,49 +2905,49 @@
       </div>
     </div>
 
-    <!-- 6. Hermes New Profile Modal -->
-    <div class="modal-overlay" id="hermes-new-profile-modal" style="display:none;">
+    <!-- 6. Ops New Profile Modal -->
+    <div class="modal-overlay" id="ops-new-profile-modal" style="display:none;">
       <div class="modal-card" style="max-width:580px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">🎭</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_profile_title">নতুন এজেন্ট পার্সোনা প্রোফাইল তৈরি</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_profile_title">নতুন এজেন্ট পার্সোনা প্রোফাইল তৈরি</h3>
           </div>
           <button type="button" class="modal-close" onclick="closeNewProfileModal()">&times;</button>
         </div>
-        <form onsubmit="saveNewHermesProfile(event)">
+        <form onsubmit="saveNewOpsProfile(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div style="display:grid; grid-template-columns: 80px 1fr; gap:12px;">
               <div class="form-group">
-                <label data-i18n="hermes_profile_label_avatar">অবতার</label>
+                <label data-i18n="ops_profile_label_avatar">অবতার</label>
                 <input type="text" id="profile-input-avatar" class="text-input" placeholder="🤖" value="⚡" style="text-align:center; font-size:1.2rem;">
               </div>
               <div class="form-group">
-                <label data-i18n="hermes_profile_label_name">প্রোফাইলের নাম</label>
+                <label data-i18n="ops_profile_label_name">প্রোফাইলের নাম</label>
                 <input type="text" id="profile-input-name" class="text-input" placeholder="IT Support Architect" required>
               </div>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_profile_label_desc">সংক্ষিপ্ত ভূমিকা / বিবরণ</label>
+              <label data-i18n="ops_profile_label_desc">সংক্ষিপ্ত ভূমিকা / বিবরণ</label>
               <input type="text" id="profile-input-desc" class="text-input" placeholder="নেটওয়ার্কিং, সার্ভার ও ট্রাবলশুটিং বিশেষজ্ঞ" required>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div class="form-group">
-                <label data-i18n="hermes_profile_label_model">ডিফল্ট মডেল</label>
+                <label data-i18n="ops_profile_label_model">ডিফল্ট মডেল</label>
                 <select id="profile-input-model" class="text-input">
                   <option value="gpt-4o">GPT-4o (High Intelligence)</option>
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
                   <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                  <option value="hermes-3-llama-70b">Hermes-3 Llama 70B</option>
+                  <option value="deepseek-r1-70b">DeepSeek R1 (Autonomous Reasoning)</option>
                 </select>
               </div>
               <div class="form-group">
-                <label data-i18n="hermes_profile_label_temp">Temperature (সৃজনশীলতা)</label>
+                <label data-i18n="ops_profile_label_temp">Temperature (সৃজনশীলতা)</label>
                 <input type="number" id="profile-input-temp" class="text-input" min="0" max="1" step="0.05" value="0.3">
               </div>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_profile_label_prompt">সিস্টেম প্রম্পট (System Prompt / Persona Instructions)</label>
+              <label data-i18n="ops_profile_label_prompt">সিস্টেম প্রম্পট (System Prompt / Persona Instructions)</label>
               <textarea id="profile-input-prompt" class="text-input" rows="4" placeholder="তুমি একজন দক্ষ এন্টারপ্রাইজ সিস্টেম আর্কিটেক্ট..." required></textarea>
             </div>
           </div>
@@ -2951,23 +2959,23 @@
       </div>
     </div>
 
-    <!-- 7. Hermes Prune Sessions Modal -->
-    <div class="modal-overlay" id="hermes-prune-sessions-modal" style="display:none;">
+    <!-- 7. Ops Prune Sessions Modal -->
+    <div class="modal-overlay" id="ops-prune-sessions-modal" style="display:none;">
       <div class="modal-card" style="max-width:500px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">🗑️</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_prune_title">পুরানো সেশন প্রুন ও ক্লিনআপ</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_prune_title">পুরানো সেশন প্রুন ও ক্লিনআপ</h3>
           </div>
           <button type="button" class="modal-close" onclick="closePruneSessionsModal()">&times;</button>
         </div>
         <form onsubmit="executePruneSessions(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
-            <p style="color:var(--text-secondary); font-size:0.85rem;" data-i18n="hermes_prune_desc">
+            <p style="color:var(--text-secondary); font-size:0.85rem;" data-i18n="ops_prune_desc">
               সিস্টেম স্টোরেজ পরিচ্ছন্ন রাখতে নির্দিষ্ট দিনের চেয়ে পুরানো বা শূন্য মেসেজযুক্ত খালি সেশনসমূহ মুছে ফেলুন।
             </p>
             <div class="form-group">
-              <label data-i18n="hermes_prune_days_label">কত দিনের পুরানো সেশন মুছবেন?</label>
+              <label data-i18n="ops_prune_days_label">কত দিনের পুরানো সেশন মুছবেন?</label>
               <select id="prune-sess-days" class="text-input">
                 <option value="7">৭ দিনের পুরানো (Older than 7 days)</option>
                 <option value="14">১৪ দিনের পুরানো (Older than 14 days)</option>
@@ -2977,7 +2985,7 @@
             </div>
             <div class="form-group" style="display:flex; align-items:center; gap:8px;">
               <input type="checkbox" id="prune-sess-empty-only" style="accent-color:var(--emerald-accent); width:18px; height:18px; cursor:pointer;">
-              <label for="prune-sess-empty-only" style="margin:0; cursor:pointer; font-size:0.85rem;" data-i18n="hermes_prune_empty_only">শুধুমাত্র খালি (০ মেসেজ) সেশন মুছুন</label>
+              <label for="prune-sess-empty-only" style="margin:0; cursor:pointer; font-size:0.85rem;" data-i18n="ops_prune_empty_only">শুধুমাত্র খালি (০ মেসেজ) সেশন মুছুন</label>
             </div>
           </div>
           <div class="modal-footer" style="padding:14px 18px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end; gap:10px;">
@@ -2988,27 +2996,27 @@
       </div>
     </div>
 
-    <!-- 8. Hermes Import Sessions Modal -->
-    <div class="modal-overlay" id="hermes-import-sessions-modal" style="display:none;">
+    <!-- 8. Ops Import Sessions Modal -->
+    <div class="modal-overlay" id="ops-import-sessions-modal" style="display:none;">
       <div class="modal-card" style="max-width:540px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">📥</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_import_title">চ্যাট সেশন ইমপোর্ট</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_import_title">চ্যাট সেশন ইমপোর্ট</h3>
           </div>
           <button type="button" class="modal-close" onclick="closeImportSessionsModal()">&times;</button>
         </div>
         <form onsubmit="executeImportSessions(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
-            <p style="color:var(--text-secondary); font-size:0.85rem;" data-i18n="hermes_import_desc">
+            <p style="color:var(--text-secondary); font-size:0.85rem;" data-i18n="ops_import_desc">
               পূর্বের এক্সপোর্টকৃত সেশনের JSON ফাইল নির্বাচন করুন অথবা সরাসরি JSON পেস্ট করুন।
             </p>
             <div class="form-group">
-              <label data-i18n="hermes_import_file_label">JSON ফাইল নির্বাচন</label>
+              <label data-i18n="ops_import_file_label">JSON ফাইল নির্বাচন</label>
               <input type="file" id="import-sessions-file" accept=".json" class="text-input" onchange="handleImportSessionFile(event)">
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_import_json_label">অথবা JSON ডাটা পেস্ট করুন</label>
+              <label data-i18n="ops_import_json_label">অথবা JSON ডাটা পেস্ট করুন</label>
               <textarea id="import-sessions-json" class="text-input" rows="5" placeholder='{"sessions": [{"title": "Session 1", "messages": []}]}'></textarea>
             </div>
           </div>
@@ -3020,36 +3028,36 @@
       </div>
     </div>
 
-    <!-- 9. Hermes Create FS Item Modal -->
-    <div class="modal-overlay" id="hermes-create-fs-modal" style="display:none;">
+    <!-- 9. Ops Create FS Item Modal -->
+    <div class="modal-overlay" id="ops-create-fs-modal" style="display:none;">
       <div class="modal-card" style="max-width:500px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:1.3rem;">📁</span>
-            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="hermes_modal_create_fs_title">নতুন ফোল্ডার বা ফাইল তৈরি</h3>
+            <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);" data-i18n="ops_modal_create_fs_title">নতুন ফোল্ডার বা ফাইল তৈরি</h3>
           </div>
-          <button type="button" class="modal-close" onclick="closeHermesCreateFsItemModal()">&times;</button>
+          <button type="button" class="modal-close" onclick="closeOpsCreateFsItemModal()">&times;</button>
         </div>
-        <form onsubmit="executeHermesCreateFsItem(event)">
+        <form onsubmit="executeOpsCreateFsItem(event)">
           <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
             <div class="form-group">
-              <label data-i18n="hermes_fs_target_path">টার্গেট পাথ (Target Path)</label>
-              <input type="text" id="hermes-create-fs-path" class="text-input" readonly style="font-family:'Fira Code', monospace; color:var(--text-muted);">
+              <label data-i18n="ops_fs_target_path">টার্গেট পাথ (Target Path)</label>
+              <input type="text" id="ops-create-fs-path" class="text-input" readonly style="font-family:'Fira Code', monospace; color:var(--text-muted);">
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_fs_item_type">আইটেমের ধরন</label>
-              <select id="hermes-create-fs-type" class="text-input">
+              <label data-i18n="ops_fs_item_type">আইটেমের ধরন</label>
+              <select id="ops-create-fs-type" class="text-input">
                 <option value="folder">📁 নতুন ফোল্ডার (New Directory)</option>
                 <option value="file">📄 নতুন ফাইল (New File)</option>
               </select>
             </div>
             <div class="form-group">
-              <label data-i18n="hermes_fs_item_name">নাম (Name)</label>
-              <input type="text" id="hermes-create-fs-name" class="text-input" placeholder="my_folder or notes.txt" required>
+              <label data-i18n="ops_fs_item_name">নাম (Name)</label>
+              <input type="text" id="ops-create-fs-name" class="text-input" placeholder="my_folder or notes.txt" required>
             </div>
           </div>
           <div class="modal-footer" style="padding:14px 18px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end; gap:10px;">
-            <button type="button" class="btn-secondary" onclick="closeHermesCreateFsItemModal()" data-i18n="btn_cancel">বাতিল</button>
+            <button type="button" class="btn-secondary" onclick="closeOpsCreateFsItemModal()" data-i18n="btn_cancel">বাতিল</button>
             <button type="submit" class="btn-primary" data-i18n="btn_create">তৈরি করুন</button>
           </div>
         </form>
@@ -3074,7 +3082,7 @@
   <script src="js/admin_manager.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/reports_manager.js"></script>
-  <script src="js/hermes_manager.js"></script>
+  <script src="js/ops_manager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

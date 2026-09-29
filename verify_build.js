@@ -184,7 +184,7 @@ function checkApiRouters() {
     'auth.py', 'chat.py', 'documents.py', 'memory.py', 'settings.py',
     'sessions.py', 'users.py', 'dashboard.py', 'models_mgmt.py',
     'mcp_router.py', 'security_router.py', 'backup.py', 'reports.py',
-    'hermes_router.py'
+    'ops_router.py'
   ];
   const routersDir = path.join(ROOT_DIR, 'backend', 'routers');
   requiredRouters.forEach(r => {
@@ -218,7 +218,7 @@ function checkFrontendAssets() {
     'js/user_manager.js', 'js/model_manager.js', 'js/memory_manager.js',
     'js/mcp_manager.js', 'js/security_manager.js', 'js/backup_manager.js',
     'js/admin_manager.js', 'js/settings.js', 'js/reports_manager.js',
-    'js/hermes_manager.js'
+    'js/ops_manager.js'
   ];
   requiredFrontend.forEach(item => {
     if (fs.existsSync(path.join(frontendDir, item))) {

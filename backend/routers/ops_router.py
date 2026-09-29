@@ -22,15 +22,15 @@ from config import settings
 from routers.auth import get_current_user
 
 logger = logging.getLogger("myagent.ops")
-router = APIRouter(prefix="/api/hermes", tags=["Autonomous Agent Engine"])
+router = APIRouter(prefix="/api/ops", tags=["Autonomous Agent Engine"])
 
 # Resolve persistent DB path
 def get_db_path() -> str:
     if os.name == 'nt' or not os.path.exists(settings.DATA_DIR):
-        return os.path.join("./data", "hermes.db")
-    return os.path.join(settings.DATA_DIR, "hermes.db")
+        return os.path.join("./data", "ops.db")
+    return os.path.join(settings.DATA_DIR, "ops.db")
 
-async def get_hermes_db():
+async def get_ops_db():
     db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     db = await aiosqlite.connect(db_path)
@@ -38,14 +38,14 @@ async def get_hermes_db():
     await db.execute("PRAGMA journal_mode=WAL;")
     return db
 
-async def init_hermes_db():
-    """Initializes Hermes persistent SQLite schema and seeds default operational configurations."""
+async def init_ops_db():
+    """Initializes Ops persistent SQLite schema and seeds default operational configurations."""
     init_opt_data_filesystem()
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         # 1. Logs table
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_logs (
+            CREATE TABLE IF NOT EXISTS ops_logs (
                 id TEXT PRIMARY KEY,
                 timestamp TEXT NOT NULL,
                 level TEXT NOT NULL,
@@ -57,7 +57,7 @@ async def init_hermes_db():
 
         # 2. Cron jobs table
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_cron_jobs (
+            CREATE TABLE IF NOT EXISTS ops_cron_jobs (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 expression TEXT NOT NULL,
@@ -73,7 +73,7 @@ async def init_hermes_db():
 
         # 3. Cron history
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_cron_history (
+            CREATE TABLE IF NOT EXISTS ops_cron_history (
                 id TEXT PRIMARY KEY,
                 job_id TEXT NOT NULL,
                 job_name TEXT NOT NULL,
@@ -84,9 +84,9 @@ async def init_hermes_db():
             )
         """)
 
-        # 4. Skills catalog (Hermes 53 Standard Skills Suite)
+        # 4. Skills catalog (Ops 53 Standard Skills Suite)
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_skills (
+            CREATE TABLE IF NOT EXISTS ops_skills (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
@@ -101,13 +101,13 @@ async def init_hermes_db():
             )
         """)
         try:
-            await db.execute("ALTER TABLE hermes_skills ADD COLUMN is_toolset INTEGER DEFAULT 0;")
+            await db.execute("ALTER TABLE ops_skills ADD COLUMN is_toolset INTEGER DEFAULT 0;")
         except Exception:
             pass
 
         # 5. Plugins catalog
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_plugins (
+            CREATE TABLE IF NOT EXISTS ops_plugins (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
@@ -123,7 +123,7 @@ async def init_hermes_db():
 
         # 6. Messaging Channels
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_channels (
+            CREATE TABLE IF NOT EXISTS ops_channels (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 platform TEXT NOT NULL,
@@ -139,7 +139,7 @@ async def init_hermes_db():
 
         # 7. Webhooks
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_webhooks (
+            CREATE TABLE IF NOT EXISTS ops_webhooks (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 webhook_type TEXT NOT NULL, -- 'inbound' or 'outbound'
@@ -155,7 +155,7 @@ async def init_hermes_db():
 
         # 8. Webhook logs
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_webhook_logs (
+            CREATE TABLE IF NOT EXISTS ops_webhook_logs (
                 id TEXT PRIMARY KEY,
                 webhook_id TEXT NOT NULL,
                 event_type TEXT NOT NULL,
@@ -169,7 +169,7 @@ async def init_hermes_db():
 
         # 9. Pairing codes & approved devices
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_pairing_codes (
+            CREATE TABLE IF NOT EXISTS ops_pairing_codes (
                 code TEXT PRIMARY KEY,
                 created_at REAL NOT NULL,
                 expires_at REAL NOT NULL,
@@ -177,7 +177,7 @@ async def init_hermes_db():
             )
         """)
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_paired_devices (
+            CREATE TABLE IF NOT EXISTS ops_paired_devices (
                 device_id TEXT PRIMARY KEY,
                 device_name TEXT NOT NULL,
                 ip_address TEXT,
@@ -190,7 +190,7 @@ async def init_hermes_db():
 
         # 10. Agent Profiles / Personas
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS hermes_profiles (
+            CREATE TABLE IF NOT EXISTS ops_profiles (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 avatar TEXT DEFAULT '🤖',
@@ -208,20 +208,20 @@ async def init_hermes_db():
         await db.commit()
 
         # Seed defaults
-        await _seed_hermes_defaults(db)
+        await _seed_ops_defaults(db)
     finally:
         await db.close()
 
-async def _seed_hermes_defaults(db: aiosqlite.Connection):
+async def _seed_ops_defaults(db: aiosqlite.Connection):
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. Seed Skills (Hermes 53 Standard Suite matching exact screenshot numbers)
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_skills") as cursor:
+    # 1. Seed Skills (Ops 53 Standard Suite matching exact screenshot numbers)
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_skills") as cursor:
         row = await cursor.fetchone()
         if not row or row["cnt"] < 60:
-            await db.execute("DELETE FROM hermes_skills WHERE is_system = 1")
+            await db.execute("DELETE FROM ops_skills WHERE is_system = 1")
             
-            hermes_53_skills = [
+            ops_53_skills = [
                 # Autonomous AI Agents (5 skills, 4 toolsets)
                 ("skill_auto_task_planner", "autonomous-task-planner", "Decompose complex multi-step user goals into executable DAG plans.", "🤖", "Autonomous AI Agents", "Deconstruct complex tasks into atomic sequential and parallel executions.", "[\"plan\", \"autonomous\"]", 1, 1, 1, now_str),
                 ("skill_subagent_swarm", "subagent-swarm-orchestrator", "Spawn, supervise, and aggregate responses from specialized subagents.", "🐝", "Autonomous AI Agents", "Orchestrate agent swarms for parallel task delegation and synthesis.", "[\"swarm\", \"subagents\"]", 1, 1, 1, now_str),
@@ -305,12 +305,12 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("skill_it_ticket_auto", "it-support-ticket-automator", "Auto-triage IT Support BD tickets, assign severity, and trigger automated remediations.", "🎫", "Productivity", "Parse incoming customer support requests, assign priority labels, and invoke targeted resolution runbooks.", "[\"ticket\", \"support\", \"helpdesk\"]", 1, 1, 1, now_str)
             ]
             await db.executemany("""
-                INSERT INTO hermes_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
+                INSERT INTO ops_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, hermes_53_skills)
+            """, ops_53_skills)
 
     # 2. Seed Plugins if empty
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_plugins") as cursor:
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_plugins") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
             plugins = [
@@ -322,12 +322,12 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("plugin_pdfminer", "PDF High-Precision Parser", "পিডিএফ ফাইলের লেআউট, টেবিল ও বাংলা হরফ সংরক্ষণ করে চাঙ্কিং।", "📄", "20240310", "document", 1, json.dumps({"extract_images": False}), "Active", now_str)
             ]
             await db.executemany("""
-                INSERT INTO hermes_plugins (id, name, description, icon, version, category, is_enabled, config_json, status, updated_at)
+                INSERT INTO ops_plugins (id, name, description, icon, version, category, is_enabled, config_json, status, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, plugins)
 
     # 3. Seed Cron Jobs if empty
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_cron_jobs") as cursor:
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_cron_jobs") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
             crons = [
@@ -338,12 +338,12 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("cron_llm_ping", "LLM Latency & Heartbeat Monitor", "*/15 * * * *", "llm_ping", json.dumps({"timeout_ms": 2000}), 1, None, "Every 15 minutes", "IDLE", now_str)
             ]
             await db.executemany("""
-                INSERT INTO hermes_cron_jobs (id, name, expression, task_type, payload, is_enabled, last_run, next_run, last_status, created_at)
+                INSERT INTO ops_cron_jobs (id, name, expression, task_type, payload, is_enabled, last_run, next_run, last_status, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, crons)
 
     # 4. Seed Channels if empty
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_channels") as cursor:
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_channels") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
             channels = [
@@ -355,12 +355,12 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("chan_email", "Email Executive Alert Gateway", "email", "✉️", "", "smtp.internal-company.local:587", "ai-alerts@company.local", 0, "Standby", None)
             ]
             await db.executemany("""
-                INSERT INTO hermes_channels (id, name, platform, icon, token, webhook_url, chat_id, is_enabled, status, last_tested)
+                INSERT INTO ops_channels (id, name, platform, icon, token, webhook_url, chat_id, is_enabled, status, last_tested)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, channels)
 
     # 5. Seed Profiles if empty
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_profiles") as cursor:
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_profiles") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
             profiles = [
@@ -371,45 +371,45 @@ async def _seed_hermes_defaults(db: aiosqlite.Connection):
                 ("prof_researcher", "Strategic Market & AI Researcher", "🌐", "ওয়েব গবেষণা, মার্কেট ট্রেন্ডস, সিন্থেসিস ও ক্রিয়েটিভ স্ট্র্যাটেজি তৈরির পার্সোনা।", "You are a Strategic Market Intelligence and Research Analyst. Conduct syntheses, explore market patterns, and provide comprehensive briefing notes.", 0.7, "llama3.3", "all", 0, 1, now_str)
             ]
             await db.executemany("""
-                INSERT INTO hermes_profiles (id, name, avatar, description, system_prompt, temperature, model, memory_scope, is_active, is_system, created_at)
+                INSERT INTO ops_profiles (id, name, avatar, description, system_prompt, temperature, model, memory_scope, is_active, is_system, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, profiles)
 
     # 6. Seed initial Logs if empty
-    async with db.execute("SELECT COUNT(*) as cnt FROM hermes_logs") as cursor:
+    async with db.execute("SELECT COUNT(*) as cnt FROM ops_logs") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
             initial_logs = [
-                (str(uuid.uuid4()), now_str, "INFO", "HermesCore", "Hermes Agent Autonomous Engine initialized on port 3399.", json.dumps({"version": "3.1.0", "host": "192.168.9.9"})),
+                (str(uuid.uuid4()), now_str, "INFO", "OpsCore", "Ops Agent Autonomous Engine initialized on port 3399.", json.dumps({"version": "3.1.0", "host": "192.168.9.9"})),
                 (str(uuid.uuid4()), now_str, "SUCCESS", "VectorMemory", "ChromaDB HNSW index & SQLite FTS5 synchronized.", json.dumps({"status": "ready"})),
                 (str(uuid.uuid4()), now_str, "AI_AGENT", "SkillsHub", "6 Core Agent Skills activated (Data Analyst, Sandbox, Auditor, etc.)", json.dumps({"active_skills": 6})),
                 (str(uuid.uuid4()), now_str, "INFO", "CronRunner", "Cron task scheduler loaded with 5 recurring enterprise jobs.", json.dumps({"jobs_count": 5})),
                 (str(uuid.uuid4()), now_str, "INFO", "Profiles", "Active agent profile set to 'Executive Intelligence Assistant'.", json.dumps({"profile_id": "prof_executive"}))
             ]
             await db.executemany("""
-                INSERT INTO hermes_logs (id, timestamp, level, module, message, details)
+                INSERT INTO ops_logs (id, timestamp, level, module, message, details)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, initial_logs)
 
     await db.commit()
 
 # ==============================================================================
-# Helper to record live Hermes logs
+# Helper to record live Ops logs
 # ==============================================================================
-async def record_hermes_log(level: str, module: str, message: str, details: Optional[Dict[str, Any]] = None):
+async def record_ops_log(level: str, module: str, message: str, details: Optional[Dict[str, Any]] = None):
     try:
-        db = await get_hermes_db()
+        db = await get_ops_db()
         log_id = str(uuid.uuid4())
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         details_str = json.dumps(details, ensure_ascii=False) if details else "{}"
         await db.execute("""
-            INSERT INTO hermes_logs (id, timestamp, level, module, message, details)
+            INSERT INTO ops_logs (id, timestamp, level, module, message, details)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (log_id, ts, level, module, message, details_str))
         await db.commit()
         await db.close()
     except Exception as e:
-        logger.error(f"Failed to record hermes log: {e}")
+        logger.error(f"Failed to record ops log: {e}")
 
 # ==============================================================================
 # 1. LOGS Endpoints
@@ -422,9 +422,9 @@ async def get_logs(
     user=Depends(get_current_user)
 ):
     """Retrieves operational telemetry and agent execution logs."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        query = "SELECT * FROM hermes_logs WHERE 1=1"
+        query = "SELECT * FROM ops_logs WHERE 1=1"
         params = []
         if level and level != "ALL":
             query += " AND level = ?"
@@ -445,13 +445,13 @@ async def get_logs(
 @router.post("/logs/clear")
 async def clear_logs(user=Depends(get_current_user)):
     """Clears system logs and keeps only a fresh initialization marker."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        await db.execute("DELETE FROM hermes_logs")
+        await db.execute("DELETE FROM ops_logs")
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         await db.execute("""
-            INSERT INTO hermes_logs (id, timestamp, level, module, message, details)
-            VALUES (?, ?, 'INFO', 'HermesCore', 'Logs cleared by admin.', '{}')
+            INSERT INTO ops_logs (id, timestamp, level, module, message, details)
+            VALUES (?, ?, 'INFO', 'OpsCore', 'Logs cleared by admin.', '{}')
         """, (str(uuid.uuid4()), now_str))
         await db.commit()
         return {"success": True, "message": "Logs successfully cleared."}
@@ -464,11 +464,11 @@ async def clear_logs(user=Depends(get_current_user)):
 @router.get("/cron")
 async def list_cron_jobs(user=Depends(get_current_user)):
     """Lists all scheduled autonomous jobs and execution history."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_cron_jobs ORDER BY created_at DESC") as cursor:
+        async with db.execute("SELECT * FROM ops_cron_jobs ORDER BY created_at DESC") as cursor:
             jobs = [dict(r) for r in await cursor.fetchall()]
-        async with db.execute("SELECT * FROM hermes_cron_history ORDER BY run_at DESC LIMIT 20") as cursor:
+        async with db.execute("SELECT * FROM ops_cron_history ORDER BY run_at DESC LIMIT 20") as cursor:
             history = [dict(r) for r in await cursor.fetchall()]
         return {"success": True, "jobs": jobs, "history": history}
     finally:
@@ -477,7 +477,7 @@ async def list_cron_jobs(user=Depends(get_current_user)):
 @router.post("/cron")
 async def create_cron_job(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Creates a new autonomous cron job."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         job_id = f"cron_{uuid.uuid4().hex[:8]}"
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -488,12 +488,12 @@ async def create_cron_job(data: Dict[str, Any] = Body(...), user=Depends(get_cur
         next_run = data.get("next_run", "Scheduled")
 
         await db.execute("""
-            INSERT INTO hermes_cron_jobs (id, name, expression, task_type, payload, is_enabled, next_run, last_status, created_at)
+            INSERT INTO ops_cron_jobs (id, name, expression, task_type, payload, is_enabled, next_run, last_status, created_at)
             VALUES (?, ?, ?, ?, ?, 1, ?, 'IDLE', ?)
         """, (job_id, name, expr, task_type, payload, next_run, now_str))
         await db.commit()
 
-        await record_hermes_log("INFO", "HermesCron", f"Created new scheduled job '{name}' [{expr}]")
+        await record_ops_log("INFO", "OpsCron", f"Created new scheduled job '{name}' [{expr}]")
         return {"success": True, "job_id": job_id, "message": "Cron job created."}
     finally:
         await db.close()
@@ -501,19 +501,19 @@ async def create_cron_job(data: Dict[str, Any] = Body(...), user=Depends(get_cur
 @router.put("/cron/{job_id}/toggle")
 async def toggle_cron_job(job_id: str, user=Depends(get_current_user)):
     """Enables or disables a scheduled cron job."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT is_enabled, name FROM hermes_cron_jobs WHERE id = ?", (job_id,)) as cursor:
+        async with db.execute("SELECT is_enabled, name FROM ops_cron_jobs WHERE id = ?", (job_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Job not found")
             new_state = 0 if row["is_enabled"] else 1
             name = row["name"]
 
-        await db.execute("UPDATE hermes_cron_jobs SET is_enabled = ? WHERE id = ?", (new_state, job_id))
+        await db.execute("UPDATE ops_cron_jobs SET is_enabled = ? WHERE id = ?", (new_state, job_id))
         await db.commit()
 
-        await record_hermes_log("INFO", "HermesCron", f"Toggled job '{name}' to {'Enabled' if new_state else 'Disabled'}")
+        await record_ops_log("INFO", "OpsCron", f"Toggled job '{name}' to {'Enabled' if new_state else 'Disabled'}")
         return {"success": True, "is_enabled": bool(new_state)}
     finally:
         await db.close()
@@ -521,9 +521,9 @@ async def toggle_cron_job(job_id: str, user=Depends(get_current_user)):
 @router.post("/cron/{job_id}/run")
 async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
     """Manually triggers an immediate run of a scheduled job."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_cron_jobs WHERE id = ?", (job_id,)) as cursor:
+        async with db.execute("SELECT * FROM ops_cron_jobs WHERE id = ?", (job_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Job not found")
@@ -539,7 +539,7 @@ async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
 
         # Update job record
         await db.execute("""
-            UPDATE hermes_cron_jobs 
+            UPDATE ops_cron_jobs 
             SET last_run = ?, last_status = 'SUCCESS'
             WHERE id = ?
         """, (now_str, job_id))
@@ -547,12 +547,12 @@ async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
         # Record history
         hist_id = str(uuid.uuid4())
         await db.execute("""
-            INSERT INTO hermes_cron_history (id, job_id, job_name, run_at, duration_ms, status, output)
+            INSERT INTO ops_cron_history (id, job_id, job_name, run_at, duration_ms, status, output)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (hist_id, job_id, job["name"], now_str, duration_ms, status, output))
         await db.commit()
 
-        await record_hermes_log("SUCCESS", "HermesCron", f"Autonomous job '{job['name']}' completed in {duration_ms}ms.", {"output": output})
+        await record_ops_log("SUCCESS", "OpsCron", f"Autonomous job '{job['name']}' completed in {duration_ms}ms.", {"output": output})
         return {"success": True, "duration_ms": duration_ms, "output": output, "status": status}
     finally:
         await db.close()
@@ -560,16 +560,16 @@ async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
 @router.delete("/cron/{job_id}")
 async def delete_cron_job(job_id: str, user=Depends(get_current_user)):
     """Deletes a cron job."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        await db.execute("DELETE FROM hermes_cron_jobs WHERE id = ?", (job_id,))
+        await db.execute("DELETE FROM ops_cron_jobs WHERE id = ?", (job_id,))
         await db.commit()
         return {"success": True, "message": "Cron job deleted."}
     finally:
         await db.close()
 
 # ==============================================================================
-# 3. SKILLS Endpoints (Hermes Skills Engine)
+# 3. SKILLS Endpoints (Ops Skills Engine)
 # ==============================================================================
 @router.get("/skills")
 async def list_skills(
@@ -579,16 +579,16 @@ async def list_skills(
     user=Depends(get_current_user)
 ):
     """Lists skills with full category aggregations and toolset counts matching screenshot."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         # Check if DB has 53 skills, if not re-seed
-        async with db.execute("SELECT COUNT(*) as cnt FROM hermes_skills") as cursor:
+        async with db.execute("SELECT COUNT(*) as cnt FROM ops_skills") as cursor:
             row = await cursor.fetchone()
             if not row or row["cnt"] < 60:
-                await _seed_hermes_defaults(db)
+                await _seed_ops_defaults(db)
 
         # All skills for metadata computation
-        async with db.execute("SELECT * FROM hermes_skills ORDER BY name ASC") as cursor:
+        async with db.execute("SELECT * FROM ops_skills ORDER BY name ASC") as cursor:
             all_rows = await cursor.fetchall()
 
         all_skills = []
@@ -660,19 +660,19 @@ async def list_skills(
 @router.put("/skills/{skill_id}/toggle")
 async def toggle_skill(skill_id: str, user=Depends(get_current_user)):
     """Enables or disables an agent skill."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT is_enabled, name FROM hermes_skills WHERE id = ?", (skill_id,)) as cursor:
+        async with db.execute("SELECT is_enabled, name FROM ops_skills WHERE id = ?", (skill_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Skill not found")
             new_state = 0 if row["is_enabled"] else 1
             name = row["name"]
 
-        await db.execute("UPDATE hermes_skills SET is_enabled = ? WHERE id = ?", (new_state, skill_id))
+        await db.execute("UPDATE ops_skills SET is_enabled = ? WHERE id = ?", (new_state, skill_id))
         await db.commit()
 
-        await record_hermes_log("INFO", "SkillsHub", f"Skill '{name}' is now {'Enabled' if new_state else 'Disabled'}")
+        await record_ops_log("INFO", "SkillsHub", f"Skill '{name}' is now {'Enabled' if new_state else 'Disabled'}")
         return {"success": True, "is_enabled": bool(new_state)}
     finally:
         await db.close()
@@ -680,7 +680,7 @@ async def toggle_skill(skill_id: str, user=Depends(get_current_user)):
 @router.post("/skills/learn")
 async def learn_skill(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Autonomously learns, analyzes and incorporates a new skill from URL, repo, or instructions."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         source_url = data.get("source_url", "").strip()
         skill_name = data.get("name", "").strip()
@@ -699,12 +699,12 @@ async def learn_skill(data: Dict[str, Any] = Body(...), user=Depends(get_current
         triggers = json.dumps([skill_name, "learned", "auto"])
 
         await db.execute("""
-            INSERT INTO hermes_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
+            INSERT INTO ops_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
             VALUES (?, ?, ?, '🪄', ?, ?, ?, 1, 1, 0, ?)
         """, (skill_id, skill_name, prompt_desc or f"Autonomously synthesized skill from {source_url or 'prompt'}", category, instructions, triggers, now_str))
         await db.commit()
 
-        await record_hermes_log("AI_AGENT", "SkillsHub", f"Autonomously learned and registered new skill '{skill_name}'")
+        await record_ops_log("AI_AGENT", "SkillsHub", f"Autonomously learned and registered new skill '{skill_name}'")
         return {"success": True, "skill_id": skill_id, "name": skill_name, "message": "Skill learned successfully"}
     finally:
         await db.close()
@@ -712,7 +712,7 @@ async def learn_skill(data: Dict[str, Any] = Body(...), user=Depends(get_current
 @router.post("/skills")
 async def create_skill(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Creates a new reusable agent skill."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         skill_id = f"skill_{uuid.uuid4().hex[:8]}"
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -725,12 +725,12 @@ async def create_skill(data: Dict[str, Any] = Body(...), user=Depends(get_curren
         is_toolset = 1 if data.get("is_toolset") else 0
 
         await db.execute("""
-            INSERT INTO hermes_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
+            INSERT INTO ops_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?)
         """, (skill_id, name, desc, icon, category, instructions, triggers, is_toolset, now_str))
         await db.commit()
 
-        await record_hermes_log("INFO", "SkillsHub", f"Added custom skill '{name}'")
+        await record_ops_log("INFO", "SkillsHub", f"Added custom skill '{name}'")
         return {"success": True, "skill_id": skill_id, "message": "Skill added."}
     finally:
         await db.close()
@@ -738,9 +738,9 @@ async def create_skill(data: Dict[str, Any] = Body(...), user=Depends(get_curren
 @router.delete("/skills/{skill_id}")
 async def delete_skill(skill_id: str, user=Depends(get_current_user)):
     """Removes a custom skill (system skills are protected)."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT is_system, name FROM hermes_skills WHERE id = ?", (skill_id,)) as cursor:
+        async with db.execute("SELECT is_system, name FROM ops_skills WHERE id = ?", (skill_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Skill not found")
@@ -748,9 +748,9 @@ async def delete_skill(skill_id: str, user=Depends(get_current_user)):
                 raise HTTPException(status_code=400, detail="Built-in system skills cannot be deleted.")
             skill_name = row["name"]
 
-        await db.execute("DELETE FROM hermes_skills WHERE id = ?", (skill_id,))
+        await db.execute("DELETE FROM ops_skills WHERE id = ?", (skill_id,))
         await db.commit()
-        await record_hermes_log("INFO", "SkillsHub", f"Deleted skill '{skill_name}'")
+        await record_ops_log("INFO", "SkillsHub", f"Deleted skill '{skill_name}'")
         return {"success": True, "message": "Skill deleted."}
     finally:
         await db.close()
@@ -761,9 +761,9 @@ async def delete_skill(skill_id: str, user=Depends(get_current_user)):
 @router.get("/plugins")
 async def list_plugins(user=Depends(get_current_user)):
     """Lists modular extensions and runtime tools."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_plugins ORDER BY name ASC") as cursor:
+        async with db.execute("SELECT * FROM ops_plugins ORDER BY name ASC") as cursor:
             rows = await cursor.fetchall()
             plugins = []
             for r in rows:
@@ -780,9 +780,9 @@ async def list_plugins(user=Depends(get_current_user)):
 @router.put("/plugins/{plugin_id}/toggle")
 async def toggle_plugin(plugin_id: str, user=Depends(get_current_user)):
     """Toggles a modular plugin extension."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT is_enabled, name FROM hermes_plugins WHERE id = ?", (plugin_id,)) as cursor:
+        async with db.execute("SELECT is_enabled, name FROM ops_plugins WHERE id = ?", (plugin_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Plugin not found")
@@ -790,10 +790,10 @@ async def toggle_plugin(plugin_id: str, user=Depends(get_current_user)):
             name = row["name"]
 
         status = "Active" if new_state else "Disabled"
-        await db.execute("UPDATE hermes_plugins SET is_enabled = ?, status = ? WHERE id = ?", (new_state, status, plugin_id))
+        await db.execute("UPDATE ops_plugins SET is_enabled = ?, status = ? WHERE id = ?", (new_state, status, plugin_id))
         await db.commit()
 
-        await record_hermes_log("INFO", "Plugins", f"Plugin '{name}' set to {status}")
+        await record_ops_log("INFO", "Plugins", f"Plugin '{name}' set to {status}")
         return {"success": True, "is_enabled": bool(new_state), "status": status}
     finally:
         await db.close()
@@ -801,9 +801,9 @@ async def toggle_plugin(plugin_id: str, user=Depends(get_current_user)):
 @router.post("/plugins/{plugin_id}/test")
 async def test_plugin(plugin_id: str, user=Depends(get_current_user)):
     """Executes a diagnostic runtime test for a plugin."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_plugins WHERE id = ?", (plugin_id,)) as cursor:
+        async with db.execute("SELECT * FROM ops_plugins WHERE id = ?", (plugin_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Plugin not found")
@@ -818,7 +818,7 @@ async def test_plugin(plugin_id: str, user=Depends(get_current_user)):
             "status": "Healthy (Ready for inference)",
             "runtime_environment": "Python 3.10+ Native Container"
         }
-        await record_hermes_log("SUCCESS", "Plugins", f"Plugin diagnostic test passed for '{plugin['name']}'.")
+        await record_ops_log("SUCCESS", "Plugins", f"Plugin diagnostic test passed for '{plugin['name']}'.")
         return res
     finally:
         await db.close()
@@ -829,9 +829,9 @@ async def test_plugin(plugin_id: str, user=Depends(get_current_user)):
 @router.get("/channels")
 async def list_channels(user=Depends(get_current_user)):
     """Lists external messaging channel integrations."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_channels ORDER BY is_enabled DESC, platform ASC") as cursor:
+        async with db.execute("SELECT * FROM ops_channels ORDER BY is_enabled DESC, platform ASC") as cursor:
             rows = await cursor.fetchall()
             channels = [dict(r) for r in rows]
             return {"success": True, "channels": channels}
@@ -841,7 +841,7 @@ async def list_channels(user=Depends(get_current_user)):
 @router.put("/channels/{channel_id}")
 async def update_channel(channel_id: str, data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Updates channel credentials and status."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         token = data.get("token", "")
         webhook_url = data.get("webhook_url", "")
@@ -850,13 +850,13 @@ async def update_channel(channel_id: str, data: Dict[str, Any] = Body(...), user
         status = "Connected" if is_enabled and (token or webhook_url) else ("Standby" if is_enabled else "Disconnected")
 
         await db.execute("""
-            UPDATE hermes_channels
+            UPDATE ops_channels
             SET token = ?, webhook_url = ?, chat_id = ?, is_enabled = ?, status = ?
             WHERE id = ?
         """, (token, webhook_url, chat_id, is_enabled, status, channel_id))
         await db.commit()
 
-        await record_hermes_log("INFO", "Channels", f"Updated channel '{channel_id}' configuration.")
+        await record_ops_log("INFO", "Channels", f"Updated channel '{channel_id}' configuration.")
         return {"success": True, "status": status}
     finally:
         await db.close()
@@ -864,19 +864,19 @@ async def update_channel(channel_id: str, data: Dict[str, Any] = Body(...), user
 @router.post("/channels/{channel_id}/test")
 async def test_channel(channel_id: str, user=Depends(get_current_user)):
     """Sends a ping test notification to a messaging channel."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT name, platform FROM hermes_channels WHERE id = ?", (channel_id,)) as cursor:
+        async with db.execute("SELECT name, platform FROM ops_channels WHERE id = ?", (channel_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Channel not found")
             name = row["name"]
 
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-        await db.execute("UPDATE hermes_channels SET last_tested = ?, status = 'Connected' WHERE id = ?", (now_str, channel_id))
+        await db.execute("UPDATE ops_channels SET last_tested = ?, status = 'Connected' WHERE id = ?", (now_str, channel_id))
         await db.commit()
 
-        await record_hermes_log("SUCCESS", "Channels", f"Test message dispatched to {name}.", {"time": now_str})
+        await record_ops_log("SUCCESS", "Channels", f"Test message dispatched to {name}.", {"time": now_str})
         return {
             "success": True,
             "message": f"Test broadcast successfully transmitted to {name}.",
@@ -891,11 +891,11 @@ async def test_channel(channel_id: str, user=Depends(get_current_user)):
 @router.get("/webhooks")
 async def list_webhooks(user=Depends(get_current_user)):
     """Lists all inbound and outbound webhooks."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_webhooks ORDER BY created_at DESC") as cursor:
+        async with db.execute("SELECT * FROM ops_webhooks ORDER BY created_at DESC") as cursor:
             webhooks = [dict(r) for r in await cursor.fetchall()]
-        async with db.execute("SELECT * FROM hermes_webhook_logs ORDER BY timestamp DESC LIMIT 25") as cursor:
+        async with db.execute("SELECT * FROM ops_webhook_logs ORDER BY timestamp DESC LIMIT 25") as cursor:
             logs = [dict(r) for r in await cursor.fetchall()]
         return {"success": True, "webhooks": webhooks, "logs": logs}
     finally:
@@ -904,23 +904,23 @@ async def list_webhooks(user=Depends(get_current_user)):
 @router.post("/webhooks")
 async def create_webhook(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Registers an inbound or outbound webhook."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         hook_id = f"hook_{uuid.uuid4().hex[:8]}"
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         name = data.get("name", "Automation Webhook")
         hook_type = data.get("webhook_type", "inbound")
-        target_url = data.get("target_url", f"/api/hermes/webhooks/inbound/{hook_id}")
+        target_url = data.get("target_url", f"/api/ops/webhooks/inbound/{hook_id}")
         secret_token = data.get("secret_token") or f"whsec_{uuid.uuid4().hex[:16]}"
         events = json.dumps(data.get("events", ["all"]))
 
         await db.execute("""
-            INSERT INTO hermes_webhooks (id, name, webhook_type, target_url, secret_token, events, is_enabled, created_at)
+            INSERT INTO ops_webhooks (id, name, webhook_type, target_url, secret_token, events, is_enabled, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 1, ?)
         """, (hook_id, name, hook_type, target_url, secret_token, events, now_str))
         await db.commit()
 
-        await record_hermes_log("INFO", "Webhooks", f"Created webhook '{name}' ({hook_type})")
+        await record_ops_log("INFO", "Webhooks", f"Created webhook '{name}' ({hook_type})")
         return {"success": True, "webhook_id": hook_id, "secret_token": secret_token}
     finally:
         await db.close()
@@ -928,9 +928,9 @@ async def create_webhook(data: Dict[str, Any] = Body(...), user=Depends(get_curr
 @router.post("/webhooks/{hook_id}/test")
 async def test_webhook(hook_id: str, user=Depends(get_current_user)):
     """Simulates an event delivery to verify webhook payload."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_webhooks WHERE id = ?", (hook_id,)) as cursor:
+        async with db.execute("SELECT * FROM ops_webhooks WHERE id = ?", (hook_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Webhook not found")
@@ -942,18 +942,18 @@ async def test_webhook(hook_id: str, user=Depends(get_current_user)):
         response = json.dumps({"status": "received", "code": 200})
 
         await db.execute("""
-            INSERT INTO hermes_webhook_logs (id, webhook_id, event_type, status_code, duration_ms, payload, response, timestamp)
+            INSERT INTO ops_webhook_logs (id, webhook_id, event_type, status_code, duration_ms, payload, response, timestamp)
             VALUES (?, ?, 'ping_test', 200, 18, ?, ?, ?)
         """, (log_id, hook_id, payload, response, now_str))
 
         await db.execute("""
-            UPDATE hermes_webhooks 
+            UPDATE ops_webhooks 
             SET delivery_count = delivery_count + 1, last_triggered = ?
             WHERE id = ?
         """, (now_str, hook_id))
         await db.commit()
 
-        await record_hermes_log("SUCCESS", "Webhooks", f"Webhook test ping successful for '{hook['name']}'")
+        await record_ops_log("SUCCESS", "Webhooks", f"Webhook test ping successful for '{hook['name']}'")
         return {"success": True, "status_code": 200, "duration_ms": 18, "message": "Delivery verified"}
     finally:
         await db.close()
@@ -961,9 +961,9 @@ async def test_webhook(hook_id: str, user=Depends(get_current_user)):
 @router.delete("/webhooks/{hook_id}")
 async def delete_webhook(hook_id: str, user=Depends(get_current_user)):
     """Deletes a webhook."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        await db.execute("DELETE FROM hermes_webhooks WHERE id = ?", (hook_id,))
+        await db.execute("DELETE FROM ops_webhooks WHERE id = ?", (hook_id,))
         await db.commit()
         return {"success": True, "message": "Webhook deleted."}
     finally:
@@ -975,15 +975,15 @@ async def delete_webhook(hook_id: str, user=Depends(get_current_user)):
 @router.get("/pairing")
 async def get_pairing_status(user=Depends(get_current_user)):
     """Returns currently paired devices and active pairing status."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_paired_devices ORDER BY paired_at DESC") as cursor:
+        async with db.execute("SELECT * FROM ops_paired_devices ORDER BY paired_at DESC") as cursor:
             devices = [dict(r) for r in await cursor.fetchall()]
         
         # Check active valid code
         now_ts = time.time()
         active_code = None
-        async with db.execute("SELECT code, expires_at FROM hermes_pairing_codes WHERE expires_at > ? AND used = 0 ORDER BY created_at DESC LIMIT 1", (now_ts,)) as cursor:
+        async with db.execute("SELECT code, expires_at FROM ops_pairing_codes WHERE expires_at > ? AND used = 0 ORDER BY created_at DESC LIMIT 1", (now_ts,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 active_code = {
@@ -998,7 +998,7 @@ async def get_pairing_status(user=Depends(get_current_user)):
 @router.post("/pairing/generate")
 async def generate_pairing_code(user=Depends(get_current_user)):
     """Generates a secure 6-digit one-time device pairing code with 5-minute validity."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         import random
         code = f"{random.randint(100000, 999999)}"
@@ -1006,14 +1006,14 @@ async def generate_pairing_code(user=Depends(get_current_user)):
         expires_at = now_ts + 300 # 5 minutes
 
         # Invalidate old unused codes
-        await db.execute("UPDATE hermes_pairing_codes SET used = 1 WHERE expires_at < ?", (now_ts,))
+        await db.execute("UPDATE ops_pairing_codes SET used = 1 WHERE expires_at < ?", (now_ts,))
         await db.execute("""
-            INSERT INTO hermes_pairing_codes (code, created_at, expires_at, used)
+            INSERT INTO ops_pairing_codes (code, created_at, expires_at, used)
             VALUES (?, ?, ?, 0)
         """, (code, now_ts, expires_at))
         await db.commit()
 
-        await record_hermes_log("INFO", "Pairing", f"New 6-digit device pairing code generated [{code}].")
+        await record_ops_log("INFO", "Pairing", f"New 6-digit device pairing code generated [{code}].")
         return {
             "success": True,
             "code": code,
@@ -1026,11 +1026,11 @@ async def generate_pairing_code(user=Depends(get_current_user)):
 @router.delete("/pairing/{device_id}")
 async def revoke_paired_device(device_id: str, user=Depends(get_current_user)):
     """Revokes access for a paired device."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        await db.execute("DELETE FROM hermes_paired_devices WHERE device_id = ?", (device_id,))
+        await db.execute("DELETE FROM ops_paired_devices WHERE device_id = ?", (device_id,))
         await db.commit()
-        await record_hermes_log("WARN", "Pairing", f"Revoked paired device authorization: {device_id}")
+        await record_ops_log("WARN", "Pairing", f"Revoked paired device authorization: {device_id}")
         return {"success": True, "message": "Device pairing revoked."}
     finally:
         await db.close()
@@ -1041,9 +1041,9 @@ async def revoke_paired_device(device_id: str, user=Depends(get_current_user)):
 @router.get("/profiles")
 async def list_profiles(user=Depends(get_current_user)):
     """Lists all configured agent persona profiles."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT * FROM hermes_profiles ORDER BY is_active DESC, name ASC") as cursor:
+        async with db.execute("SELECT * FROM ops_profiles ORDER BY is_active DESC, name ASC") as cursor:
             profiles = [dict(r) for r in await cursor.fetchall()]
             return {"success": True, "profiles": profiles}
     finally:
@@ -1052,19 +1052,19 @@ async def list_profiles(user=Depends(get_current_user)):
 @router.post("/profiles/{profile_id}/activate")
 async def activate_profile(profile_id: str, user=Depends(get_current_user)):
     """Switches the active persona profile for the AI agent."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT name FROM hermes_profiles WHERE id = ?", (profile_id,)) as cursor:
+        async with db.execute("SELECT name FROM ops_profiles WHERE id = ?", (profile_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Profile not found")
             name = row["name"]
 
-        await db.execute("UPDATE hermes_profiles SET is_active = 0")
-        await db.execute("UPDATE hermes_profiles SET is_active = 1 WHERE id = ?", (profile_id,))
+        await db.execute("UPDATE ops_profiles SET is_active = 0")
+        await db.execute("UPDATE ops_profiles SET is_active = 1 WHERE id = ?", (profile_id,))
         await db.commit()
 
-        await record_hermes_log("SUCCESS", "Profiles", f"Agent persona activated: '{name}'")
+        await record_ops_log("SUCCESS", "Profiles", f"Agent persona activated: '{name}'")
         return {"success": True, "active_profile_id": profile_id, "name": name}
     finally:
         await db.close()
@@ -1072,7 +1072,7 @@ async def activate_profile(profile_id: str, user=Depends(get_current_user)):
 @router.post("/profiles")
 async def create_profile(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
     """Creates a new agent persona profile."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
         prof_id = f"prof_{uuid.uuid4().hex[:8]}"
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1085,12 +1085,12 @@ async def create_profile(data: Dict[str, Any] = Body(...), user=Depends(get_curr
         memory_scope = data.get("memory_scope", "all")
 
         await db.execute("""
-            INSERT INTO hermes_profiles (id, name, avatar, description, system_prompt, temperature, model, memory_scope, is_active, is_system, created_at)
+            INSERT INTO ops_profiles (id, name, avatar, description, system_prompt, temperature, model, memory_scope, is_active, is_system, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
         """, (prof_id, name, avatar, desc, system_prompt, temp, model, memory_scope, now_str))
         await db.commit()
 
-        await record_hermes_log("INFO", "Profiles", f"Created new agent profile '{name}'")
+        await record_ops_log("INFO", "Profiles", f"Created new agent profile '{name}'")
         return {"success": True, "profile_id": prof_id, "message": "Profile created."}
     finally:
         await db.close()
@@ -1098,9 +1098,9 @@ async def create_profile(data: Dict[str, Any] = Body(...), user=Depends(get_curr
 @router.delete("/profiles/{profile_id}")
 async def delete_profile(profile_id: str, user=Depends(get_current_user)):
     """Deletes a custom agent profile."""
-    db = await get_hermes_db()
+    db = await get_ops_db()
     try:
-        async with db.execute("SELECT is_system, is_active FROM hermes_profiles WHERE id = ?", (profile_id,)) as cursor:
+        async with db.execute("SELECT is_system, is_active FROM ops_profiles WHERE id = ?", (profile_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Profile not found")
@@ -1109,7 +1109,7 @@ async def delete_profile(profile_id: str, user=Depends(get_current_user)):
             if row["is_active"] == 1:
                 raise HTTPException(status_code=400, detail="Cannot delete currently active profile.")
 
-        await db.execute("DELETE FROM hermes_profiles WHERE id = ?", (profile_id,))
+        await db.execute("DELETE FROM ops_profiles WHERE id = ?", (profile_id,))
         await db.commit()
         return {"success": True, "message": "Profile deleted."}
     finally:
@@ -1120,7 +1120,7 @@ async def delete_profile(profile_id: str, user=Depends(get_current_user)):
 # ==============================================================================
 @router.get("/files/overview")
 async def get_files_overview(user=Depends(get_current_user)):
-    """Detailed file system and uploaded knowledge documents inspector for Hermes FILES tab."""
+    """Detailed file system and uploaded knowledge documents inspector for Ops FILES tab."""
     from memory.vector_store import VectorMemoryStore
     try:
         store = VectorMemoryStore()
@@ -1151,7 +1151,7 @@ async def get_files_overview(user=Depends(get_current_user)):
 
 
 # ==============================================================================
-# 10. REAL FILESYSTEM EXPLORER (Matching Hermes Screenshot /opt/data Explorer)
+# 10. REAL FILESYSTEM EXPLORER (Matching Ops Screenshot /opt/data Explorer)
 # ==============================================================================
 FS_BASE_DIR = os.path.abspath(os.path.join(settings.DATA_DIR if os.path.exists(settings.DATA_DIR) else "./data", "opt_data"))
 

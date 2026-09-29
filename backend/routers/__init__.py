@@ -16,6 +16,5 @@ from .models_mgmt import router as models_mgmt_router
 from .mcp_router import router as mcp_router
 from .security_router import router as security_router
 from .backup import router as backup_router
-from .reports import router as reports_router
-from .hermes_router import router as hermes_router, init_hermes_db, record_hermes_log
+from .ops_router import router as ops_router, init_ops_db, record_ops_log
 

@@ -349,7 +349,7 @@ function toggleMobileSidebar() {
   }
 }
 
-// Tab Switching across all views (including Hermes Suite, Full-Page Admin & Settings)
+// Tab Switching across all views (including Autonomous Operations Suite, Full-Page Admin & Settings)
 function switchTab(tabName) {
   const tabs = [
     'chat', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
@@ -406,20 +406,20 @@ function switchTab(tabName) {
     if (topbarDesc) topbarDesc.innerText = typeof t === 'function' ? t(tabTitles[tabName].desc) : '';
   }
 
-  // Hermes Module Loaders
-  if (tabName === 'sessions' && typeof loadHermesSessions === 'function') loadHermesSessions();
+  // Autonomous Operations Module Loaders
+  if (tabName === 'sessions' && typeof loadOpsSessions === 'function') loadOpsSessions();
   else if (tabName === 'files') {
-    if (typeof loadHermesFilesExplorer === 'function') loadHermesFilesExplorer();
-    else if (typeof loadHermesFiles === 'function') loadHermesFiles();
+    if (typeof loadOpsFilesExplorer === 'function') loadOpsFilesExplorer();
+    else if (typeof loadOpsFiles === 'function') loadOpsFiles();
   }
-  else if (tabName === 'logs' && typeof loadHermesLogs === 'function') loadHermesLogs();
-  else if (tabName === 'cron' && typeof loadHermesCron === 'function') loadHermesCron();
-  else if (tabName === 'skills' && typeof loadHermesSkills === 'function') loadHermesSkills();
-  else if (tabName === 'plugins' && typeof loadHermesPlugins === 'function') loadHermesPlugins();
-  else if (tabName === 'channels' && typeof loadHermesChannels === 'function') loadHermesChannels();
-  else if (tabName === 'webhooks' && typeof loadHermesWebhooks === 'function') loadHermesWebhooks();
-  else if (tabName === 'pairing' && typeof loadHermesPairing === 'function') loadHermesPairing();
-  else if (tabName === 'profiles' && typeof loadHermesProfiles === 'function') loadHermesProfiles();
+  else if (tabName === 'logs' && typeof loadOpsLogs === 'function') loadOpsLogs();
+  else if (tabName === 'cron' && typeof loadOpsCron === 'function') loadOpsCron();
+  else if (tabName === 'skills' && typeof loadOpsSkills === 'function') loadOpsSkills();
+  else if (tabName === 'plugins' && typeof loadOpsPlugins === 'function') loadOpsPlugins();
+  else if (tabName === 'channels' && typeof loadOpsChannels === 'function') loadOpsChannels();
+  else if (tabName === 'webhooks' && typeof loadOpsWebhooks === 'function') loadOpsWebhooks();
+  else if (tabName === 'pairing' && typeof loadOpsPairing === 'function') loadOpsPairing();
+  else if (tabName === 'profiles' && typeof loadOpsProfiles === 'function') loadOpsProfiles();
   // Existing View Loaders
   else if (tabName === 'admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
   else if (tabName === 'dashboard') {
