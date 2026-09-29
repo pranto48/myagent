@@ -234,7 +234,8 @@ class CompanyAIAgent:
         1. Action: <tool_name>\nAction Input: <json/str>
         2. Markdown JSON codeblocks with "action"/"tool"
         3. XML-like <tool_call><name>...</name><arguments>...</arguments></tool_call>
-        4. Function calls e.g. tool_name(arg1=val1, ...)
+        4. Structured <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+        5. Function calls e.g. tool_name(arg1=val1, ...)
         """
         calls = []
         if not text:
@@ -271,7 +272,7 @@ class CompanyAIAgent:
                     calls.append({
                         "id": f"call_react_json_{turn}_{len(calls)}",
                         "name": tool_name.strip(),
-                        "arguments": json.dumps(args) if isinstance(args, dict) else str(args)
+                        "arguments": json.dumps(args, ensure_ascii=False) if isinstance(args, dict) else str(args)
                     })
             except Exception:
                 pass
@@ -287,6 +288,22 @@ class CompanyAIAgent:
                     "name": t_name,
                     "arguments": t_args or "{}"
                 })
+
+        # Format 4: Single JSON object inside <tool_call> ... </tool_call>
+        tool_call_json = re.compile(r'<tool_call>\s*(\{[\s\S]*?\})\s*</tool_call>', re.DOTALL | re.IGNORECASE)
+        for match in tool_call_json.finditer(text):
+            try:
+                data = json.loads(match.group(1))
+                t_name = data.get("name") or data.get("tool") or data.get("action")
+                t_args = data.get("arguments") or data.get("parameters") or data.get("args") or {}
+                if t_name and isinstance(t_name, str):
+                    calls.append({
+                        "id": f"call_react_tagjson_{turn}_{len(calls)}",
+                        "name": t_name.strip(),
+                        "arguments": json.dumps(t_args, ensure_ascii=False) if isinstance(t_args, dict) else str(t_args)
+                    })
+            except Exception:
+                pass
 
         return calls
 
@@ -426,7 +443,8 @@ class CompanyAIAgent:
         # Add tool usage instructions into system prompt for models without native function calling
         system_content += (
             "\n\nAVAILABLE TOOLS: You have access to the following built-in tools and any connected MCP tools:\n"
-            "- query_company_memory(query, top_k): Search internal company memory.\n"
+            "- query_company_memory(query, top_k): Fast hybrid search (< 10ms) across indexed company documents, policies, and records.\n"
+            "- save_company_memory(title, content, category, tags): Persist verified facts, rules, guidelines, credentials, or findings into permanent memory.\n"
             "- python_runner(code): Run Python code with pandas (pd), numpy (np), datetime, statistics, and load_dataset(filename).\n"
             "- analyze_big_data(filepath, query_type): Aggregations, summaries, and correlations on CSV/Excel/JSON.\n"
             "- smart_data_summarizer(filepath): In-depth statistical profile, null checks, and KPI summary of tabular datasets.\n"
@@ -435,8 +453,13 @@ class CompanyAIAgent:
             "- generate_data_report(title, report_markdown, filename): Save executive markdown report.\n"
             "- read_pdf_document, read_word_document, read_excel_spreadsheet, read_image_ocr: Multi-format readers.\n"
             "- fs_list_files, fs_read_file, fs_write_file, sqlite_query, system_info, web_search, web_scrape.\n\n"
-            "MULTI-STEP REASONING: Plan complex tasks step by step. You may call tools iteratively. If a tool reports an error, analyze the error and retry with corrected code/arguments. "
-            "To execute a tool via text if function calling is unavailable, use: Action: <tool_name>\nAction Input: <json_or_args> or ```json {\"action\": \"<tool_name>\", \"action_input\": {...}} ```"
+            "MULTI-STEP REASONING PROTOCOL:\n"
+            "1. Plan complex tasks step by step inside `<thought> ... </thought>`.\n"
+            "2. Execute tools iteratively to gather evidence or compute results.\n"
+            "3. If a tool reports an error, analyze the root cause inside `<thought>`, adjust parameters or code, and retry.\n"
+            "4. If function calling is not natively active in your runtime, you can call tools using explicit tags:\n"
+            "<tool_call>\n{\"name\": \"<tool_name>\", \"arguments\": {...}}\n</tool_call>\n"
+            "or Action: <tool_name>\nAction Input: <json_or_args>"
         )
 
         messages = [{"role": "system", "content": system_content}]
@@ -450,8 +473,8 @@ class CompanyAIAgent:
 
         tools_schema = await AgentTools.get_all_tools_schema()
 
-        # Multi-turn autonomous tool execution loop (up to 5 iterative reasoning turns)
-        max_tool_turns = 5
+        # Multi-turn autonomous tool execution loop (up to 10 iterative reasoning turns)
+        max_tool_turns = 10
         for turn in range(max_tool_turns):
             try:
                 # First attempt with tools parameter
@@ -578,22 +601,24 @@ class CompanyAIAgent:
                             if tc.function and tc.function.arguments:
                                 tool_calls_map[idx]["arguments"] += tc.function.arguments
 
-                    # Regular token delta with live thought streaming support (<think> tags)
+                    # Regular token delta with live thought streaming support (<thought> and <think> tags)
                     if delta and delta.content:
                         token = delta.content
                         full_assistant_message += token
 
-                        if "<think>" in token:
+                        if "<thought>" in token or "<think>" in token:
                             in_thought_mode = True
-                            parts = token.split("<think>", 1)
+                            tag = "<thought>" if "<thought>" in token else "<think>"
+                            parts = token.split(tag, 1)
                             if parts[0]:
                                 yield f"data: {json.dumps({'type': 'token', 'token': parts[0]})}\n\n"
                             if len(parts) > 1 and parts[1]:
                                 yield f"data: {json.dumps({'type': 'thought', 'thought': parts[1]})}\n\n"
                             continue
-                        elif "</think>" in token:
+                        elif "</thought>" in token or "</think>" in token:
                             in_thought_mode = False
-                            parts = token.split("</think>", 1)
+                            tag = "</thought>" if "</thought>" in token else "</think>"
+                            parts = token.split(tag, 1)
                             if parts[0]:
                                 yield f"data: {json.dumps({'type': 'thought', 'thought': parts[0]})}\n\n"
                             if len(parts) > 1 and parts[1]:
@@ -605,16 +630,44 @@ class CompanyAIAgent:
                         else:
                             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
-                tool_calls_detected = [tc for tc in tool_calls_map.values() if tc.get("name")]
+                native_tool_calls = [tc for tc in tool_calls_map.values() if tc.get("name")]
+                is_native_call = bool(native_tool_calls)
 
                 # Fallback ReAct check in text output using multi-syntax parser
-                if not tool_calls_detected:
+                if not is_native_call:
                     tool_calls_detected = self._extract_text_tool_calls(full_assistant_message, turn)
+                else:
+                    tool_calls_detected = native_tool_calls
 
                 # If no tools were called, stream done event and finish
                 if not tool_calls_detected:
                     yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
                     return
+
+                # Append assistant message to history with correct specification
+                if is_native_call:
+                    clean_assistant_text = full_assistant_message
+                    clean_assistant_text = re.sub(r'<thought>[\s\S]*?</thought>', '', clean_assistant_text, flags=re.IGNORECASE)
+                    clean_assistant_text = re.sub(r'<think>[\s\S]*?</think>', '', clean_assistant_text, flags=re.IGNORECASE).strip()
+                    messages.append({
+                        "role": "assistant",
+                        "content": clean_assistant_text if clean_assistant_text else None,
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tc["name"],
+                                    "arguments": tc["arguments"]
+                                }
+                            } for tc in native_tool_calls
+                        ]
+                    })
+                else:
+                    messages.append({
+                        "role": "assistant",
+                        "content": full_assistant_message
+                    })
 
                 # Execute all detected tools
                 for tc in tool_calls_detected:
@@ -631,25 +684,39 @@ class CompanyAIAgent:
                     # Execute tool locally or via MCP
                     tool_output = await AgentTools.dispatch_tool(fn_name, fn_args)
 
+                    # Special event for autonomous memory saving
+                    if fn_name == "save_company_memory" and "Successfully saved" in tool_output:
+                        yield f"data: {json.dumps({'type': 'memory_saved', 'note': fn_args.get('title', 'Memory Note'), 'doc_id': 'auto'})}\n\n"
+
                     # Notify frontend of tool result
                     yield f"data: {json.dumps({'type': 'tool_result', 'name': fn_name, 'result': tool_output[:1500] if len(tool_output) > 1500 else tool_output})}\n\n"
 
-                    # Append to conversation messages with self-healing feedback on error
-                    messages.append({
-                        "role": "assistant",
-                        "content": f"[Invoked tool {fn_name} with arguments: {json.dumps(fn_args)}]"
-                    })
-
-                    is_error = tool_output.startswith(("Error", "Python Execution Error", "Big Data analysis error", "Chart generator error")) or "not found" in tool_output.lower()
-                    if is_error:
+                    # Append to conversation messages with standard protocol
+                    if is_native_call:
                         messages.append({
-                            "role": "user",
-                            "content": f"[Tool Error from {fn_name}]:\n{tool_output}\n\nPlease analyze what caused this error, adjust the arguments or code, and re-try the tool execution or provide a clear resolution."
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "name": fn_name,
+                            "content": tool_output
                         })
                     else:
+                        is_error = tool_output.startswith(("Error", "Python Execution Error", "Big Data analysis error", "Chart generator error")) or "not found" in tool_output.lower()
+                        if is_error:
+                            feedback = (
+                                f"<tool_response status=\"error\">\n"
+                                f"{{\"name\": \"{fn_name}\", \"error\": {json.dumps(tool_output, ensure_ascii=False)}}}\n"
+                                f"</tool_response>\n"
+                                f"[Instruction: Analyze what caused this error inside <thought>...</thought>, correct parameters or code, and re-try or provide a clear resolution.]"
+                            )
+                        else:
+                            feedback = (
+                                f"<tool_response status=\"success\">\n"
+                                f"{{\"name\": \"{fn_name}\", \"output\": {json.dumps(tool_output, ensure_ascii=False)}}}\n"
+                                f"</tool_response>"
+                            )
                         messages.append({
                             "role": "user",
-                            "content": f"[Tool Observation from {fn_name}]:\n{tool_output}\n\nPlease synthesize this tool observation and continue answering the user's question."
+                            "content": feedback
                         })
 
             except Exception as e:
@@ -839,9 +906,13 @@ class CompanyAIAgent:
             temperature=target_temp
         )
 
-        reply_text = response.choices[0].message.content if response.choices else ""
+        raw_reply = response.choices[0].message.content if response.choices else ""
+        clean_reply = re.sub(r'<thought>[\s\S]*?</thought>', '', raw_reply, flags=re.IGNORECASE)
+        clean_reply = re.sub(r'<think>[\s\S]*?</think>', '', clean_reply, flags=re.IGNORECASE).strip()
+        final_reply = clean_reply if clean_reply else raw_reply
+
         return {
-            "reply": reply_text,
+            "reply": final_reply,
             "sources": [s.model_dump() for s in sources],
             "model_used": target_model
         }

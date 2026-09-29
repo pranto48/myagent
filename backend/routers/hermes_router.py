@@ -2,7 +2,7 @@
 # Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
 # Made By Arif (https://arifmahmud.com/)
 # Project: MyAgent | Version: 3.1.0
-# Hermes Agent Operational Engine Backend Router (FILES, MODELS, LOGS, CRON, 
+# Autonomous Agent Operational Engine Backend Router (FILES, MODELS, LOGS, CRON, 
 # SKILLS, PLUGINS, MCP, CHANNELS, WEBHOOKS, PAIRING, PROFILES)
 # ==============================================================================
 
@@ -21,8 +21,8 @@ from pydantic import BaseModel, Field
 from config import settings
 from routers.auth import get_current_user
 
-logger = logging.getLogger("myagent.hermes")
-router = APIRouter(prefix="/api/hermes", tags=["Hermes Agent Engine"])
+logger = logging.getLogger("myagent.ops")
+router = APIRouter(prefix="/api/hermes", tags=["Autonomous Agent Engine"])
 
 # Resolve persistent DB path
 def get_db_path() -> str:

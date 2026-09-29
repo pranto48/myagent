@@ -38,6 +38,28 @@ class AgentTools:
         return store.super_fast_search(query=query, top_k=top_k, user_role=user_role)
 
     @staticmethod
+    def save_company_memory(
+        title: str,
+        content: str,
+        category: str = "general",
+        tags: Optional[List[str]] = None,
+        security_level: str = "INTERNAL"
+    ) -> str:
+        """Autonomously persists a key fact, rule, guideline, or finding into the company hybrid vector memory."""
+        try:
+            store = VectorMemoryStore()
+            res = store.add_note(
+                title=title,
+                content=content,
+                category=category,
+                tags=tags or ["autonomous_save"],
+                security_level=security_level
+            )
+            return f"Successfully saved to company persistent memory. Note ID: {res.get('doc_id')}, Chunks indexed: {res.get('chunks_count')}"
+        except Exception as e:
+            return f"Error saving to company memory: {str(e)}"
+
+    @staticmethod
     async def web_search(query: str) -> str:
         """Autonomous live web search using DuckDuckGo Instant Answers with resilient HTML fallback."""
         try:
@@ -711,6 +733,18 @@ class AgentTools:
                 hits = cls.query_company_memory(query=q, top_k=k)
                 return json.dumps(hits, ensure_ascii=False, indent=2)
 
+            elif tool_name == "save_company_memory":
+                tags_input = args.get("tags", [])
+                if isinstance(tags_input, str):
+                    tags_input = [t.strip() for t in tags_input.split(",") if t.strip()]
+                return cls.save_company_memory(
+                    title=args.get("title", "Autonomous Saved Memory"),
+                    content=args.get("content", ""),
+                    category=args.get("category", "general"),
+                    tags=tags_input,
+                    security_level=args.get("security_level", "INTERNAL")
+                )
+
             elif tool_name == "web_search":
                 return await cls.web_search(args.get("query", ""))
 
@@ -812,6 +846,32 @@ class AgentTools:
                             "top_k": {"type": "integer", "description": "Number of top chunks to retrieve (default: 4)"}
                         },
                         "required": ["query"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_company_memory",
+                    "description": "Autonomously saves a verified fact, policy, rule, credential, or finding into the company permanent hybrid memory.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string", "description": "Concise descriptive title for the memory note"},
+                            "content": {"type": "string", "description": "Full text details of the fact, rule, or information to record"},
+                            "category": {"type": "string", "description": "Category tag e.g. policy, finance, operation, user_instruction, project"},
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of search keywords or entity tags"
+                            },
+                            "security_level": {
+                                "type": "string",
+                                "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"],
+                                "description": "Data classification level (default: INTERNAL)"
+                            }
+                        },
+                        "required": ["title", "content"]
                     }
                 }
             },
@@ -958,6 +1018,36 @@ class AgentTools:
                         "properties": {
                             "directory": {"type": "string", "description": "Subdirectory name (optional, defaults to root)"}
                         }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fs_read_file",
+                    "description": "Reads text, markdown, json, or code file contents from data storage.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Filename or path of the file to read"},
+                            "max_chars": {"type": "integer", "description": "Maximum number of characters to read (default: 5000)"}
+                        },
+                        "required": ["filepath"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fs_write_file",
+                    "description": "Safely writes analysis notes or report files to the data/reports folder.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filepath": {"type": "string", "description": "Filename for the new file e.g. analysis.txt"},
+                            "content": {"type": "string", "description": "Text content to write"}
+                        },
+                        "required": ["filepath", "content"]
                     }
                 }
             },

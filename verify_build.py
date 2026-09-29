@@ -16,6 +16,11 @@ ROOT_DIR = Path(__file__).resolve().parent
 ERRORS = []
 WARNINGS = []
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 def log_pass(msg):
     print(f"  [PASS] {msg}")
 

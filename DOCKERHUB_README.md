@@ -6,13 +6,13 @@
 
 **MyAgent (ampagent)** is a self-hosted, enterprise-grade Autonomous AI Agent and Operational Intelligence Suite built by **[IT support BD](https://itsupport.com.bd)** and architected by **[Arif Mahmud](https://arifmahmud.com/)**.
 
-Equipped with a native **Hermes Agent Operational Engine**, MyAgent features an interactive **Sessions Hub**, an in-browser virtual `/opt/data` **Filesystem Explorer**, an extensive **60-Skill Agent Library (36 Toolsets)** across 10 functional domains, bilingual Bengali/English real-time i18n support, and a dual-memory ChromaDB vector and SQLite FTS5 RAG engine.
+Equipped with a native **Autonomous Agent Operational Engine**, MyAgent features an interactive **Sessions Hub**, an in-browser virtual `/opt/data` **Filesystem Explorer**, an extensive **60-Skill Agent Library (36 Toolsets)** across 10 functional domains, bilingual Bengali/English real-time i18n support, and a dual-memory ChromaDB vector and SQLite FTS5 RAG engine.
 
 ---
 
 ## 🌟 Core Architectural Features
 
-* **Hermes Agent Operational Suite:**
+* **Autonomous Agent Operational Suite:**
   * **Sessions Hub:** Real-time KPI metrics (`Total`, `Active in store`, `Archived`, `Messages`, `Sources`), platform connection monitors (`api_server`, `webchat`, `cli`), and terminal TUI one-click jump.
   * **Filesystem Explorer (`/opt/data`):** Full in-browser directory explorer with drag-and-drop file ingestion, virtual path traversal protection, and breadcrumb navigation.
   * **60 Agent Skills Library:** 36 executable CLI/API toolsets and 24 procedural capabilities across 10 distinct categories with live search, square tile toggle, and autonomous learning (`Learn a skill`).
@@ -31,7 +31,7 @@ Equipped with a native **Hermes Agent Operational Engine**, MyAgent features an 
 | Tag | Target Architecture | Description |
 | :--- | :--- | :--- |
 | `latest` | `linux/amd64` | Latest stable production release of MyAgent Suite |
-| `v3.1.0` | `linux/amd64` | Production release featuring Hermes Agent Sessions, Files, and 60-Skill Hub |
+| `v3.1.0` | `linux/amd64` | Production release featuring Autonomous Agent Sessions, Files, and 60-Skill Hub |
 | `backend-latest` | `linux/amd64` | Standalone FastAPI AI & Memory Engine container |
 | `frontend-latest` | `linux/amd64` | Standalone Nginx Web UI container |
 

@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
 """
 Automated Verification and Test Suite for MyAgent.
 Tests: Config, Document Chunking, Excel Parsing, SQLite Multi-Session Store, JWT Auth.
@@ -76,6 +76,71 @@ class TestMyAgentSystem(unittest.TestCase):
 
         asyncio.run(run_session_test())
         print("✅ [Pass] SQLite persistent multi-session chat storage validated.")
+
+    def test_05_autonomous_tools(self):
+        """Tests autonomous tool capabilities: save_company_memory, fs_write_file, visual_chart_generator."""
+        from agent.tools import AgentTools
+
+        # Test chart generator
+        chart = AgentTools.visual_chart_generator("bar", "Q1 Sales", ["Jan", "Feb", "Mar"], [100, 250, 180])
+        self.assertIn("Q1 Sales", chart)
+        self.assertIn("Feb", chart)
+
+        # Test fs write & read
+        w_res = AgentTools.fs_write_file("test_auto.txt", "Autonomous Agent Test Content")
+        self.assertIn("test_auto.txt", w_res)
+        r_res = AgentTools.fs_read_file("reports/test_auto.txt")
+        self.assertIn("Autonomous Agent Test Content", r_res)
+
+        # Test memory persistence
+        mem_res = AgentTools.save_company_memory(
+            title="Office Working Hours",
+            content="Official office hours are 9:00 AM to 6:00 PM Sunday through Thursday.",
+            category="policy",
+            tags=["office", "hours", "policy"]
+        )
+        self.assertIn("Successfully saved", mem_res)
+        print("✅ [Pass] Autonomous tools (save_company_memory, charts, fs) validated.")
+
+    def test_06_multi_syntax_tool_parser(self):
+        """Tests robust parsing of multiple text tool calling syntaxes."""
+        from agent.core_agent import CompanyAIAgent
+
+        # 1. XML JSON tag
+        sample_tag = '<thought>Need to check policy</thought><tool_call>{"name": "query_company_memory", "arguments": {"query": "vacation leave"}}</tool_call>'
+        calls = CompanyAIAgent._extract_text_tool_calls(sample_tag, 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["name"], "query_company_memory")
+
+        # 2. Markdown JSON block
+        sample_md = '```json\n{"action": "python_runner", "action_input": {"code": "2 + 2"}}\n```'
+        calls_md = CompanyAIAgent._extract_text_tool_calls(sample_md, 1)
+        self.assertEqual(len(calls_md), 1)
+        self.assertEqual(calls_md[0]["name"], "python_runner")
+
+        # 3. Action format
+        sample_act = 'Action: fs_read_file\nAction Input: {"filepath": "report.md"}'
+        calls_act = CompanyAIAgent._extract_text_tool_calls(sample_act, 2)
+        self.assertEqual(len(calls_act), 1)
+        self.assertEqual(calls_act[0]["name"], "fs_read_file")
+        print("✅ [Pass] Multi-syntax tool call parser validated for all 3 formats.")
+
+    def test_07_all_tools_schema(self):
+        """Ensures all tools have standard valid OpenAI function schemas."""
+        from agent.tools import AgentTools
+        schemas = AgentTools.get_openai_tools_schema()
+        tool_names = [s["function"]["name"] for s in schemas]
+
+        required = [
+            "query_company_memory", "save_company_memory", "web_search", "web_scrape",
+            "python_runner", "analyze_big_data", "generate_data_report", "read_pdf_document",
+            "read_word_document", "read_excel_spreadsheet", "read_image_ocr", "fs_list_files",
+            "fs_read_file", "fs_write_file", "sqlite_query", "smart_data_summarizer",
+            "cross_document_comparator", "visual_chart_generator", "system_info"
+        ]
+        for req in required:
+            self.assertIn(req, tool_names, f"Tool '{req}' is missing from OpenAI tool schema!")
+        print(f"✅ [Pass] All {len(required)} tool schemas registered and validated.")
 
 if __name__ == "__main__":
     unittest.main()

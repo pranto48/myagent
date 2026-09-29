@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
         await m_db.close()
         await SecurityAuditStore().init_db()
         await init_hermes_db()
-        logger.info(f"Persistent databases, Hermes engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
+        logger.info(f"Persistent databases, Autonomous Agent engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
 
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",
-    description="Enterprise AI Agent with Hermes Operational Suite, Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
+    description="Enterprise AI Agent with Autonomous Operational Suite, Data Security System, Hybrid Vector Memory, MCP Hub, and Universal Branding",
     version="3.1.0",
     lifespan=lifespan
 )

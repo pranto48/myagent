@@ -195,7 +195,7 @@ class ChatSessionStore:
 
     @classmethod
     async def get_sessions_overview(cls) -> Dict[str, Any]:
-        """Returns deep telemetry overview matching Hermes Sessions dashboard."""
+        """Returns deep telemetry overview for the Sessions dashboard."""
         db = await cls.get_db()
         try:
             # 1. Total sessions
