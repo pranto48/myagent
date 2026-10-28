@@ -15,10 +15,11 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "company-secret-jwt-token-key-3399-2026"
     JWT_EXPIRATION_HOURS: int = 72
 
-    # Remote / Local LLM Server (OpenAI-compatible)
-    LLM_BASE_URL: str = "http://192.168.20.10:1234/v1"
-    LLM_API_KEY: str = "sk-lm-itvN1hr4:n8gt8iapM8Slt3NqjlHk"
-    LLM_MODEL: str = "gemma-4-e2b-it-qat"
+    # Remote / Local LLM Server (OxionAI, OpenAI-compatible, LM Studio)
+    LLM_BASE_URL: str = "https://oxionai.com/v1"
+    LLM_API_KEY: str = "cc_o6cFXoXcIp9XGvQlBUBqG3qp0QmgXgb7WZeR3hwFnV6R4I3R"
+    LLM_MODEL: str = "gemini-3.7-flash"
+    LLM_VERIFY_SSL: bool = False
 
     # Agent Persona & Behavior
     AGENT_NAME: str = "Company Data Intelligence Agent"

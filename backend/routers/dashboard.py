@@ -78,8 +78,12 @@ async def get_dashboard_stats():
         else:
             test_url = f"{base_url}/models"
 
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            res = await client.get(test_url)
+        headers = {}
+        if settings.LLM_API_KEY and settings.LLM_API_KEY != "not-needed":
+            headers["Authorization"] = f"Bearer {settings.LLM_API_KEY}"
+        verify_ssl = getattr(settings, "LLM_VERIFY_SSL", False)
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=4.0) as client:
+            res = await client.get(test_url, headers=headers)
             if res.status_code in [200, 401]:
                 llm_connected = True
                 ping_ms = round((time.time() - start_time) * 1000, 1)

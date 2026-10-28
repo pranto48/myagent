@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
-from agent.core_agent import CompanyAIAgent
+from agent.core_agent import CompanyAIAgent, get_shared_agent
 from memory.chat_session_store import ChatSessionStore
 from memory.document_loader import DocumentProcessor
 from memory.vector_store import VectorMemoryStore
@@ -19,13 +19,7 @@ from config import settings
 
 router = APIRouter(prefix="/api/chat", tags=["Chat & Agent"])
 
-_agent_instance = None
-
-def get_agent() -> CompanyAIAgent:
-    global _agent_instance
-    if _agent_instance is None:
-        _agent_instance = CompanyAIAgent()
-    return _agent_instance
+get_agent = get_shared_agent
 
 class SaveAttachmentRequest(BaseModel):
     doc_id: str

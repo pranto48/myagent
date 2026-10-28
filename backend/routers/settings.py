@@ -2,17 +2,11 @@
 from fastapi import APIRouter, HTTPException
 from config import settings
 from models.schemas import SettingsUpdateRequest
-from agent.core_agent import CompanyAIAgent
+from agent.core_agent import CompanyAIAgent, get_shared_agent
 
 router = APIRouter(prefix="/api/settings", tags=["Settings & Connectivity"])
 
-_agent_instance = None
-
-def get_agent() -> CompanyAIAgent:
-    global _agent_instance
-    if _agent_instance is None:
-        _agent_instance = CompanyAIAgent()
-    return _agent_instance
+get_agent = get_shared_agent
 
 @router.get("")
 async def get_settings():
@@ -23,6 +17,7 @@ async def get_settings():
         "agent_name": settings.AGENT_NAME,
         "llm_base_url": settings.LLM_BASE_URL,
         "llm_model": settings.LLM_MODEL,
+        "llm_api_key": settings.LLM_API_KEY,
         "agent_temperature": settings.AGENT_TEMPERATURE,
         "embedding_model": settings.EMBEDDING_MODEL,
         "top_k_results": settings.TOP_K_RESULTS,

@@ -12,6 +12,7 @@ import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import httpx
 from openai import AsyncOpenAI
 from config import settings
 from memory.vector_store import VectorMemoryStore
@@ -87,10 +88,12 @@ class ReportAgent:
         base_url = settings.LLM_BASE_URL.strip()
         if not base_url.endswith("/v1") and "/v1/" not in base_url:
             base_url = base_url.rstrip("/") + "/v1"
+        verify_ssl = getattr(settings, "LLM_VERIFY_SSL", False)
+        async_http_client = httpx.AsyncClient(verify=verify_ssl, timeout=180.0)
         self.client = AsyncOpenAI(
             base_url=base_url,
             api_key=settings.LLM_API_KEY or "not-needed",
-            timeout=180.0
+            http_client=async_http_client
         )
 
     def _init_report_db(self):

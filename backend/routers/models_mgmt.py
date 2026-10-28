@@ -10,16 +10,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from config import settings
-from agent.core_agent import CompanyAIAgent
+from agent.core_agent import CompanyAIAgent, get_shared_agent
 
 router = APIRouter(prefix="/api/models", tags=["AI Model Management"])
 
-_agent_instance = None
-def get_agent() -> CompanyAIAgent:
-    global _agent_instance
-    if _agent_instance is None:
-        _agent_instance = CompanyAIAgent()
-    return _agent_instance
+get_agent = get_shared_agent
 
 class SwitchModelReq(BaseModel):
     model: str
@@ -58,7 +53,8 @@ async def ping_llm_server(req: Optional[TestConnectionReq] = None):
         headers["Authorization"] = f"Bearer {api_key}"
 
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
+        verify_ssl = getattr(settings, "LLM_VERIFY_SSL", False)
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=5.0) as client:
             res = await client.get(endpoint, headers=headers)
             latency = round((time.time() - start) * 1000, 1)
             models = []

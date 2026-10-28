@@ -6728,5 +6728,33 @@ body.light-theme .reasoning-body,
   transform: scale(1.08);
 }
 
+/* ==============================================================================
+ * Autonomous Enterprise Cron Engine Styles
+ * ============================================================================== */
+.badge-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 255, 180, 0.15);
+  color: #00ffb4;
+  border: 1px solid rgba(0, 255, 180, 0.4);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(0, 255, 180, 0.2);
+}
+
+.cron-card.disabled-job {
+  opacity: 0.65;
+  filter: grayscale(0.2);
+}
+
+.cron-card:hover {
+  border-color: rgba(0, 255, 180, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
 
 

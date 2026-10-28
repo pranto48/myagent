@@ -20,10 +20,21 @@ async function loadModelsOverview() {
       if (serverInput) serverInput.value = data.base_url;
 
       const modelSelect = document.getElementById('hub-model-select');
-      if (modelSelect && data.available_models) {
-        modelSelect.innerHTML = data.available_models.map(m => `
+      let models = (data.available_models && data.available_models.length > 2)
+        ? data.available_models
+        : (typeof ALL_OXIONAI_MODELS !== 'undefined' ? ALL_OXIONAI_MODELS : []);
+      if (data.active_model && !models.includes(data.active_model)) {
+        models = [data.active_model, ...models];
+      }
+      if (modelSelect) {
+        modelSelect.innerHTML = models.map(m => `
           <option value="${m}" ${m === data.active_model ? 'selected' : ''}>${m}</option>
         `).join('');
+      }
+
+      // Automatically sync available models to topbar dropdown
+      if (typeof updateModelDropdown === 'function') {
+        updateModelDropdown(models, data.active_model);
       }
     }
   } catch (err) {

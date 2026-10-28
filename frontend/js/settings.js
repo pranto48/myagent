@@ -116,12 +116,27 @@ async function loadSettings() {
       if (modelInput) modelInput.value = data.llm_model || '';
       if (tempInput) tempInput.value = data.agent_temperature || 0.3;
       if (tempDisplay) tempDisplay.innerText = data.agent_temperature !== undefined ? data.agent_temperature : '0.3';
+      const keyInput = document.getElementById('setting-llm-key');
+      if (keyInput && data.llm_api_key) keyInput.value = data.llm_api_key;
       
       const modelLabel = document.getElementById('sidebar-model-name');
       if (modelLabel) modelLabel.innerText = data.llm_model || 'Unknown';
 
-      // Sync topbar model dropdown
-      updateModelDropdown([data.llm_model], data.llm_model);
+      // Sync topbar model dropdown with live available models
+      try {
+        const mRes = await fetch('/api/models', {
+          headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+        });
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          const modelsList = Array.from(new Set([data.llm_model, ...(mData.available_models || [])])).filter(Boolean);
+          updateModelDropdown(modelsList, data.llm_model);
+        } else {
+          updateModelDropdown([data.llm_model], data.llm_model);
+        }
+      } catch (mErr) {
+        updateModelDropdown([data.llm_model], data.llm_model);
+      }
     }
   } catch (err) {
     console.warn('Error loading settings:', err);
@@ -130,15 +145,66 @@ async function loadSettings() {
 
 const loadSettingsHub = loadSettings;
 
+const ALL_OXIONAI_MODELS = [
+  "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-pro", "gemma-2-2b",
+  "claude-sonnet-5", "claude-opus-5.5", "claude-opus-5", "claude-opus-4.8",
+  "claude-opus-4.7", "claude-opus-4.6", "claude-fable-5.1", "claude-fable-5", "claude-mythos-preview",
+  "gpt-5.5", "gpt-5.5-pro", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+  "deepseek-v4-pro-max", "deepseek-v4-pro-0813", "deepseek-v4-flash-0731",
+  "grok-4.5", "grok-4.6",
+  "qwen3.8-max", "qwen3.8-27b", "qwen3.7-max",
+  "kimi-k3", "kimi-k2.6", "glm-5.3", "glm-5.2",
+  "seed-2.1-pro", "seed-2.1-turbo", "muse-spark-1.1"
+];
+
 // Update Model Select Dropdown in Topbar
 function updateModelDropdown(models, activeModel) {
   const select = document.getElementById('topbar-model-select');
   if (!select) return;
 
-  const uniqueModels = Array.from(new Set([activeModel, ...(models || [])])).filter(Boolean);
-  select.innerHTML = uniqueModels.map(m => `
-    <option value="${m}" ${m === activeModel ? 'selected' : ''}>${m}</option>
-  `).join('');
+  const currentActive = activeModel || select.value || "gemini-3.7-flash";
+  let fullList = (models && models.length > 2) ? models : ALL_OXIONAI_MODELS;
+  if (currentActive && !fullList.includes(currentActive)) {
+    fullList = [currentActive, ...fullList];
+  }
+
+  const uniqueModels = Array.from(new Set(fullList)).filter(Boolean);
+
+  const groups = {
+    "Google Gemini & Gemma": uniqueModels.filter(m => m.includes("gemini") || m.includes("gemma")),
+    "Anthropic Claude Series": uniqueModels.filter(m => m.includes("claude")),
+    "OpenAI GPT Series": uniqueModels.filter(m => m.includes("gpt")),
+    "DeepSeek Series": uniqueModels.filter(m => m.includes("deepseek")),
+    "xAI Grok Series": uniqueModels.filter(m => m.includes("grok")),
+    "Alibaba Qwen Series": uniqueModels.filter(m => m.includes("qwen")),
+    "Moonshot Kimi & Zhipu GLM": uniqueModels.filter(m => m.includes("kimi") || m.includes("glm")),
+    "ByteDance Seed & Other": uniqueModels.filter(m => 
+      !m.includes("gemini") && !m.includes("gemma") &&
+      !m.includes("claude") && !m.includes("gpt") &&
+      !m.includes("deepseek") && !m.includes("grok") &&
+      !m.includes("qwen") && !m.includes("kimi") && !m.includes("glm")
+    )
+  };
+
+  let html = "";
+  for (const [groupName, grpModels] of Object.entries(groups)) {
+    if (grpModels.length > 0) {
+      html += `<optgroup label="${groupName}">`;
+      for (const m of grpModels) {
+        html += `<option value="${m}" ${m === currentActive ? 'selected' : ''}>${m}</option>`;
+      }
+      html += `</optgroup>`;
+    }
+  }
+
+  if (!html) {
+    html = uniqueModels.map(m => `
+      <option value="${m}" ${m === currentActive ? 'selected' : ''}>${m}</option>
+    `).join('');
+  }
+
+  select.innerHTML = html;
+  select.value = currentActive;
 }
 
 // Test connectivity to external LLM Server

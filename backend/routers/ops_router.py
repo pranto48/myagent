@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from config import settings
 from routers.auth import get_current_user
+from cron import cron_scheduler, CronExpression, validate_cron_expression, TASK_METADATA
 
 logger = logging.getLogger("myagent.ops")
 router = APIRouter(prefix="/api/ops", tags=["Autonomous Agent Engine"])
@@ -330,12 +331,18 @@ async def _seed_ops_defaults(db: aiosqlite.Connection):
     async with db.execute("SELECT COUNT(*) as cnt FROM ops_cron_jobs") as cursor:
         row = await cursor.fetchone()
         if row and row["cnt"] == 0:
+            def _calc_next(e: str) -> Optional[str]:
+                try:
+                    return CronExpression(e).get_next_run().strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return None
+
             crons = [
-                ("cron_daily_brief", "Daily Executive Intelligence Briefing", "0 9 * * *", "executive_report", json.dumps({"scope": "daily", "auto_save": True}), 1, None, "Every day at 09:00 AM", "IDLE", now_str),
-                ("cron_vacuum_memory", "Nightly Vector & FTS5 Vacuum", "0 3 * * *", "memory_vacuum", json.dumps({"reclaim_disk": True}), 1, None, "Every day at 03:00 AM", "IDLE", now_str),
-                ("cron_auto_reindex", "Autonomous Knowledge Base Re-Index", "0 1 * * 0", "reindex_kb", json.dumps({"rebuild_hnsw": True}), 1, None, "Sunday at 01:00 AM", "IDLE", now_str),
-                ("cron_sec_audit", "Data Security & Compliance Audit Scan", "0 */6 * * *", "security_scan", json.dumps({"check_dlp": True, "check_brute_force": True}), 1, None, "Every 6 hours", "IDLE", now_str),
-                ("cron_llm_ping", "LLM Latency & Heartbeat Monitor", "*/15 * * * *", "llm_ping", json.dumps({"timeout_ms": 2000}), 1, None, "Every 15 minutes", "IDLE", now_str)
+                ("cron_daily_brief", "Daily Executive Intelligence Briefing", "0 9 * * *", "executive_report", json.dumps({"scope": "daily", "auto_save": True}), 1, None, _calc_next("0 9 * * *"), "IDLE", now_str),
+                ("cron_vacuum_memory", "Nightly Vector & FTS5 Vacuum", "0 3 * * *", "memory_vacuum", json.dumps({"reclaim_disk": True}), 1, None, _calc_next("0 3 * * *"), "IDLE", now_str),
+                ("cron_auto_reindex", "Autonomous Knowledge Base Re-Index", "0 1 * * 0", "reindex_kb", json.dumps({"rebuild_hnsw": True}), 1, None, _calc_next("0 1 * * 0"), "IDLE", now_str),
+                ("cron_sec_audit", "Data Security & Compliance Audit Scan", "0 */6 * * *", "security_scan", json.dumps({"check_dlp": True, "check_brute_force": True}), 1, None, _calc_next("0 */6 * * *"), "IDLE", now_str),
+                ("cron_llm_ping", "LLM Latency & Heartbeat Monitor", "*/15 * * * *", "llm_ping", json.dumps({"timeout_ms": 2000}), 1, None, _calc_next("*/15 * * * *"), "IDLE", now_str)
             ]
             await db.executemany("""
                 INSERT INTO ops_cron_jobs (id, name, expression, task_type, payload, is_enabled, last_run, next_run, last_status, created_at)
@@ -459,112 +466,257 @@ async def clear_logs(user=Depends(get_current_user)):
         await db.close()
 
 # ==============================================================================
-# 2. CRON Endpoints
+# 2. CRON Endpoints (Autonomous Enterprise Scheduler Engine)
 # ==============================================================================
 @router.get("/cron")
 async def list_cron_jobs(user=Depends(get_current_user)):
-    """Lists all scheduled autonomous jobs and execution history."""
+    """Lists all scheduled autonomous jobs with live execution stats, countdowns and history."""
     db = await get_ops_db()
     try:
+        # Fetch jobs
         async with db.execute("SELECT * FROM ops_cron_jobs ORDER BY created_at DESC") as cursor:
-            jobs = [dict(r) for r in await cursor.fetchall()]
-        async with db.execute("SELECT * FROM ops_cron_history ORDER BY run_at DESC LIMIT 20") as cursor:
+            raw_jobs = [dict(r) for r in await cursor.fetchall()]
+
+        # Fetch aggregate stats per job from history
+        stats_map: Dict[str, Dict[str, Any]] = {}
+        async with db.execute("""
+            SELECT 
+                job_id,
+                COUNT(*) as total_runs,
+                SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_runs,
+                SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_runs,
+                ROUND(AVG(duration_ms), 0) as avg_duration_ms
+            FROM ops_cron_history
+            GROUP BY job_id
+        """) as cursor:
+            for row in await cursor.fetchall():
+                stats_map[row["job_id"]] = {
+                    "total_runs": row["total_runs"],
+                    "success_runs": row["success_runs"],
+                    "failed_runs": row["failed_runs"],
+                    "avg_duration_ms": row["avg_duration_ms"] or 0
+                }
+
+        now_dt = datetime.now()
+        enriched_jobs = []
+
+        for j in raw_jobs:
+            job_id = j["id"]
+            expr = j["expression"]
+            is_enabled = bool(j.get("is_enabled", 1))
+
+            # Dynamic running check
+            is_running = cron_scheduler.is_job_running(job_id)
+            if is_running:
+                j["last_status"] = "RUNNING"
+
+            # Parse expression for descriptions & future next_run
+            try:
+                cron_obj = CronExpression(expr)
+                j["human_en"] = cron_obj.to_human_en()
+                j["human_bn"] = cron_obj.to_human_bn()
+
+                # If enabled and next_run is missing or expired in DB, recalculate next_run
+                nr_str = j.get("next_run")
+                needs_update = False
+                if is_enabled:
+                    if not nr_str or len(str(nr_str)) != 19:
+                        needs_update = True
+                    else:
+                        try:
+                            nr_dt = datetime.strptime(str(nr_str), "%Y-%m-%d %H:%M:%S")
+                            if nr_dt <= now_dt:
+                                needs_update = True
+                        except Exception:
+                            needs_update = True
+
+                if needs_update:
+                    calc_next = cron_obj.get_next_run(now_dt).strftime("%Y-%m-%d %H:%M:%S")
+                    j["next_run"] = calc_next
+                    await db.execute("UPDATE ops_cron_jobs SET next_run = ? WHERE id = ?", (calc_next, job_id))
+            except Exception as e:
+                j["human_en"] = expr
+                j["human_bn"] = expr
+
+            j["is_running"] = is_running
+            j["stats"] = stats_map.get(job_id, {
+                "total_runs": 0,
+                "success_runs": 0,
+                "failed_runs": 0,
+                "avg_duration_ms": 0
+            })
+            enriched_jobs.append(j)
+
+        await db.commit()
+
+        # Fetch recent execution history
+        async with db.execute("SELECT * FROM ops_cron_history ORDER BY run_at DESC LIMIT 30") as cursor:
             history = [dict(r) for r in await cursor.fetchall()]
-        return {"success": True, "jobs": jobs, "history": history}
+
+        return {
+            "success": True,
+            "jobs": enriched_jobs,
+            "history": history,
+            "task_types": TASK_METADATA
+        }
     finally:
         await db.close()
 
 @router.post("/cron")
 async def create_cron_job(data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
-    """Creates a new autonomous cron job."""
+    """Creates a new autonomous cron job with expression validation."""
+    name = data.get("name", "").strip()
+    expr = data.get("expression", "").strip()
+    task_type = data.get("task_type", "system_health").strip()
+    payload = data.get("payload", {})
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Job name cannot be empty.")
+    if not expr:
+        raise HTTPException(status_code=400, detail="Cron expression cannot be empty.")
+
+    # Validate cron expression
+    val = validate_cron_expression(expr)
+    if not val["valid"]:
+        raise HTTPException(status_code=400, detail=f"Invalid cron expression: {val['error']}")
+
+    next_run_str = val["next_run"]
+    payload_str = json.dumps(payload, ensure_ascii=False) if isinstance(payload, dict) else str(payload)
+    job_id = f"cron_{uuid.uuid4().hex[:8]}"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     db = await get_ops_db()
     try:
-        job_id = f"cron_{uuid.uuid4().hex[:8]}"
-        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-        name = data.get("name", "Custom Task")
-        expr = data.get("expression", "0 0 * * *")
-        task_type = data.get("task_type", "custom")
-        payload = json.dumps(data.get("payload", {}))
-        next_run = data.get("next_run", "Scheduled")
-
         await db.execute("""
             INSERT INTO ops_cron_jobs (id, name, expression, task_type, payload, is_enabled, next_run, last_status, created_at)
             VALUES (?, ?, ?, ?, ?, 1, ?, 'IDLE', ?)
-        """, (job_id, name, expr, task_type, payload, next_run, now_str))
+        """, (job_id, name, expr, task_type, payload_str, next_run_str, now_str))
         await db.commit()
 
-        await record_ops_log("INFO", "OpsCron", f"Created new scheduled job '{name}' [{expr}]")
-        return {"success": True, "job_id": job_id, "message": "Cron job created."}
+        await record_ops_log("INFO", "OpsCron", f"Created new scheduled job '{name}' [{expr}] - Next run: {next_run_str}")
+        return {
+            "success": True,
+            "job_id": job_id,
+            "next_run": next_run_str,
+            "human_en": val["human_en"],
+            "human_bn": val["human_bn"],
+            "message": "Cron job created successfully."
+        }
     finally:
         await db.close()
 
-@router.put("/cron/{job_id}/toggle")
-async def toggle_cron_job(job_id: str, user=Depends(get_current_user)):
-    """Enables or disables a scheduled cron job."""
-    db = await get_ops_db()
-    try:
-        async with db.execute("SELECT is_enabled, name FROM ops_cron_jobs WHERE id = ?", (job_id,)) as cursor:
-            row = await cursor.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Job not found")
-            new_state = 0 if row["is_enabled"] else 1
-            name = row["name"]
-
-        await db.execute("UPDATE ops_cron_jobs SET is_enabled = ? WHERE id = ?", (new_state, job_id))
-        await db.commit()
-
-        await record_ops_log("INFO", "OpsCron", f"Toggled job '{name}' to {'Enabled' if new_state else 'Disabled'}")
-        return {"success": True, "is_enabled": bool(new_state)}
-    finally:
-        await db.close()
-
-@router.post("/cron/{job_id}/run")
-async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
-    """Manually triggers an immediate run of a scheduled job."""
+@router.put("/cron/{job_id}")
+async def update_cron_job(job_id: str, data: Dict[str, Any] = Body(...), user=Depends(get_current_user)):
+    """Updates an existing scheduled cron job."""
     db = await get_ops_db()
     try:
         async with db.execute("SELECT * FROM ops_cron_jobs WHERE id = ?", (job_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Job not found")
-            job = dict(row)
+            existing = dict(row)
 
-        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
-        start_time = time.time()
-        
-        # Simulate task execution
-        status = "SUCCESS"
-        output = f"Executed {job['name']} ({job['task_type']}) successfully. Verified all parameters."
-        duration_ms = int((time.time() - start_time) * 1000) + 42
+        name = data.get("name", existing["name"]).strip()
+        expr = data.get("expression", existing["expression"]).strip()
+        task_type = data.get("task_type", existing["task_type"]).strip()
+        is_enabled = int(data.get("is_enabled", existing["is_enabled"]))
+        payload = data.get("payload", existing.get("payload"))
 
-        # Update job record
+        val = validate_cron_expression(expr)
+        if not val["valid"]:
+            raise HTTPException(status_code=400, detail=f"Invalid cron expression: {val['error']}")
+
+        next_run_str = val["next_run"] if is_enabled else None
+        payload_str = json.dumps(payload, ensure_ascii=False) if isinstance(payload, dict) else str(payload)
+
         await db.execute("""
             UPDATE ops_cron_jobs 
-            SET last_run = ?, last_status = 'SUCCESS'
+            SET name = ?, expression = ?, task_type = ?, payload = ?, is_enabled = ?, next_run = ?
             WHERE id = ?
-        """, (now_str, job_id))
-
-        # Record history
-        hist_id = str(uuid.uuid4())
-        await db.execute("""
-            INSERT INTO ops_cron_history (id, job_id, job_name, run_at, duration_ms, status, output)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (hist_id, job_id, job["name"], now_str, duration_ms, status, output))
+        """, (name, expr, task_type, payload_str, is_enabled, next_run_str, job_id))
         await db.commit()
 
-        await record_ops_log("SUCCESS", "OpsCron", f"Autonomous job '{job['name']}' completed in {duration_ms}ms.", {"output": output})
-        return {"success": True, "duration_ms": duration_ms, "output": output, "status": status}
+        await record_ops_log("INFO", "OpsCron", f"Updated scheduled job '{name}' [{expr}]")
+        return {"success": True, "message": "Cron job updated successfully.", "next_run": next_run_str}
     finally:
         await db.close()
 
+@router.put("/cron/{job_id}/toggle")
+async def toggle_cron_job(job_id: str, user=Depends(get_current_user)):
+    """Enables or disables a scheduled cron job and adjusts next_run."""
+    db = await get_ops_db()
+    try:
+        async with db.execute("SELECT is_enabled, name, expression FROM ops_cron_jobs WHERE id = ?", (job_id,)) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Job not found")
+            new_state = 0 if row["is_enabled"] else 1
+            name = row["name"]
+            expr = row["expression"]
+
+        next_run = None
+        if new_state == 1:
+            try:
+                cron = CronExpression(expr)
+                next_run = cron.get_next_run().strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+        await db.execute("UPDATE ops_cron_jobs SET is_enabled = ?, next_run = ? WHERE id = ?", (new_state, next_run, job_id))
+        await db.commit()
+
+        await record_ops_log("INFO", "OpsCron", f"Toggled job '{name}' to {'Enabled' if new_state else 'Disabled'}")
+        return {"success": True, "is_enabled": bool(new_state), "next_run": next_run}
+    finally:
+        await db.close()
+
+@router.post("/cron/{job_id}/run")
+async def trigger_cron_job(job_id: str, user=Depends(get_current_user)):
+    """Manually triggers an immediate real execution of a scheduled job."""
+    try:
+        result = await cron_scheduler.trigger_job_by_id(job_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to execute cron job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+
 @router.delete("/cron/{job_id}")
 async def delete_cron_job(job_id: str, user=Depends(get_current_user)):
-    """Deletes a cron job."""
+    """Deletes a cron job and its execution history."""
     db = await get_ops_db()
     try:
         await db.execute("DELETE FROM ops_cron_jobs WHERE id = ?", (job_id,))
+        await db.execute("DELETE FROM ops_cron_history WHERE job_id = ?", (job_id,))
         await db.commit()
-        return {"success": True, "message": "Cron job deleted."}
+        await record_ops_log("INFO", "OpsCron", f"Deleted cron job '{job_id}'")
+        return {"success": True, "message": "Cron job and history deleted."}
+    finally:
+        await db.close()
+
+@router.post("/cron/validate")
+async def validate_cron_endpoint(data: Dict[str, str] = Body(...), user=Depends(get_current_user)):
+    """Validates expression and returns predicted execution timestamps and descriptions."""
+    expr = data.get("expression", "").strip()
+    return validate_cron_expression(expr)
+
+@router.get("/cron/task-types")
+async def get_cron_task_types(user=Depends(get_current_user)):
+    """Returns available task types metadata and default templates."""
+    return {"success": True, "task_types": TASK_METADATA}
+
+@router.delete("/cron/history/clear")
+async def clear_cron_history(job_id: Optional[str] = Query(None), user=Depends(get_current_user)):
+    """Clears execution history logs."""
+    db = await get_ops_db()
+    try:
+        if job_id:
+            await db.execute("DELETE FROM ops_cron_history WHERE job_id = ?", (job_id,))
+        else:
+            await db.execute("DELETE FROM ops_cron_history")
+        await db.commit()
+        return {"success": True, "message": "Cron history cleared successfully."}
     finally:
         await db.close()
 

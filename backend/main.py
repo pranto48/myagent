@@ -66,8 +66,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
 
+    # Initialize Autonomous Cron Scheduler
+    try:
+        from cron import cron_scheduler
+        await cron_scheduler.start()
+        logger.info("Autonomous enterprise cron scheduler started.")
+    except Exception as e:
+        logger.error(f"Cron scheduler startup error: {e}")
+
     yield
     logger.info("Shutting down MyAgent services...")
+    try:
+        from cron import cron_scheduler
+        await cron_scheduler.stop()
+        logger.info("Autonomous enterprise cron scheduler stopped.")
+    except Exception as e:
+        logger.error(f"Cron scheduler shutdown error: {e}")
 
 app = FastAPI(
     title="MyAgent - Enterprise AI Agent Platform",

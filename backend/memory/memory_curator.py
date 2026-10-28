@@ -12,7 +12,7 @@ import uuid
 import logging
 import asyncio
 from typing import Dict, Any, List, Optional
-from pathlib import Path
+import httpx
 from openai import OpenAI
 from config import settings
 from memory.vector_store import VectorMemoryStore
@@ -105,10 +105,12 @@ Return ONLY valid JSON matching this schema:
                 base_url = base_url.rstrip("/") + "/v1"
 
             loop = asyncio.get_event_loop()
+            verify_ssl = getattr(settings, "LLM_VERIFY_SSL", False)
+            sync_http_client = httpx.Client(verify=verify_ssl, timeout=httpx.Timeout(6.0, connect=3.0))
             client = OpenAI(
                 base_url=base_url,
                 api_key=settings.LLM_API_KEY or "not-needed",
-                timeout=4.0
+                http_client=sync_http_client
             )
 
             def _call_openai():

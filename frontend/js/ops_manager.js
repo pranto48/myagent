@@ -639,8 +639,63 @@ function downloadOpsLogs() {
 }
 
 // ==============================================================================
-// 3. CRON MODULE
 // ==============================================================================
+// 3. ENHANCED CRON MODULE (Autonomous Enterprise Scheduler)
+// ==============================================================================
+let _opsCronCache = {
+  jobs: [],
+  history: [],
+  taskTypes: []
+};
+let _cronValidateTimeout = null;
+
+function getCronTaskIcon(type) {
+  const map = {
+    system_health: '🩺',
+    llm_ping: '🩺',
+    memory_vacuum: '🧹',
+    cleanup_cache: '🧹',
+    security_scan: '🛡️',
+    sec_audit: '🛡️',
+    executive_report: '📊',
+    report_digest: '📊',
+    backup_sync: '🗄️',
+    reindex_kb: '📚',
+    agent_task: '🤖',
+    custom_prompt: '🤖',
+    webhook_dispatch: '🌐'
+  };
+  return map[type] || '⏱️';
+}
+
+function formatRelativeNextRun(nextRunStr) {
+  if (!nextRunStr) return '';
+  try {
+    const target = new Date(nextRunStr.replace(' ', 'T')).getTime();
+    const now = Date.now();
+    const diffMs = target - now;
+    const isBn = typeof currentLang !== 'undefined' ? currentLang === 'bn' : true;
+
+    if (diffMs <= 0) {
+      return isBn ? 'এখনই রান হবে' : 'Due now';
+    }
+
+    const diffMins = Math.round(diffMs / 60000);
+    if (diffMins < 60) {
+      return isBn ? `${diffMins} মিনিট পর` : `in ${diffMins}m`;
+    }
+    const diffHours = Math.floor(diffMins / 60);
+    const remMins = diffMins % 60;
+    if (diffHours < 24) {
+      return isBn ? `${diffHours} ঘণ্টা ${remMins} মি. পর` : `in ${diffHours}h ${remMins}m`;
+    }
+    const diffDays = Math.floor(diffHours / 24);
+    return isBn ? `${diffDays} দিন পর` : `in ${diffDays}d`;
+  } catch (e) {
+    return nextRunStr;
+  }
+}
+
 async function loadOpsCron() {
   const jobsList = document.getElementById('ops-cron-jobs-list');
   const historyList = document.getElementById('ops-cron-history-list');
@@ -651,46 +706,112 @@ async function loadOpsCron() {
     const data = await res.json();
     if (!data.success) return;
 
+    _opsCronCache.jobs = data.jobs || [];
+    _opsCronCache.history = data.history || [];
+    if (data.task_types) _opsCronCache.taskTypes = data.task_types;
+
+    const isBn = typeof currentLang !== 'undefined' ? currentLang === 'bn' : true;
+
     // Render Jobs
-    jobsList.innerHTML = data.jobs.map(j => `
-      <div class="ops-card cron-card ${j.is_enabled ? 'active-job' : 'disabled-job'}">
-        <div class="cron-card-header">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div class="cron-icon">⏱️</div>
-            <div>
-              <div class="cron-name">${escapeHtml(j.name)}</div>
-              <div class="cron-expr"><code>${escapeHtml(j.expression)}</code> • <span style="color:var(--text-muted);">${escapeHtml(j.next_run || '')}</span></div>
+    if (_opsCronCache.jobs.length === 0) {
+      jobsList.innerHTML = `
+        <div class="ops-card" style="text-align:center; padding:32px; color:var(--text-muted);">
+          <div style="font-size:2rem; margin-bottom:8px;">⏱️</div>
+          <div style="font-weight:600;">${isBn ? 'কোনো ক্রন জব কনফিগার করা হয়নি।' : 'No scheduled cron jobs configured yet.'}</div>
+        </div>
+      `;
+    } else {
+      jobsList.innerHTML = _opsCronCache.jobs.map(j => {
+        const stats = j.stats || { total_runs: 0, success_runs: 0, failed_runs: 0, avg_duration_ms: 0 };
+        const total = stats.total_runs || 0;
+        const successRate = total > 0 ? Math.round((stats.success_runs / total) * 100) : 100;
+        const icon = getCronTaskIcon(j.task_type);
+        const humanDesc = isBn ? (j.human_bn || j.expression) : (j.human_en || j.expression);
+        const relNext = formatRelativeNextRun(j.next_run);
+
+        // Status badge
+        let statusBadge = '';
+        if (j.is_running) {
+          statusBadge = `<span class="badge-running"><span class="pulse-dot"></span> ${typeof t === 'function' ? t('ops_cron_status_running') : 'RUNNING...'}</span>`;
+        } else if (j.last_status === 'SUCCESS') {
+          statusBadge = `<span class="status-pill success">SUCCESS</span>`;
+        } else if (j.last_status === 'FAILED') {
+          statusBadge = `<span class="status-pill failed">FAILED</span>`;
+        } else {
+          statusBadge = `<span class="status-pill" style="background:rgba(255,255,255,0.08); color:var(--text-muted);">IDLE</span>`;
+        }
+
+        return `
+          <div class="ops-card cron-card ${j.is_enabled ? 'active-job' : 'disabled-job'}" style="position:relative; transition:all 0.2s ease;">
+            <div class="cron-card-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+              <div style="display:flex; align-items:flex-start; gap:12px;">
+                <div class="cron-icon" style="font-size:1.6rem; width:44px; height:44px; border-radius:10px; background:rgba(0,255,180,0.08); border:1px solid rgba(0,255,180,0.2); display:flex; align-items:center; justify-content:center;">${icon}</div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span class="cron-name" style="font-size:1rem; font-weight:700; color:var(--text-primary);">${escapeHtml(j.name)}</span>
+                    ${statusBadge}
+                  </div>
+                  <div class="cron-expr" style="margin-top:4px; font-size:0.85rem; color:var(--text-secondary);">
+                    <code style="background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:4px; border:1px solid rgba(255,255,255,0.08); color:var(--accent); font-family:'Fira Code', monospace;">${escapeHtml(j.expression)}</code> 
+                    • <span style="color:var(--text-primary); font-weight:500;">${escapeHtml(humanDesc)}</span>
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                    <span>🕒 ${typeof t === 'function' ? t('ops_cron_next_run') : 'পরবর্তী রান'}: </span>
+                    <strong style="color:var(--accent);">${escapeHtml(j.next_run || 'N/A')}</strong>
+                    ${relNext ? `<span style="background:rgba(0,255,180,0.1); color:var(--accent); padding:1px 6px; border-radius:10px; margin-left:6px; font-weight:600;">${relNext}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div class="cron-actions" style="display:flex; align-items:center; gap:8px;">
+                <button class="btn-sm-action-cyber" id="cron-run-btn-${j.id}" onclick="triggerOpsCron('${j.id}')" title="Run Now" style="padding:5px 12px; font-weight:600;">
+                  ⚡ ${typeof t === 'function' ? t('ops_run_now') : 'রান নাও'}
+                </button>
+                <button class="btn-sm-action-cyber" onclick="openEditCronModal('${j.id}')" title="Edit Job" style="padding:5px 10px;">
+                  ✏️
+                </button>
+                <label class="ops-switch" title="Toggle On/Off">
+                  <input type="checkbox" ${j.is_enabled ? 'checked' : ''} onchange="toggleOpsCron('${j.id}')">
+                  <span class="slider round"></span>
+                </label>
+                <button class="btn-sm-action-cyber danger" onclick="deleteOpsCron('${j.id}')" title="Delete Job" style="padding:5px 10px;">
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            <div class="cron-card-footer" style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:0.75rem;">
+              <div style="display:flex; align-items:center; gap:12px; color:var(--text-muted);">
+                <span>📊 <strong>${total}</strong> ${typeof t === 'function' ? t('ops_cron_runs_count') : 'মোট রান'}</span>
+                <span>✅ <strong>${successRate}%</strong> ${typeof t === 'function' ? t('ops_cron_success_rate') : 'সফলতা'}</span>
+                <span>⚡ <strong>${stats.avg_duration_ms}ms</strong> ${typeof t === 'function' ? t('ops_cron_avg_duration') : 'গড় সময়'}</span>
+              </div>
+              <div style="color:var(--text-muted);">
+                <span>${typeof t === 'function' ? t('ops_last_run') : 'সর্বশেষ রান'}: <strong style="color:var(--text-secondary);">${j.last_run || 'Never'}</strong></span>
+              </div>
             </div>
           </div>
-          <div class="cron-actions">
-            <button class="btn-sm-action-cyber" onclick="triggerOpsCron('${j.id}')" title="Run Now">⚡ ${typeof t === 'function' ? t('ops_run_now') : 'রান নাও'}</button>
-            <label class="ops-switch">
-              <input type="checkbox" ${j.is_enabled ? 'checked' : ''} onchange="toggleOpsCron('${j.id}')">
-              <span class="slider round"></span>
-            </label>
-            <button class="btn-sm-action-cyber danger" onclick="deleteOpsCron('${j.id}')">🗑️</button>
-          </div>
-        </div>
-        <div class="cron-card-footer">
-          <span>${typeof t === 'function' ? t('ops_last_status') : 'সর্বশেষ স্ট্যাটাস'}: <span class="badge-${j.last_status === 'SUCCESS' ? 'online' : 'idle'}">${j.last_status}</span></span>
-          <span style="color:var(--text-muted); font-size:0.75rem;">${typeof t === 'function' ? t('ops_last_run') : 'সর্বশেষ রান'}: ${j.last_run || 'N/A'}</span>
-        </div>
-      </div>
-    `).join('');
+        `;
+      }).join('');
+    }
 
     // Render History
     if (historyList) {
-      if (!data.history || data.history.length === 0) {
-        historyList.innerHTML = `<div style="text-align:center; padding:16px; color:var(--text-muted);">${typeof t === 'function' ? t('ops_cron_no_hist') : 'কোনো পূর্ববর্তী এক্সিকিউশন ইতিহাস নেই।'}</div>`;
+      if (!_opsCronCache.history || _opsCronCache.history.length === 0) {
+        historyList.innerHTML = `<div style="text-align:center; padding:18px; color:var(--text-muted);">${typeof t === 'function' ? t('ops_cron_no_hist') : 'কোনো পূর্ববর্তী এক্সিকিউশন ইতিহাস নেই।'}</div>`;
       } else {
-        historyList.innerHTML = data.history.map(h => `
-          <div class="ops-history-item">
-            <div style="display:flex; justify-content:space-between;">
-              <span style="font-weight:600; color:var(--text-primary);">${escapeHtml(h.job_name)}</span>
-              <span class="status-pill ${h.status === 'SUCCESS' ? 'success' : 'failed'}">${h.status} (${h.duration_ms}ms)</span>
+        historyList.innerHTML = _opsCronCache.history.map(h => `
+          <div class="ops-history-item" style="padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px; cursor:pointer; transition:background 0.15s ease;" onclick="viewOpsCronHistoryDetails('${h.id}')" title="Click to view output trace">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:700; color:var(--text-primary); font-size:0.85rem;">${escapeHtml(h.job_name)}</span>
+                <span class="status-pill ${h.status === 'SUCCESS' ? 'success' : 'failed'}" style="font-size:0.7rem; padding:1px 6px;">${h.status} (${h.duration_ms}ms)</span>
+              </div>
+              <span style="font-size:0.7rem; color:var(--text-muted); font-family:monospace;">${h.run_at}</span>
             </div>
-            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">${escapeHtml(h.output || '')}</div>
-            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">${h.run_at}</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${escapeHtml(h.output || '')}
+            </div>
           </div>
         `).join('');
       }
@@ -701,17 +822,35 @@ async function loadOpsCron() {
 }
 
 async function triggerOpsCron(jobId) {
+  const btn = document.getElementById(`cron-run-btn-${jobId}`);
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `⏳ ...`;
+  }
+
   try {
     const res = await opsFetch(`/api/ops/cron/${jobId}/run`, { method: 'POST' });
     const data = await res.json();
-    if (data.success) {
+    if (res.ok && data.status) {
       if (typeof showToast === 'function') {
-        showToast(typeof t === 'function' ? t('ops_cron_triggered') : `জব সফলভাবে এক্সিকিউট হয়েছে (${data.duration_ms}ms)`, 'success');
+        const msg = data.status === 'SUCCESS'
+          ? `জব সফলভাবে এক্সিকিউট হয়েছে (${data.duration_ms}ms)`
+          : `জব ব্যর্থ হয়েছে: ${data.output?.slice(0, 80)}`;
+        showToast(msg, data.status === 'SUCCESS' ? 'success' : 'error');
       }
       loadOpsCron();
+    } else {
+      alert(data.detail || 'Failed to trigger cron job');
     }
   } catch (err) {
-    alert('Failed to trigger cron job');
+    console.error(err);
+    alert('Failed to trigger cron job: network error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
   }
 }
 
@@ -729,6 +868,7 @@ async function deleteOpsCron(jobId) {
   try {
     await opsFetch(`/api/ops/cron/${jobId}`, { method: 'DELETE' });
     loadOpsCron();
+    if (typeof showToast === 'function') showToast('ক্রন জব মুছে ফেলা হয়েছে', 'info');
   } catch (err) {
     alert('Failed to delete cron');
   }
@@ -736,7 +876,71 @@ async function deleteOpsCron(jobId) {
 
 function openNewCronModal() {
   const modal = document.getElementById('ops-new-cron-modal');
-  if (modal) modal.style.display = 'flex';
+  if (!modal) return;
+
+  document.getElementById('cron-input-id').value = '';
+  const titleEl = document.getElementById('ops-cron-modal-title');
+  if (titleEl) titleEl.innerText = typeof t === 'function' ? t('ops_modal_cron_title') : 'নতুন অটোনোমাস ক্রন শিডিউল';
+  
+  const submitBtn = document.getElementById('cron-modal-submit-btn');
+  if (submitBtn) submitBtn.innerText = typeof t === 'function' ? t('btn_save') : 'সংরক্ষণ করুন';
+
+  document.getElementById('cron-input-name').value = '';
+  document.getElementById('cron-preset-select').value = 'custom';
+  document.getElementById('cron-input-expr').value = '0 * * * *';
+  document.getElementById('cron-input-type').value = 'system_health';
+  document.getElementById('cron-input-payload').value = JSON.stringify({ timeout_ms: 2000 }, null, 2);
+
+  handleOpsCronExprInput('0 * * * *');
+  modal.style.display = 'flex';
+}
+
+function openEditCronModal(jobId) {
+  const modal = document.getElementById('ops-new-cron-modal');
+  if (!modal) return;
+
+  const job = _opsCronCache.jobs.find(j => j.id === jobId);
+  if (!job) return;
+
+  document.getElementById('cron-input-id').value = job.id;
+  const titleEl = document.getElementById('ops-cron-modal-title');
+  if (titleEl) titleEl.innerText = typeof t === 'function' ? t('ops_cron_modal_title_edit') : 'ক্রন জব এডিট করুন';
+
+  const submitBtn = document.getElementById('cron-modal-submit-btn');
+  if (submitBtn) submitBtn.innerText = typeof t === 'function' ? t('btn_save') : 'আপডেট করুন';
+
+  document.getElementById('cron-input-name').value = job.name || '';
+  document.getElementById('cron-input-expr').value = job.expression || '';
+  document.getElementById('cron-input-type').value = job.task_type || 'system_health';
+
+  // Preset match check
+  const presetSelect = document.getElementById('cron-preset-select');
+  if (presetSelect) {
+    let matched = false;
+    for (let opt of presetSelect.options) {
+      if (opt.value === job.expression) {
+        presetSelect.value = opt.value;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) presetSelect.value = 'custom';
+  }
+
+  // Payload formatting
+  let payloadStr = '{}';
+  if (job.payload) {
+    try {
+      const parsed = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+      payloadStr = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+      payloadStr = String(job.payload);
+    }
+  }
+  document.getElementById('cron-input-payload').value = payloadStr;
+
+  handleOpsCronExprInput(job.expression);
+  modal.style.display = 'flex';
 }
 
 function closeNewCronModal() {
@@ -744,26 +948,172 @@ function closeNewCronModal() {
   if (modal) modal.style.display = 'none';
 }
 
+function handleOpsCronPresetChange(preset) {
+  if (preset && preset !== 'custom') {
+    const exprInput = document.getElementById('cron-input-expr');
+    if (exprInput) {
+      exprInput.value = preset;
+      handleOpsCronExprInput(preset);
+    }
+  }
+}
+
+function handleOpsCronExprInput(expr) {
+  clearTimeout(_cronValidateTimeout);
+  const previewDiv = document.getElementById('cron-expr-preview');
+  const iconSpan = document.getElementById('cron-expr-icon');
+  const textSpan = document.getElementById('cron-expr-text');
+  if (!previewDiv || !expr) return;
+
+  _cronValidateTimeout = setTimeout(async () => {
+    try {
+      const res = await opsFetch('/api/ops/cron/validate', {
+        method: 'POST',
+        body: JSON.stringify({ expression: expr })
+      });
+      const data = await res.json();
+      const isBn = typeof currentLang !== 'undefined' ? currentLang === 'bn' : true;
+
+      if (data.valid) {
+        previewDiv.style.background = 'rgba(0,255,180,0.06)';
+        previewDiv.style.borderColor = 'rgba(0,255,180,0.3)';
+        iconSpan.innerText = '✅';
+        const human = isBn ? data.human_bn : data.human_en;
+        textSpan.innerHTML = `<strong>${escapeHtml(human)}</strong> • পরবর্তী রান: <span style="color:var(--accent);">${data.next_run}</span>`;
+      } else {
+        previewDiv.style.background = 'rgba(255,75,75,0.08)';
+        previewDiv.style.borderColor = 'rgba(255,75,75,0.3)';
+        iconSpan.innerText = '❌';
+        textSpan.innerText = isBn ? `ত্রুটি: ${data.error || 'অকার্যকর ফরম্যাট'}` : `Error: ${data.error || 'Invalid syntax'}`;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, 250);
+}
+
+function handleOpsCronTaskTypeChange(type) {
+  resetOpsCronPayloadTemplate(type);
+}
+
+function resetOpsCronPayloadTemplate(typeOverride) {
+  const taskType = typeOverride || document.getElementById('cron-input-type').value;
+  const payloadEl = document.getElementById('cron-input-payload');
+  if (!payloadEl) return;
+
+  const templates = {
+    system_health: { timeout_ms: 2000 },
+    memory_vacuum: { reclaim_disk: true },
+    security_scan: { check_dlp: true },
+    executive_report: { scope: 'daily', auto_save: true },
+    backup_sync: { retention_count: 5 },
+    reindex_kb: { rebuild_hnsw: true },
+    agent_task: { prompt: "Analyze today's conversation trends and summarize top requested topics." },
+    webhook_dispatch: { url: "https://example.com/webhook", data: { alert_level: "info" } }
+  };
+
+  const tpl = templates[taskType] || {};
+  payloadEl.value = JSON.stringify(tpl, null, 2);
+}
+
 async function saveNewOpsCron(e) {
   e.preventDefault();
+  const jobId = document.getElementById('cron-input-id').value.trim();
   const name = document.getElementById('cron-input-name').value.trim();
   const expression = document.getElementById('cron-input-expr').value.trim();
   const task_type = document.getElementById('cron-input-type').value;
+  const payloadRaw = document.getElementById('cron-input-payload').value.trim();
+
+  let payload = {};
+  if (payloadRaw) {
+    try {
+      payload = JSON.parse(payloadRaw);
+    } catch (err) {
+      alert('Invalid JSON in payload field: ' + err.message);
+      return;
+    }
+  }
 
   try {
-    const res = await opsFetch('/api/ops/cron', {
-      method: 'POST',
-      body: JSON.stringify({ name, expression, task_type, payload: {} })
-    });
+    let res;
+    if (jobId) {
+      // Update existing
+      res = await opsFetch(`/api/ops/cron/${jobId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, expression, task_type, payload })
+      });
+    } else {
+      // Create new
+      res = await opsFetch('/api/ops/cron', {
+        method: 'POST',
+        body: JSON.stringify({ name, expression, task_type, payload })
+      });
+    }
+
     const data = await res.json();
-    if (data.success) {
+    if (res.ok && data.success) {
       closeNewCronModal();
       loadOpsCron();
-      if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('ops_cron_saved') : 'নতুন ক্রন জব যুক্ত হয়েছে', 'success');
+      if (typeof showToast === 'function') {
+        const msg = jobId
+          ? (typeof t === 'function' ? t('ops_cron_updated') : 'ক্রন জব সফলভাবে আপডেট হয়েছে')
+          : (typeof t === 'function' ? t('ops_cron_saved') : 'নতুন ক্রন জব যুক্ত হয়েছে');
+        showToast(msg, 'success');
+      }
+    } else {
+      alert(data.detail || 'Failed to save cron job');
     }
   } catch (err) {
-    alert('Failed to save cron');
+    alert('Failed to save cron: ' + err.message);
   }
+}
+
+async function clearOpsCronHistory() {
+  if (!confirm(typeof t === 'function' ? t('ops_cron_confirm_clear_history') : 'আপনি কি সমস্ত ক্রন এক্সিকিউশন ইতিহাস মুছে ফেলতে চান?')) return;
+  try {
+    const res = await opsFetch('/api/ops/cron/history/clear', { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      loadOpsCron();
+      if (typeof showToast === 'function') {
+        showToast(typeof t === 'function' ? t('ops_cron_history_cleared') : 'এক্সিকিউশন ইতিহাস সফলভাবে মুছে ফেলা হয়েছে', 'info');
+      }
+    }
+  } catch (err) {
+    alert('Failed to clear history: ' + err.message);
+  }
+}
+
+function viewOpsCronHistoryDetails(histId) {
+  const item = _opsCronCache.history.find(h => h.id === histId);
+  if (!item) return;
+
+  const modal = document.getElementById('ops-cron-detail-modal');
+  if (!modal) return;
+
+  document.getElementById('cron-detail-job-name').innerText = item.job_name || 'Cron Job';
+  const pill = document.getElementById('cron-detail-status-pill');
+  if (pill) {
+    pill.className = `status-pill ${item.status === 'SUCCESS' ? 'success' : 'failed'}`;
+    pill.innerText = item.status;
+  }
+  document.getElementById('cron-detail-time').innerText = item.run_at || '-';
+  document.getElementById('cron-detail-duration').innerText = `${item.duration_ms || 0}ms`;
+  document.getElementById('cron-detail-output').innerText = item.output || 'No output recorded.';
+
+  modal.style.display = 'flex';
+}
+
+function closeOpsCronDetailModal() {
+  const modal = document.getElementById('ops-cron-detail-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function copyCronDetailOutput() {
+  const out = document.getElementById('cron-detail-output').innerText;
+  navigator.clipboard.writeText(out).then(() => {
+    if (typeof showToast === 'function') showToast('আউটপুট ক্লিপবোর্ডে কপি করা হয়েছে', 'success');
+  });
 }
 
 // ==============================================================================
@@ -1530,8 +1880,17 @@ window.triggerOpsCron = triggerOpsCron;
 window.toggleOpsCron = toggleOpsCron;
 window.deleteOpsCron = deleteOpsCron;
 window.openNewCronModal = openNewCronModal;
+window.openEditCronModal = openEditCronModal;
 window.closeNewCronModal = closeNewCronModal;
+window.handleOpsCronPresetChange = handleOpsCronPresetChange;
+window.handleOpsCronExprInput = handleOpsCronExprInput;
+window.handleOpsCronTaskTypeChange = handleOpsCronTaskTypeChange;
+window.resetOpsCronPayloadTemplate = resetOpsCronPayloadTemplate;
 window.saveNewOpsCron = saveNewOpsCron;
+window.clearOpsCronHistory = clearOpsCronHistory;
+window.viewOpsCronHistoryDetails = viewOpsCronHistoryDetails;
+window.closeOpsCronDetailModal = closeOpsCronDetailModal;
+window.copyCronDetailOutput = copyCronDetailOutput;
 
 window.loadOpsSkills = loadOpsSkills;
 window.setOpsSkillFilter = setOpsSkillFilter;

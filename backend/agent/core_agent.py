@@ -36,15 +36,19 @@ class CompanyAIAgent:
         if not base_url.endswith("/v1") and not "/v1/" in base_url:
             base_url = base_url.rstrip("/") + "/v1"
 
+        verify_ssl = getattr(settings, "LLM_VERIFY_SSL", False)
+        async_http_client = httpx.AsyncClient(verify=verify_ssl, timeout=httpx.Timeout(60.0, connect=5.0))
+        sync_http_client = httpx.Client(verify=verify_ssl, timeout=httpx.Timeout(10.0, connect=4.0))
+
         self.client = AsyncOpenAI(
             base_url=base_url,
             api_key=settings.LLM_API_KEY or "not-needed",
-            timeout=httpx.Timeout(60.0, connect=4.0)
+            http_client=async_http_client
         )
         self.sync_client = OpenAI(
             base_url=base_url,
             api_key=settings.LLM_API_KEY or "not-needed",
-            timeout=httpx.Timeout(10.0, connect=3.0)
+            http_client=sync_http_client
         )
 
     def refresh_client(self):
@@ -67,12 +71,33 @@ class CompanyAIAgent:
             }
         except Exception as e:
             logger.warning(f"Connection test to LLM server failed: {e}")
+            fallback_models = []
+            if "oxionai" in settings.LLM_BASE_URL.lower():
+                fallback_models = [
+                    "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.1-pro", "gemma-2-2b",
+                    "claude-sonnet-5", "claude-opus-5.5", "claude-opus-5", "claude-opus-4.8",
+                    "claude-opus-4.7", "claude-opus-4.6", "claude-fable-5.1", "claude-fable-5", "claude-mythos-preview",
+                    "gpt-5.5", "gpt-5.5-pro", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
+                    "deepseek-v4-pro-max", "deepseek-v4-pro-0813", "deepseek-v4-flash-0731",
+                    "grok-4.5", "grok-4.6",
+                    "qwen3.8-max", "qwen3.8-27b", "qwen3.7-max",
+                    "kimi-k3", "kimi-k2.6", "glm-5.3", "glm-5.2",
+                    "seed-2.1-pro", "seed-2.1-turbo", "muse-spark-1.1"
+                ]
             return {
                 "success": False,
                 "message": f"Could not connect to LLM server at {settings.LLM_BASE_URL}: {str(e)}",
-                "models_available": [],
+                "models_available": fallback_models,
                 "active_model": settings.LLM_MODEL
             }
+
+_shared_agent_instance: Optional[CompanyAIAgent] = None
+
+def get_shared_agent() -> CompanyAIAgent:
+    global _shared_agent_instance
+    if _shared_agent_instance is None:
+        _shared_agent_instance = CompanyAIAgent()
+    return _shared_agent_instance
 
     @staticmethod
     def is_conversational_greeting(text: str) -> bool:
@@ -565,6 +590,26 @@ class CompanyAIAgent:
                                     f"3. অথবা অ্যাডমিন প্যানেলের **সিস্টেম সেটিংস (⚙️)** থেকে সক্রিয় কোনো সার্ভার URL সেট করুন।"
                                 )
                         for word in fallback_reply.split(" "):
+                            yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
+                            await asyncio.sleep(0.015)
+                        yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                        return
+                    elif "service_upgrading" in err_lower or "503" in err_lower or "maintenance" in err_lower:
+                        if language == "en":
+                            upgrade_msg = (
+                                f"🛠️ **[OxionAI Server Maintenance / Upgrading]**\n\n"
+                                f"The upstream AI model provider (`{target_model}` @ `{settings.LLM_BASE_URL}`) reported:\n\n"
+                                f"> *\"Our service is being upgraded right now and will be back to normal within a few minutes. Please retry shortly — your plan and balance are not affected.\"*\n\n"
+                                f"💡 **Note:** OxionAI's platform is currently undergoing a scheduled maintenance upgrade. Your configuration and account are intact. Please retry in a few moments, or switch to another model from the topbar."
+                            )
+                        else:
+                            upgrade_msg = (
+                                f"🛠️ **[OxionAI সার্ভার সাময়িক আপগ্রেড / মেইনটেন্যান্স]**\n\n"
+                                f"OxionAI সার্ভার (`{target_model}` @ `{settings.LLM_BASE_URL}`) থেকে জানানো হয়েছে:\n\n"
+                                f"> *\"Our service is being upgraded right now and will be back to normal within a few minutes. Please retry shortly — your plan and balance are not affected.\"*\n\n"
+                                f"💡 **পরামর্শ:** OxionAI-এর ক্লাউড গেটওয়েতে বর্তমানে ব্যাকএন্ড আপগ্রেড চলছে। আপনার সেটিংস বা একাউন্ট ব্যালেন্সে কোনো সমস্যা নেই; কিছু সময় পর পুনরায় চেষ্টা করুন অথবা সাময়িকভাবে টপবার ড্রপডাউন থেকে লোকাল মডেল সিলেক্ট করুন।"
+                            )
+                        for word in upgrade_msg.split(" "):
                             yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
                             await asyncio.sleep(0.015)
                         yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
