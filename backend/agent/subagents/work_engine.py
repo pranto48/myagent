@@ -165,11 +165,14 @@ class SubAgentWorkEngine:
             from memory.vector_store import VectorMemoryStore
             vs = VectorMemoryStore()
             query_text = task_instruction
-            search_results = vs.similarity_search(query_text, top_k=3)
+            try:
+                search_results = vs.search_memory(query=query_text, top_k=3)
+            except Exception:
+                search_results = []
             specialized_tool_data = {
                 "matched_chunks": len(search_results),
                 "snippets": [
-                    {"content": doc.page_content[:200], "source": doc.metadata.get("source", "Memory")}
+                    {"content": (doc.get("content", "") if isinstance(doc, dict) else str(doc))[:200], "source": doc.get("source", "Memory") if isinstance(doc, dict) else "Memory"}
                     for doc in search_results
                 ]
             }
