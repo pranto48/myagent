@@ -1964,3 +1964,376 @@ window.closeOpsCreateFsItemModal = closeOpsCreateFsItemModal;
 window.executeOpsCreateFsItem = executeOpsCreateFsItem;
 window.deleteOpsFsItem = deleteOpsFsItem;
 window.downloadOrPreviewFsFile = downloadOrPreviewFsFile;
+
+// ==============================================================================
+// 12. SUB-AGENTS WORK SYSTEM & NETWORK PING MODULE
+// ==============================================================================
+let opsSubAgentsState = {
+  currentTab: 'skills',
+  subagents: [],
+  serverInfo: { server_ip: '192.168.9.9', gateway_ip: '192.168.9.1' },
+  targets: [],
+  lastResult: null,
+  isPinging: false
+};
+
+function switchSkillsSubTab(tabName) {
+  opsSubAgentsState.currentTab = tabName;
+
+  const btnSkills = document.getElementById('btn-subtab-skills');
+  const btnSubagents = document.getElementById('btn-subtab-subagents');
+  const layoutSkills = document.getElementById('ops-skills-layout');
+  const layoutSubagents = document.getElementById('ops-subagents-layout');
+
+  if (tabName === 'subagents') {
+    if (btnSkills) btnSkills.classList.remove('active');
+    if (btnSubagents) btnSubagents.classList.add('active');
+    if (layoutSkills) layoutSkills.style.display = 'none';
+    if (layoutSubagents) layoutSubagents.style.display = 'flex';
+    loadOpsSubAgents();
+  } else {
+    if (btnSubagents) btnSubagents.classList.remove('active');
+    if (btnSkills) btnSkills.classList.add('active');
+    if (layoutSubagents) layoutSubagents.style.display = 'none';
+    if (layoutSkills) layoutSkills.style.display = 'grid';
+  }
+}
+
+async function loadOpsSubAgents() {
+  try {
+    // 1. Fetch subagents
+    const resSub = await opsFetch('/api/ops/subagents');
+    const dataSub = await resSub.json();
+    if (dataSub.success) {
+      opsSubAgentsState.subagents = dataSub.subagents || [];
+      renderSubAgentsGrid(opsSubAgentsState.subagents);
+      const countEl = document.getElementById('subagents-fleet-count');
+      if (countEl) countEl.innerText = `${opsSubAgentsState.subagents.length} Agents Configured`;
+    }
+
+    // 2. Fetch ping subagent status & server IP
+    const resPing = await opsFetch('/api/ops/subagents/ping/status');
+    const dataPing = await resPing.json();
+    if (dataPing.success) {
+      opsSubAgentsState.serverInfo = dataPing.server_info || {};
+      opsSubAgentsState.targets = dataPing.targets || [];
+
+      const serverIpEl = document.getElementById('ping-server-ip-display');
+      const sourceIpEl = document.getElementById('stat-source-server-ip');
+      const gatewayIpEl = document.getElementById('stat-gateway-ip');
+      if (serverIpEl) serverIpEl.innerText = dataPing.server_info?.server_ip || '192.168.9.9';
+      if (sourceIpEl) sourceIpEl.innerText = dataPing.server_info?.server_ip || '192.168.9.9';
+      if (gatewayIpEl) gatewayIpEl.innerText = dataPing.server_info?.gateway_ip || '192.168.9.1';
+
+      if (dataPing.recent_history && dataPing.recent_history.length > 0 && !opsSubAgentsState.lastResult) {
+        renderPingSingleResult(dataPing.recent_history[0]);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading subagents telemetry:', err);
+  }
+}
+
+function renderSubAgentsGrid(subagents) {
+  const grid = document.getElementById('subagents-cards-grid');
+  if (!grid) return;
+
+  if (!subagents || subagents.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1/-1; padding:32px; text-align:center; color:#64748b;">কোনো সাব-এজেন্ট কনফিগার করা নেই।</div>`;
+    return;
+  }
+
+  grid.innerHTML = subagents.map(agent => {
+    const isOnline = agent.status === 'ONLINE' || agent.status === 'READY';
+    const statusClass = agent.status === 'ONLINE' ? 'status-online' : (agent.status === 'READY' ? 'status-ready' : 'status-degraded');
+    const metrics = agent.metrics || {};
+
+    const metricItems = Object.entries(metrics).slice(0, 3).map(([k, v]) => `
+      <div class="subagent-metric-item">
+        <span>${escapeHtml(k.replace(/_/g, ' '))}</span>
+        <strong>${escapeHtml(String(v))}</strong>
+      </div>
+    `).join('');
+
+    const skillPills = (agent.assigned_skills || []).map(sk => `
+      <span class="subagent-skill-pill">#${escapeHtml(sk.replace('skill_', ''))}</span>
+    `).join('');
+
+    return `
+      <div class="subagent-card" id="subagent-card-${agent.id}">
+        <div class="subagent-card-header">
+          <div class="subagent-identity">
+            <div class="subagent-avatar">${agent.icon || '🤖'}</div>
+            <div class="subagent-title-info">
+              <h5>${escapeHtml(agent.name)}</h5>
+              <span class="subagent-role">${escapeHtml(agent.role || 'Specialized Agent')}</span>
+            </div>
+          </div>
+          <span class="status-pill ${statusClass}">${agent.status || 'READY'}</span>
+        </div>
+
+        <p class="subagent-desc">${escapeHtml(agent.description)}</p>
+
+        <div class="subagent-skills-tags">
+          ${skillPills}
+        </div>
+
+        <div class="subagent-metrics-row">
+          ${metricItems || '<div class="subagent-metric-item"><span>Status</span><strong>Active</strong></div>'}
+        </div>
+
+        <div class="subagent-card-actions">
+          <div style="font-size:0.75rem; color:#64748b; font-family:'Fira Code',monospace;">
+            Model: <span style="color:#f1e7d0;">${escapeHtml(agent.model || 'gemini-3.7-flash')}</span>
+          </div>
+          <button type="button" class="btn-sm-action-cyber" onclick="executeSubAgentTask('${agent.id}', '${escapeHtml(agent.name)}')">
+            ⚡ Run Task
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handlePingTypeChange(val) {
+  const portGroup = document.getElementById('ping-port-group');
+  if (portGroup) {
+    portGroup.style.display = val === 'tcp' ? 'flex' : 'none';
+  }
+}
+
+function selectPingPreset(ip, name, port, type, btnEl) {
+  const targetInput = document.getElementById('ping-target-input');
+  const typeSelect = document.getElementById('ping-type-select');
+  const portInput = document.getElementById('ping-port-input');
+  const portGroup = document.getElementById('ping-port-group');
+
+  if (targetInput) targetInput.value = ip;
+  if (typeSelect) typeSelect.value = type || 'icmp';
+  if (portInput) portInput.value = port || 80;
+  if (portGroup) portGroup.style.display = type === 'tcp' ? 'flex' : 'none';
+
+  document.querySelectorAll('.preset-chip').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+
+  // Trigger test immediately
+  triggerPingDiagnosis();
+}
+
+async function triggerPingDiagnosis() {
+  if (opsSubAgentsState.isPinging) return;
+  const targetInput = document.getElementById('ping-target-input');
+  const typeSelect = document.getElementById('ping-type-select');
+  const portInput = document.getElementById('ping-port-input');
+  const countSelect = document.getElementById('ping-count-select');
+  const spinner = document.getElementById('ping-btn-spinner');
+  const resultPane = document.getElementById('ping-live-result-pane');
+
+  const target = targetInput ? targetInput.value.trim() : '192.168.9.5';
+  if (!target) {
+    alert('অনুগ্রহ করে টার্গেট আইপি বা হোস্টনেম লিখুন');
+    return;
+  }
+
+  const ping_type = typeSelect ? typeSelect.value : 'icmp';
+  const port = (ping_type === 'tcp' && portInput) ? parseInt(portInput.value) || 80 : null;
+  const count = countSelect ? parseInt(countSelect.value) || 3 : 3;
+
+  opsSubAgentsState.isPinging = true;
+  if (spinner) spinner.style.display = 'inline-block';
+  if (resultPane) {
+    resultPane.innerHTML = `
+      <div style="padding:24px; text-align:center; color:#38bdf8; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(56,189,248,0.2);">
+        <span class="spin" style="display:inline-block; font-size:1.2rem; margin-right:8px;">⏳</span>
+        সার্ভার IP (${opsSubAgentsState.serverInfo?.server_ip || '192.168.9.9'}) থেকে <strong>${escapeHtml(target)}</strong>-এ পিং টেস্ট চলছে...
+      </div>
+    `;
+  }
+
+  try {
+    const res = await opsFetch('/api/ops/subagents/ping/run', {
+      method: 'POST',
+      body: JSON.stringify({ target, ping_type, port, count })
+    });
+    const data = await res.json();
+    if (data.success && data.data) {
+      opsSubAgentsState.lastResult = data.data;
+      renderPingSingleResult(data.data);
+      const fleetLat = document.getElementById('stat-fleet-latency');
+      if (fleetLat && data.data.latency_ms !== null && data.data.latency_ms !== undefined) {
+        fleetLat.innerText = `${data.data.latency_ms} ms`;
+      }
+    } else {
+      throw new Error(data.message || 'Ping failed');
+    }
+  } catch (err) {
+    console.error('Ping diagnosis error:', err);
+    if (resultPane) {
+      resultPane.innerHTML = `<div style="padding:18px; text-align:center; color:#f43f5e; background:rgba(244,63,94,0.1); border-radius:6px; border:1px solid rgba(244,63,94,0.3);">পিং পরীক্ষায় সমস্যা হয়েছে: ${escapeHtml(err.message)}</div>`;
+    }
+  } finally {
+    opsSubAgentsState.isPinging = false;
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+async function triggerFleetBatchPing() {
+  if (opsSubAgentsState.isPinging) return;
+  const spinner = document.getElementById('ping-btn-spinner');
+  const resultPane = document.getElementById('ping-live-result-pane');
+
+  opsSubAgentsState.isPinging = true;
+  if (spinner) spinner.style.display = 'inline-block';
+  if (resultPane) {
+    resultPane.innerHTML = `
+      <div style="padding:24px; text-align:center; color:#38bdf8; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(56,189,248,0.2);">
+        <span class="spin" style="display:inline-block; font-size:1.2rem; margin-right:8px;">⏳</span>
+        ফ্লিটের সকল নোডে প্যারালাল পিং টেস্ট চলছে (Gateway, NAS Storage, DNS, Local Server)...
+      </div>
+    `;
+  }
+
+  try {
+    const res = await opsFetch('/api/ops/subagents/ping/run', {
+      method: 'POST',
+      body: JSON.stringify({ run_all_presets: true })
+    });
+    const data = await res.json();
+    if (data.success && data.data) {
+      renderPingBatchResult(data.data);
+      const fleetLat = document.getElementById('stat-fleet-latency');
+      if (fleetLat) fleetLat.innerText = `${data.data.fleet_avg_latency_ms || 0.45} ms`;
+    } else {
+      throw new Error(data.message || 'Batch ping failed');
+    }
+  } catch (err) {
+    console.error('Batch ping error:', err);
+    if (resultPane) {
+      resultPane.innerHTML = `<div style="padding:18px; text-align:center; color:#f43f5e; background:rgba(244,63,94,0.1); border-radius:6px;">ফ্লিট পিং পরীক্ষায় সমস্যা: ${escapeHtml(err.message)}</div>`;
+    }
+  } finally {
+    opsSubAgentsState.isPinging = false;
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+function renderPingSingleResult(r) {
+  const pane = document.getElementById('ping-live-result-pane');
+  if (!pane) return;
+
+  const isOnline = r.status === 'ONLINE';
+  const isDegraded = r.status === 'DEGRADED';
+  const statusClass = isOnline ? 'status-online' : (isDegraded ? 'status-degraded' : 'status-offline');
+  const statusColor = isOnline ? '#22c55e' : (isDegraded ? '#f59e0b' : '#f43f5e');
+
+  pane.innerHTML = `
+    <div class="ping-result-card ${statusClass}">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <strong style="font-size:0.98rem; color:#f1e7d0;">${escapeHtml(r.target_ip)} ${r.target_name ? `(${escapeHtml(r.target_name)})` : ''}</strong>
+          <span style="margin-left:8px; font-size:0.75rem; color:#94a3b8;">Source: ${escapeHtml(r.source_server_ip || r.server_ip || '192.168.9.9')} • Method: ${escapeHtml(r.method || r.ping_type || 'ICMP')}</span>
+        </div>
+        <span class="status-pill ${statusClass}">${r.status}</span>
+      </div>
+
+      <div class="ping-result-grid">
+        <div class="ping-metric-box">
+          <span class="metric-name">Latency</span>
+          <span class="metric-val" style="color:${statusColor};">${r.latency_ms !== null && r.latency_ms !== undefined ? `${r.latency_ms} ms` : 'N/A'}</span>
+        </div>
+        <div class="ping-metric-box">
+          <span class="metric-name">Packet Loss</span>
+          <span class="metric-val" style="color:${r.packet_loss === 0 ? '#22c55e' : (r.packet_loss < 50 ? '#f59e0b' : '#f43f5e')};">${r.packet_loss ?? 0}%</span>
+        </div>
+        <div class="ping-metric-box">
+          <span class="metric-name">Min / Max</span>
+          <span class="metric-val">${r.min_ms !== null && r.min_ms !== undefined ? `${r.min_ms} / ${r.max_ms} ms` : 'N/A'}</span>
+        </div>
+        <div class="ping-metric-box">
+          <span class="metric-name">Jitter / RTT</span>
+          <span class="metric-val">${r.jitter_ms !== null && r.jitter_ms !== undefined ? `${r.jitter_ms} ms` : 'N/A'}</span>
+        </div>
+      </div>
+
+      ${r.raw_output ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <span style="font-size:0.72rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Raw Terminal Diagnostics:</span>
+          <span style="font-size:0.72rem; color:#38bdf8; font-family:'Fira Code',monospace;">Exit Code: ${r.success ? 0 : 1}</span>
+        </div>
+        <div class="ping-terminal-output">${escapeHtml(r.raw_output)}</div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderPingBatchResult(batch) {
+  const pane = document.getElementById('ping-live-result-pane');
+  if (!pane) return;
+
+  const results = batch.results || [];
+  const rowsHtml = results.map(r => {
+    const isOnline = r.status === 'ONLINE';
+    const isDegraded = r.status === 'DEGRADED';
+    const statusClass = isOnline ? 'status-online' : (isDegraded ? 'status-degraded' : 'status-offline');
+    const color = isOnline ? '#22c55e' : (isDegraded ? '#f59e0b' : '#f43f5e');
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.06); border-radius:6px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="chip-dot ${isOnline ? 'online' : 'offline'}"></span>
+          <div>
+            <strong style="font-size:0.88rem; color:#ffffff;">${escapeHtml(r.target_ip)}</strong>
+            <span style="font-size:0.75rem; color:#94a3b8; margin-left:6px;">${escapeHtml(r.target_name || '')}</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div style="font-family:'Fira Code',monospace; font-size:0.85rem; color:${color}; font-weight:600;">
+            ${r.latency_ms !== null && r.latency_ms !== undefined ? `${r.latency_ms} ms` : 'Failed'}
+          </div>
+          <span class="status-pill ${statusClass}" style="min-width:65px; text-align:center;">${r.status}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  pane.innerHTML = `
+    <div class="ping-result-card" style="border-left: 4px solid #38bdf8;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:8px;">
+        <div>
+          <strong style="font-size:1rem; color:#38bdf8;">ফ্লিট পিং ও নেটওয়ার্ক স্টেটাস সারাংশ</strong>
+          <span style="font-size:0.75rem; color:#94a3b8; margin-left:8px;">Source: ${escapeHtml(batch.server_ip || '192.168.9.9')} • Time: ${escapeHtml(batch.timestamp)}</span>
+        </div>
+        <div style="font-size:0.82rem; font-family:'Fira Code',monospace; color:#22c55e;">
+          ${batch.online_count}/${batch.total_targets} Hosts Online (Avg: ${batch.fleet_avg_latency_ms}ms)
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${rowsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function executeSubAgentTask(agentId, agentName) {
+  if (agentId === 'net_ping_subagent') {
+    triggerFleetBatchPing();
+    if (typeof showToast === 'function') showToast(`সাব-এজেন্ট '${agentName}': ফ্লিট পিং পরীক্ষা শুরু হয়েছে`, 'info');
+  } else {
+    if (typeof switchTab === 'function') switchTab('chat');
+    const inputEl = document.getElementById('chat-input') || document.getElementById('prompt-input');
+    if (inputEl) {
+      inputEl.value = `@${agentId} Analyze network status and review active infrastructure metrics.`;
+      inputEl.focus();
+    }
+    if (typeof showToast === 'function') showToast(`সাব-এজেন্ট '${agentName}' অ্যাক্টিভেট করা হয়েছে`, 'success');
+  }
+}
+
+// Export window methods
+window.switchSkillsSubTab = switchSkillsSubTab;
+window.loadOpsSubAgents = loadOpsSubAgents;
+window.handlePingTypeChange = handlePingTypeChange;
+window.selectPingPreset = selectPingPreset;
+window.triggerPingDiagnosis = triggerPingDiagnosis;
+window.triggerFleetBatchPing = triggerFleetBatchPing;
+window.executeSubAgentTask = executeSubAgentTask;

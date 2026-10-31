@@ -367,8 +367,21 @@ async def execute_agent_task(payload: Dict[str, Any]) -> str:
 
 
 # Registry of task executors
+async def execute_network_ping(payload: Dict[str, Any]) -> str:
+    """Executes network ping diagnostics from Agent Server to monitored targets."""
+    try:
+        from agent.subagents.ping_agent import NetworkPingSubAgent
+        res = await NetworkPingSubAgent.batch_ping()
+        online = res.get("online_count", 0)
+        total = res.get("total_targets", 0)
+        avg_lat = res.get("fleet_avg_latency_ms", 0)
+        return f"Network Ping Sub-Agent: {online}/{total} hosts online (Avg latency: {avg_lat}ms) from server {res.get('server_ip')}"
+    except Exception as e:
+        return f"Network Ping failed: {str(e)}"
+
 EXECUTOR_MAP = {
     "llm_ping": execute_llm_ping,
+    "network_ping": execute_network_ping,
     "system_health": execute_llm_ping,
     "memory_vacuum": execute_memory_vacuum,
     "cleanup_cache": execute_memory_vacuum,
@@ -384,6 +397,16 @@ EXECUTOR_MAP = {
 }
 
 TASK_METADATA = [
+    {
+        "type": "network_ping",
+        "name_en": "Network Ping & Latency Diagnostics",
+        "name_bn": "নেটওয়ার্ক পিং ও লেটেন্সি ডায়াগনস্টিকস",
+        "icon": "📡",
+        "description_en": "Pings critical infrastructure nodes (Gateway, NAS, DNS) and records latency metrics.",
+        "description_bn": "গেটওয়ে, ন্যাস স্টোরেজ ও পাবলিক ডিএনএসে পিং পাঠিয়ে লেটেন্সি ও সংযোগ পর্যবেক্ষণ করে।",
+        "default_expr": "*/10 * * * *",
+        "default_payload": {}
+    },
     {
         "type": "system_health",
         "name_en": "System Health & LLM Ping",

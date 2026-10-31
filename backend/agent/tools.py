@@ -723,6 +723,33 @@ class AgentTools:
         except Exception as e:
             return f"Chart generator error: {str(e)}"
 
+    @staticmethod
+    async def ping_network_diagnostics(target: str, ping_type: str = "icmp", port: Optional[int] = None, count: int = 3) -> str:
+        """
+        Autonomous Sub-Agent tool to test ping connectivity and measure latency from the
+        Agent Server (192.168.9.9) to another IP address or hostname.
+        """
+        try:
+            from agent.subagents.ping_agent import NetworkPingSubAgent
+            res = await NetworkPingSubAgent.ping_target(target=target, ping_type=ping_type, port=port, count=count)
+            status_emoji = "🟢" if res.get("status") == "ONLINE" else ("🟡" if res.get("status") == "DEGRADED" else "🔴")
+            lines = [
+                f"### {status_emoji} নেটওয়ার্ক পিং ও স্টেটাস রিপোর্ট ({res.get('status')})",
+                f"- **সার্ভার উৎস আইপি (Source IP):** `{res.get('source_server_ip', '192.168.9.9')}`",
+                f"- **টার্গেট আইপি (Target IP):** `{res.get('target_ip')}` ({res.get('target_name', 'Host')})",
+                f"- **টেস্টিং মেথড:** `{res.get('method', 'ICMP')}`",
+                f"- **কানেকশন স্টেটাস:** `{res.get('status')}`",
+                f"- **গড় লেটেন্সি (Avg Latency):** `{res.get('latency_ms', 'N/A')} ms`",
+                f"- **প্যাকেট লস (Packet Loss):** `{res.get('packet_loss', 0)}%`"
+            ]
+            if res.get("min_ms") is not None and res.get("max_ms") is not None:
+                lines.append(f"- **ন্যূনতম / সর্বোচ্চ লেটেন্সি:** `{res.get('min_ms')} ms` / `{res.get('max_ms')} ms`")
+            if res.get("raw_output"):
+                lines.append(f"\n```text\n{res.get('raw_output')}\n```")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Ping diagnostics error: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -822,6 +849,14 @@ class AgentTools:
             elif tool_name == "system_info":
                 return cls.system_info()
 
+            elif tool_name == "ping_network_diagnostics":
+                return await cls.ping_network_diagnostics(
+                    target=args.get("target") or args.get("ip") or "192.168.9.1",
+                    ping_type=args.get("ping_type", "icmp"),
+                    port=int(args["port"]) if args.get("port") else None,
+                    count=int(args.get("count", 3))
+                )
+
             else:
                 # Check dynamic MCP manager
                 from mcp.manager import MCPManager
@@ -834,6 +869,23 @@ class AgentTools:
     def get_openai_tools_schema(cls) -> List[Dict[str, Any]]:
         """Returns standard OpenAI Function Calling tool definitions for all built-in tools."""
         return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "ping_network_diagnostics",
+                    "description": "Network Sub-Agent: Pings and checks latency/status from Agent Server (192.168.9.9) to another IP address or domain.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "target": {"type": "string", "description": "Target IP address or domain (e.g. 192.168.9.5, 192.168.9.1, 8.8.8.8)"},
+                            "ping_type": {"type": "string", "enum": ["icmp", "tcp"], "description": "Type of ping: 'icmp' or 'tcp' port probe"},
+                            "port": {"type": "integer", "description": "TCP port if ping_type is tcp (e.g. 80, 443, 3399, 445)"},
+                            "count": {"type": "integer", "description": "Number of ping packets to send (default 3)"}
+                        },
+                        "required": ["target"]
+                    }
+                }
+            },
             {
                 "type": "function",
                 "function": {

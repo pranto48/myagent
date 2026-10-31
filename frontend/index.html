@@ -2134,8 +2134,22 @@
             </div>
           </div>
 
-          <!-- 2-Column Split Layout -->
-          <div class="ops-skills-layout">
+          <!-- View Mode Switcher: Skills vs Sub-Agents -->
+          <div class="ops-skills-tabs-bar">
+            <button type="button" class="ops-subtab-btn active" id="btn-subtab-skills" onclick="switchSkillsSubTab('skills')">
+              <span class="subtab-icon">📦</span>
+              <span data-i18n="ops_skills_tab_catalog">Skills Library & Toolsets</span>
+              <span class="subtab-badge" id="badge-skills-count">60</span>
+            </button>
+            <button type="button" class="ops-subtab-btn" id="btn-subtab-subagents" onclick="switchSkillsSubTab('subagents')">
+              <span class="subtab-icon">🤖</span>
+              <span data-i18n="ops_skills_tab_subagents">Sub-Agents Work System</span>
+              <span class="subtab-badge pulse-badge" id="badge-subagents-count">6 Active Swarm</span>
+            </button>
+          </div>
+
+          <!-- 2-Column Split Layout for Skills -->
+          <div class="ops-skills-layout" id="ops-skills-layout">
             <!-- Left Navigation Sidebar: Filters & Categories -->
             <aside class="ops-skills-sidebar">
               <!-- Filters Section -->
@@ -2200,6 +2214,174 @@
                 <!-- Dynamically rendered rows matching screenshot -->
               </div>
             </main>
+          </div>
+
+          <!-- Sub-Agents Work System Layout -->
+          <div class="ops-subagents-layout" id="ops-subagents-layout" style="display:none;">
+            <!-- Top Subagents Hero Banner -->
+            <div class="subagents-hero-banner">
+              <div class="subagents-hero-info">
+                <div class="hero-tag-row">
+                  <span class="hero-live-pill">● LIVE SWARM</span>
+                  <span class="hero-server-tag">Agent Server IP: <strong id="ping-server-ip-display">192.168.9.9</strong> (Port: 3399)</span>
+                </div>
+                <h3 class="hero-title" data-i18n="subagents_hero_title">স্বয়ংক্রিয় সাব-এজেন্ট ওয়ার্কিং সিস্টেম ও সোয়ার্ম হাব</h3>
+                <p class="hero-desc" data-i18n="subagents_hero_desc">
+                  নেটওয়ার্ক সেন্টিনেল, ডিএজি প্ল্যানার, মেমোরি কিউরেটর ও ডিএলপি অডিটর সাব-এজেন্টদের প্যারালাল টাস্ক অর্কেস্ট্রেশন ও রিয়েলটাইম টেলিমেট্রি।
+                </p>
+              </div>
+              <div class="subagents-hero-actions">
+                <button type="button" class="btn-sm-action-cyber" onclick="loadOpsSubAgents()">🔄 <span data-i18n="btn_refresh">রিফ্রেশ</span></button>
+                <button type="button" class="btn-primary" onclick="triggerFleetBatchPing()">⚡ <span data-i18n="btn_run_fleet_ping">ফ্লিট পিং টেস্ট চালান</span></button>
+              </div>
+            </div>
+
+            <!-- 1. Dedicated Network Ping Sub-Agent Control Deck -->
+            <div class="ping-subagent-card">
+              <div class="ping-card-header">
+                <div class="ping-title-group">
+                  <span class="ping-icon">📡</span>
+                  <div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <h4 style="margin:0; font-size:1.05rem; color:#f1e7d0;" data-i18n="ping_subagent_title">Network Ping & Latency Telemetry Sub-Agent</h4>
+                      <span class="status-pill status-online" id="ping-subagent-status-badge">ONLINE</span>
+                    </div>
+                    <p style="margin:3px 0 0 0; font-size:0.78rem; color:#94a3b8;" data-i18n="ping_subagent_desc">
+                      সার্ভার উৎস আইপি (192.168.9.9) থেকে লোকাল ও এক্সটার্নাল আইপিতে ICMP / TCP পিং পাঠিয়ে সংযোগ ও লেটেন্সি মনিটরিং
+                    </p>
+                  </div>
+                </div>
+                <div class="ping-stats-pills">
+                  <div class="ping-stat-chip">
+                    <span class="stat-lbl">Source Server:</span>
+                    <strong class="stat-val" id="stat-source-server-ip">192.168.9.9</strong>
+                  </div>
+                  <div class="ping-stat-chip">
+                    <span class="stat-lbl">Gateway:</span>
+                    <strong class="stat-val" id="stat-gateway-ip">192.168.9.1</strong>
+                  </div>
+                  <div class="ping-stat-chip">
+                    <span class="stat-lbl">Fleet Avg Latency:</span>
+                    <strong class="stat-val" id="stat-fleet-latency">0.45 ms</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive Ping Control Console -->
+              <div class="ping-control-bar">
+                <div class="ping-input-group">
+                  <label class="ping-field-lbl" data-i18n="ping_target_label">টার্গেট আইপি বা হোস্টনেম:</label>
+                  <div class="ping-input-wrap">
+                    <span class="input-icon">🎯</span>
+                    <input type="text" id="ping-target-input" class="ping-text-input" placeholder="e.g. 192.168.9.5, 192.168.9.1, 8.8.8.8" value="192.168.9.5">
+                  </div>
+                </div>
+
+                <div class="ping-input-group" style="max-width:180px;">
+                  <label class="ping-field-lbl" data-i18n="ping_type_label">টেস্টিং মেথড:</label>
+                  <select id="ping-type-select" class="ping-select" onchange="handlePingTypeChange(this.value)">
+                    <option value="icmp" selected>ICMP Ping (Standard)</option>
+                    <option value="tcp">TCP Port Handshake</option>
+                  </select>
+                </div>
+
+                <div class="ping-input-group" id="ping-port-group" style="max-width:110px; display:none;">
+                  <label class="ping-field-lbl" data-i18n="ping_port_label">পোর্ট:</label>
+                  <input type="number" id="ping-port-input" class="ping-text-input" placeholder="445" value="445">
+                </div>
+
+                <div class="ping-input-group" style="max-width:90px;">
+                  <label class="ping-field-lbl" data-i18n="ping_count_label">প্যাকেট:</label>
+                  <select id="ping-count-select" class="ping-select">
+                    <option value="3" selected>3</option>
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                  </select>
+                </div>
+
+                <div class="ping-btn-group">
+                  <button type="button" class="btn-primary ping-action-btn" id="btn-run-ping-now" onclick="triggerPingDiagnosis()">
+                    <span id="ping-btn-spinner" style="display:none;">⏳</span>
+                    <span>🚀</span> <span data-i18n="btn_ping_run">পিং চালান</span>
+                  </button>
+                  <button type="button" class="ops-outline-btn ping-action-btn" onclick="triggerFleetBatchPing()">
+                    <span>⚡</span> <span data-i18n="btn_ping_all">সব আইপি টেস্ট</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick Presets Row -->
+              <div class="ping-presets-row">
+                <span class="preset-label" data-i18n="ping_presets_label">কুইক টার্গেট সিলেক্ট:</span>
+                <div class="preset-chips-container" id="ping-preset-chips">
+                  <button type="button" class="preset-chip" onclick="selectPingPreset('192.168.9.1', 'Gateway Router', 80, 'icmp', this)">
+                    <span class="chip-dot online"></span> 192.168.9.1 (Gateway)
+                  </button>
+                  <button type="button" class="preset-chip active" onclick="selectPingPreset('192.168.9.5', 'NAS Storage', 445, 'icmp', this)">
+                    <span class="chip-dot online"></span> 192.168.9.5 (NAS Storage)
+                  </button>
+                  <button type="button" class="preset-chip" onclick="selectPingPreset('192.168.9.9', 'Local Host', 3399, 'icmp', this)">
+                    <span class="chip-dot online"></span> 192.168.9.9 (Local Server)
+                  </button>
+                  <button type="button" class="preset-chip" onclick="selectPingPreset('8.8.8.8', 'Google DNS', 53, 'icmp', this)">
+                    <span class="chip-dot online"></span> 8.8.8.8 (Google DNS)
+                  </button>
+                  <button type="button" class="preset-chip" onclick="selectPingPreset('1.1.1.1', 'Cloudflare DNS', 53, 'icmp', this)">
+                    <span class="chip-dot online"></span> 1.1.1.1 (Cloudflare DNS)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Ping Diagnostic Result Banner -->
+              <div class="ping-result-display-area" id="ping-live-result-pane">
+                <div class="ping-result-card status-online">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      <strong style="font-size:0.95rem; color:#f1e7d0;">192.168.9.5 (NAS Storage Server)</strong>
+                      <span style="margin-left:8px; font-size:0.75rem; color:#94a3b8;">Source: 192.168.9.9 • Method: ICMP</span>
+                    </div>
+                    <span class="status-pill status-online">ONLINE</span>
+                  </div>
+                  <div class="ping-result-grid">
+                    <div class="ping-metric-box">
+                      <span class="metric-name">Latency</span>
+                      <span class="metric-val" style="color:#22c55e;">0.45 ms</span>
+                    </div>
+                    <div class="ping-metric-box">
+                      <span class="metric-name">Packet Loss</span>
+                      <span class="metric-val" style="color:#22c55e;">0%</span>
+                    </div>
+                    <div class="ping-metric-box">
+                      <span class="metric-name">Min / Max</span>
+                      <span class="metric-val">0.38 / 0.52 ms</span>
+                    </div>
+                    <div class="ping-metric-box">
+                      <span class="metric-name">Jitter</span>
+                      <span class="metric-val">0.05 ms</span>
+                    </div>
+                  </div>
+                  <div class="ping-terminal-output">PING 192.168.9.5 (192.168.9.5) 56(84) bytes of data.
+64 bytes from 192.168.9.5: icmp_seq=1 ttl=64 time=0.452 ms
+64 bytes from 192.168.9.5: icmp_seq=2 ttl=64 time=0.381 ms
+64 bytes from 192.168.9.5: icmp_seq=3 ttl=64 time=0.518 ms
+--- 192.168.9.5 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Sub-Agents Swarm Grid -->
+            <div class="subagents-section-header">
+              <h4 class="subagents-section-title">
+                <span>🐝</span> <span data-i18n="subagents_grid_title">সক্রিয় সাব-এজেন্ট সোয়ার্ম (Active Sub-Agents Fleet)</span>
+              </h4>
+              <span class="subagents-count-chip" id="subagents-fleet-count">6 Agents Configured</span>
+            </div>
+
+            <div class="subagents-grid" id="subagents-cards-grid">
+              <!-- Dynamically rendered sub-agent cards -->
+            </div>
           </div>
 
           <!-- Floating Skill Agent Help Pill -->

@@ -6758,3 +6758,603 @@ body.light-theme .reasoning-body,
 
 
 
+
+/* ==============================================================================
+   SUB-AGENTS WORK SYSTEM & NETWORK PING STYLES (Cyber Enterprise Theme)
+   ============================================================================== */
+.ops-skills-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 18px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+}
+
+.ops-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 16px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ops-subtab-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1e7d0;
+  border-color: rgba(241, 231, 208, 0.3);
+}
+
+.ops-subtab-btn.active {
+  background: #f1e7d0 !important;
+  color: #0b0f17 !important;
+  border-color: #f1e7d0 !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(241, 231, 208, 0.2);
+}
+
+.subtab-badge {
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+}
+
+.ops-subtab-btn.active .subtab-badge {
+  background: rgba(0, 0, 0, 0.15);
+  color: #0b0f17;
+}
+
+.pulse-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-weight: 600;
+}
+
+/* Sub-agents Layout */
+.ops-subagents-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease;
+}
+
+.subagents-hero-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(16, 24, 39, 0.95), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  padding: 18px 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.hero-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.hero-live-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.8px;
+}
+
+.hero-server-tag {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-family: 'Fira Code', monospace;
+}
+
+.hero-server-tag strong {
+  color: #38bdf8;
+}
+
+.hero-title {
+  margin: 0 0 4px 0;
+  font-size: 1.2rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.hero-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  max-width: 750px;
+  line-height: 1.4;
+}
+
+.subagents-hero-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Network Ping Sub-Agent Control Deck */
+.ping-subagent-card {
+  background: #0d121c;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.ping-subagent-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #38bdf8, #22c55e, #f1e7d0);
+}
+
+.ping-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.ping-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ping-icon {
+  font-size: 1.8rem;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.ping-stats-pills {
+  display: flex;
+  gap: 12px;
+}
+
+.ping-stat-chip {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}
+
+.ping-stat-chip .stat-lbl {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ping-stat-chip .stat-val {
+  font-size: 0.92rem;
+  font-family: 'Fira Code', monospace;
+  color: #38bdf8;
+}
+
+/* Ping Control Bar */
+.ping-control-bar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ping-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.ping-field-lbl {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  letter-spacing: 0.3px;
+}
+
+.ping-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+.ping-input-wrap:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+.ping-text-input {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85rem;
+  outline: none;
+  width: 100%;
+}
+
+.ping-select {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: #ffffff;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.ping-select:focus {
+  border-color: #38bdf8;
+}
+
+.ping-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.ping-action-btn {
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* Preset Chips */
+.ping-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.preset-label {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.preset-chips-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-family: 'Fira Code', monospace;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-chip:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.preset-chip.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chip-dot.online {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.chip-dot.offline {
+  background: #f43f5e;
+}
+
+/* Ping Result Area */
+.ping-result-display-area {
+  margin-top: 10px;
+}
+
+.ping-result-card {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+.ping-result-card.status-online {
+  border-left: 4px solid #22c55e;
+}
+
+.ping-result-card.status-degraded {
+  border-left: 4px solid #f59e0b;
+}
+
+.ping-result-card.status-offline {
+  border-left: 4px solid #f43f5e;
+}
+
+.ping-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.ping-metric-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ping-metric-box .metric-name {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.ping-metric-box .metric-val {
+  font-size: 0.95rem;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.ping-terminal-output {
+  background: #05070a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 10px 14px;
+  color: #a3e635;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  margin-top: 10px;
+  white-space: pre-wrap;
+}
+
+/* Sub-Agents Fleet Cards Grid */
+.subagents-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0 6px 0;
+}
+
+.subagents-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f1e7d0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subagents-count-chip {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.subagents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.subagent-card {
+  background: #0e131f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.subagent-card:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.subagent-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.subagent-identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.subagent-avatar {
+  font-size: 1.6rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.subagent-title-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.subagent-title-info h5 {
+  margin: 0 0 2px 0;
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.subagent-role {
+  font-size: 0.72rem;
+  color: #38bdf8;
+  font-weight: 500;
+}
+
+.subagent-desc {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.subagent-skills-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.subagent-skill-pill {
+  font-size: 0.68rem;
+  background: rgba(241, 231, 208, 0.08);
+  border: 1px solid rgba(241, 231, 208, 0.2);
+  color: #f1e7d0;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+}
+
+.subagent-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.subagent-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.subagent-metric-item span {
+  font-size: 0.65rem;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.subagent-metric-item strong {
+  font-size: 0.85rem;
+  font-family: 'Fira Code', monospace;
+  color: #22c55e;
+}
+
+.subagent-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.status-pill {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.status-pill.status-online {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-pill.status-degraded {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-pill.status-offline {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.status-pill.status-ready {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
