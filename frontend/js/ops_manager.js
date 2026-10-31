@@ -17,10 +17,17 @@ let opsCurrentSessionSource = 'any';
 let opsCurrentSessionView = 'overview';
 
 // ------------------------------------------------------------------------------
-// Helper: Authenticated fetch wrapper
+// Helper: Authenticated fetch wrapper & Token Resolver
 // ------------------------------------------------------------------------------
+function getOpsToken() {
+  return localStorage.getItem('myagent_access_token') ||
+         localStorage.getItem('myagent_token') ||
+         (typeof getAuthToken === 'function' ? getAuthToken() : '') ||
+         '';
+}
+
 async function opsFetch(url, options = {}) {
-  const token = localStorage.getItem('myagent_token');
+  const token = getOpsToken();
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
@@ -360,7 +367,7 @@ async function handleOpsFsDrop(e) {
 
 async function uploadFilesToFs(files) {
   const path = opsFsCurrentPath || '/opt/data';
-  const token = localStorage.getItem('myagent_token');
+  const token = getOpsToken();
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -1187,7 +1194,14 @@ async function loadOpsSkills() {
     renderOpsSkillsRows(opsSkillsState.allSkills);
   } catch (err) {
     console.error('Error loading ops skills:', err);
-    listPane.innerHTML = `<div style="padding:28px; text-align:center; color:#f43f5e;">${typeof t === 'function' ? t('ops_error_load') : 'স্কিল লোড করতে সমস্যা হয়েছে।'}</div>`;
+    listPane.innerHTML = `
+      <div style="padding:32px; text-align:center; color:#f43f5e;">
+        <div style="font-size:2rem; margin-bottom:8px;">⚠️</div>
+        <div style="font-weight:600; font-size:1rem; margin-bottom:6px;">${typeof t === 'function' ? t('ops_error_load') : 'স্কিল লোড করতে সমস্যা হয়েছে।'}</div>
+        <div style="font-size:0.85rem; color:#94a3b8; margin-bottom:14px;">${escapeHtml(err.message || 'Network or authorization error')}</div>
+        <button type="button" class="btn btn-outline" style="padding:6px 16px; font-size:0.85rem; cursor:pointer;" onclick="loadOpsSkills()">🔄 পুনরায় চেষ্টা করুন (Retry)</button>
+      </div>
+    `;
   }
 }
 

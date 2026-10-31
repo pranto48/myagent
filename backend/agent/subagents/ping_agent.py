@@ -294,3 +294,4 @@ class NetworkPingSubAgent:
             "fleet_avg_latency_ms": fleet_avg_latency,
             "results": results
         }
+

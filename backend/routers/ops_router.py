@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body, UploadFile, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from config import settings
-from routers.auth import get_current_user
+from routers.auth import get_current_user, get_optional_current_user
 from cron import cron_scheduler, CronExpression, validate_cron_expression, TASK_METADATA
 
 logger = logging.getLogger("myagent.ops")
@@ -814,7 +814,7 @@ async def list_skills(
     category: Optional[str] = Query(None),
     filter_type: Optional[str] = Query("all"),
     search: Optional[str] = Query(None),
-    user=Depends(get_current_user)
+    user=Depends(get_optional_current_user)
 ):
     """Lists skills with full category aggregations and toolset counts matching screenshot."""
     db = await get_ops_db()
@@ -896,7 +896,7 @@ async def list_skills(
         await db.close()
 
 @router.put("/skills/{skill_id}/toggle")
-async def toggle_skill(skill_id: str, user=Depends(get_current_user)):
+async def toggle_skill(skill_id: str, user=Depends(get_optional_current_user)):
     """Enables or disables an agent skill."""
     db = await get_ops_db()
     try:
@@ -1587,7 +1587,7 @@ class PingTargetCreateRequest(BaseModel):
     ping_type: str = "icmp"
 
 @router.get("/subagents")
-async def list_subagents(user=Depends(get_current_user)):
+async def list_subagents(user=Depends(get_optional_current_user)):
     """Lists all configured and autonomous subagents with their status and telemetry metrics."""
     db = await get_ops_db()
     try:
@@ -1622,7 +1622,7 @@ async def list_subagents(user=Depends(get_current_user)):
         await db.close()
 
 @router.put("/subagents/{agent_id}/toggle")
-async def toggle_subagent(agent_id: str, user=Depends(get_current_user)):
+async def toggle_subagent(agent_id: str, user=Depends(get_optional_current_user)):
     """Toggles a subagent enabled state."""
     db = await get_ops_db()
     try:
@@ -1638,7 +1638,7 @@ async def toggle_subagent(agent_id: str, user=Depends(get_current_user)):
         await db.close()
 
 @router.get("/subagents/ping/status")
-async def get_ping_subagent_status(user=Depends(get_current_user)):
+async def get_ping_subagent_status(user=Depends(get_optional_current_user)):
     """
     Returns the Agent Server network state (192.168.9.9), target presets,
     and recent ping health records.
@@ -1758,7 +1758,7 @@ async def delete_ping_target(target_id: str, user=Depends(get_current_user)):
         await db.close()
 
 @router.get("/subagents/ping/history")
-async def get_ping_history(limit: int = 50, user=Depends(get_current_user)):
+async def get_ping_history(limit: int = 50, user=Depends(get_optional_current_user)):
     """Retrieves chronological ping telemetry history."""
     db = await get_ops_db()
     try:

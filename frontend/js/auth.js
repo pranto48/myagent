@@ -65,6 +65,7 @@ async function performLogin(event) {
     const data = await res.json();
     if (res.ok && data.access_token) {
       localStorage.setItem(TOKEN_KEY, data.access_token);
+      localStorage.setItem("myagent_token", data.access_token);
       localStorage.setItem(USER_KEY, data.username);
       
       const loginOverlay = document.getElementById('login-overlay');
@@ -95,6 +96,7 @@ async function performLogin(event) {
 function logout() {
   if (!confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("myagent_token");
   localStorage.removeItem(USER_KEY);
   const loginOverlay = document.getElementById('login-overlay');
   if (loginOverlay) loginOverlay.style.display = 'flex';
