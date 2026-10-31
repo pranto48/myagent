@@ -2254,25 +2254,84 @@
 
             <!-- Right Main Pane: Skills Cards List -->
             <main class="ops-skills-main-pane">
+              <!-- KPI Metrics Bar -->
+              <div class="skills-kpi-bar" id="skills-kpi-bar">
+                <div class="kpi-metric-card active" id="kpi-card-all" onclick="setOpsSkillStatusFilter('all', this)">
+                  <div class="kpi-icon-box">📦</div>
+                  <div class="kpi-info">
+                    <span class="kpi-val" id="kpi-total-skills">61</span>
+                    <span class="kpi-lbl" data-i18n="skills_kpi_total">Total Skills</span>
+                  </div>
+                </div>
+                <div class="kpi-metric-card" id="kpi-card-enabled" onclick="setOpsSkillStatusFilter('enabled', this)">
+                  <div class="kpi-icon-box" style="color:var(--emerald-glow); background:rgba(16,185,129,0.12);">⚡</div>
+                  <div class="kpi-info">
+                    <span class="kpi-val" id="kpi-enabled-skills" style="color:var(--emerald-glow);">61</span>
+                    <span class="kpi-lbl" data-i18n="skills_kpi_active">Active Fleet</span>
+                  </div>
+                </div>
+                <div class="kpi-metric-card" id="kpi-card-toolsets" onclick="setOpsSkillStatusFilter('toolsets', this)">
+                  <div class="kpi-icon-box" style="color:#38bdf8; background:rgba(56,189,248,0.12);">🔧</div>
+                  <div class="kpi-info">
+                    <span class="kpi-val" id="kpi-toolset-skills" style="color:#38bdf8;">29</span>
+                    <span class="kpi-lbl" data-i18n="skills_kpi_toolsets">Toolsets</span>
+                  </div>
+                </div>
+                <div class="kpi-metric-card" id="kpi-card-categories">
+                  <div class="kpi-icon-box" style="color:#f59e0b; background:rgba(245,158,11,0.12);">🏷️</div>
+                  <div class="kpi-info">
+                    <span class="kpi-val" id="kpi-category-count" style="color:#f59e0b;">10</span>
+                    <span class="kpi-lbl" data-i18n="skills_kpi_domains">Domains</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Sub Header Bar -->
               <div class="ops-skills-sub-header">
                 <div class="ops-active-cat-display">
                   <span class="cat-icon" id="ops-active-cat-icon">⬡</span>
                   <span class="cat-title" id="ops-active-cat-title">ALL</span>
+                  <span class="ops-badge-box" id="ops-skills-pane-count">61 skills</span>
                 </div>
-                <div class="ops-skills-actions-group">
-                  <span class="ops-badge-box" id="ops-skills-pane-count">53 skills</span>
-                  <button type="button" class="ops-outline-btn" onclick="openOpsLearnSkillModal()">
-                    <span>🪄</span> <span data-i18n="ops_btn_learn_skill">Learn a skill</span>
-                  </button>
-                  <button type="button" class="ops-outline-btn" onclick="openNewSkillModal()">
-                    <span>+</span> <span data-i18n="ops_btn_new_skill">New skill</span>
-                  </button>
+                
+                <div class="ops-skills-controls-row">
+                  <!-- Sort Dropdown -->
+                  <div class="ops-sort-wrapper">
+                    <span class="sort-icon">⇅</span>
+                    <select id="ops-skills-sort-select" class="ops-skill-select" onchange="handleOpsSkillSort(this.value)">
+                      <option value="name_asc">নাম: A → Z</option>
+                      <option value="name_desc">নাম: Z → A</option>
+                      <option value="enabled">সক্রিয় প্রথমে (Enabled)</option>
+                      <option value="toolsets">টুলসেট প্রথমে (Toolsets)</option>
+                      <option value="category">ক্যাটাগরি অনুসারে</option>
+                      <option value="recent">নতুন সংযোজিত (Recent)</option>
+                    </select>
+                  </div>
+
+                  <!-- View Mode Switcher -->
+                  <div class="skills-view-mode-toggle" id="skills-view-mode-toggle">
+                    <button type="button" class="view-mode-btn active" id="btn-view-grid" onclick="toggleSkillsViewMode('grid')" title="গ্রিড ভিউ (Grid View)">
+                      <span>⊞</span>
+                    </button>
+                    <button type="button" class="view-mode-btn" id="btn-view-list" onclick="toggleSkillsViewMode('list')" title="লিস্ট ভিউ (List View)">
+                      <span>☰</span>
+                    </button>
+                  </div>
+
+                  <!-- Action Buttons -->
+                  <div class="ops-skills-actions-group">
+                    <button type="button" class="ops-outline-btn cyber-btn-glow" onclick="openOpsLearnSkillModal()">
+                      <span>🪄</span> <span data-i18n="ops_btn_learn_skill">Learn a skill</span>
+                    </button>
+                    <button type="button" class="ops-outline-btn primary-glow-btn" onclick="openNewSkillModal()">
+                      <span>+</span> <span data-i18n="ops_btn_new_skill">New skill</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Skills List Container -->
-              <div class="ops-skills-rows-list" id="ops-skills-list-pane">
+              <div class="ops-skills-rows-list grid-mode" id="ops-skills-list-pane">
                 <!-- Dynamically rendered rows matching screenshot -->
               </div>
             </main>
@@ -3248,6 +3307,88 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <button type="submit" class="btn-primary" data-i18n="btn_save">স্কিল যুক্ত করুন</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- 3.5. Ops Cyber Skill Detail & Live Test Modal -->
+    <div class="modal-overlay" id="modal-skill-detail" style="display:none;">
+      <div class="modal-card cyber-modal-card" style="max-width:680px; width:92vw;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="skill-detail-icon-pill" id="detail-skill-icon">📦</span>
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <h3 style="margin:0; font-size:1.15rem; color:var(--text-primary); font-family:'Fira Code', monospace;" id="detail-skill-name">skill-name</h3>
+                <span class="badge badge-toolset" id="detail-skill-toolset-badge" style="display:none;">TOOLSET</span>
+                <span class="badge badge-system" id="detail-skill-system-badge" style="display:none;">SYSTEM</span>
+              </div>
+              <span style="font-size:0.75rem; color:#94a3b8;" id="detail-skill-cat">Software Development</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <label class="cyber-switch" title="Toggle Active Status">
+              <input type="checkbox" id="detail-skill-toggle" onchange="toggleDetailSkillFromModal()">
+              <span class="slider round"></span>
+            </label>
+            <button type="button" class="modal-close" onclick="closeSkillDetailModal()">&times;</button>
+          </div>
+        </div>
+
+        <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:16px; max-height:75vh; overflow-y:auto;">
+          <!-- Description -->
+          <div class="detail-section">
+            <label class="detail-label">বিবরণ (Description)</label>
+            <div class="detail-desc-box" id="detail-skill-desc">...</div>
+          </div>
+
+          <!-- Triggers -->
+          <div class="detail-section">
+            <label class="detail-label">ট্রিগার কিওয়ার্ডস (Triggers)</label>
+            <div class="detail-triggers-wrap" id="detail-skill-triggers">
+              <!-- Rendered trigger chips -->
+            </div>
+          </div>
+
+          <!-- Execution Instructions -->
+          <div class="detail-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label class="detail-label" style="margin:0;">এক্সিকিউশন ইন্সট্রাকশন / প্রম্পট গাইডলাইন</label>
+              <button type="button" class="mini-btn-copy" onclick="copyDetailInstructions()" title="Copy instructions">📋 কপি</button>
+            </div>
+            <pre class="detail-instructions-pre" id="detail-skill-instructions"></pre>
+          </div>
+
+          <!-- Live Interactive Test Runner -->
+          <div class="detail-section skill-test-runner-card">
+            <div class="test-runner-header">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="color:var(--emerald-glow);">⚡</span>
+                <strong style="font-size:0.88rem; color:#f1e7d0;">লাইভ স্কিল সিমুলেশন ও ভেরিফিকেশন (Live Test Runner)</strong>
+              </div>
+              <span class="test-latency-pill" id="detail-test-latency" style="display:none;">0ms</span>
+            </div>
+            <div class="test-runner-input-row">
+              <input type="text" id="detail-test-input" class="text-input" placeholder="টেস্ট প্রম্পট লিখুন (যেমন: deploy latest changes, analyze code)..." onkeydown="if(event.key==='Enter') executeDetailSkillTest()">
+              <button type="button" class="btn-primary" id="btn-run-detail-test" onclick="executeDetailSkillTest()">
+                <span>▶ রান টেস্ট</span>
+              </button>
+            </div>
+            <div class="test-runner-terminal" id="detail-test-terminal" style="display:none;">
+              <pre id="detail-test-output"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding:14px 18px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <button type="button" class="btn-secondary" onclick="openSkillInChatFromModal()">
+              <span>💬 চ্যাটে ব্যবহার করুন</span>
+            </button>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn-secondary" onclick="closeSkillDetailModal()" data-i18n="btn_cancel">বন্ধ করুন</button>
+          </div>
+        </div>
       </div>
     </div>
 

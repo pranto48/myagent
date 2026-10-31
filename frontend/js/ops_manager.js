@@ -1125,15 +1125,19 @@ function copyCronDetailOutput() {
 
 // ==============================================================================
 // ==============================================================================
-// 4. SKILLS MODULE (Matching Ops Agent Skills Hub Screenshot)
+// 4. SKILLS MODULE (Matching Ops Agent Skills Hub Screenshot & Cyber Suite)
 // ==============================================================================
 let opsSkillsState = {
   allSkills: [],
   categories: {},
-  filters: { all: 53, toolsets: 29, browse_hub: 0 },
+  filters: { all: 61, toolsets: 29, browse_hub: 0 },
   activeFilter: 'all',
+  statusFilter: 'all',
   activeCategory: 'all',
-  searchQuery: ''
+  searchQuery: '',
+  sortBy: 'name_asc',
+  viewMode: localStorage.getItem('myagent_skills_view_mode') || 'grid',
+  activeModalSkillId: null
 };
 
 async function loadOpsSkills() {
@@ -1143,7 +1147,7 @@ async function loadOpsSkills() {
   listPane.innerHTML = `<div style="padding:28px; text-align:center; color:#64748b;">${typeof t === 'function' ? t('ops_loading') : 'লোড হচ্ছে...'}</div>`;
 
   try {
-    let url = `/api/ops/skills?filter_type=${encodeURIComponent(opsSkillsState.activeFilter)}`;
+    let url = `/api/ops/skills?filter_type=${encodeURIComponent(opsSkillsState.activeFilter)}&sort_by=${encodeURIComponent(opsSkillsState.sortBy)}`;
     if (opsSkillsState.activeCategory && opsSkillsState.activeCategory !== 'all') {
       url += `&category=${encodeURIComponent(opsSkillsState.activeCategory)}`;
     }
@@ -1159,38 +1163,59 @@ async function loadOpsSkills() {
     if (data.categories) opsSkillsState.categories = data.categories;
     if (data.filters) opsSkillsState.filters = data.filters;
 
-    // 1. Update Subtitle
+    // 1. Update KPI bar numbers
+    const kpiTotal = document.getElementById('kpi-total-skills');
+    if (kpiTotal) kpiTotal.innerText = data.total_skills ?? opsSkillsState.allSkills.length;
+    const kpiEnabled = document.getElementById('kpi-enabled-skills');
+    if (kpiEnabled) kpiEnabled.innerText = data.enabled_skills ?? 0;
+    const kpiToolsets = document.getElementById('kpi-toolset-skills');
+    if (kpiToolsets) kpiToolsets.innerText = data.toolset_count ?? 0;
+    const kpiCats = document.getElementById('kpi-category-count');
+    if (kpiCats) kpiCats.innerText = Object.keys(data.categories || {}).length || 10;
+
+    // 2. Update Subtitle & Filter counts
     const subTitle = document.getElementById('ops-skills-enabled-subtitle');
     if (subTitle) {
       subTitle.innerText = `${data.enabled_skills || 0}/${data.total_skills || 0} enabled`;
     }
 
-    // 2. Update Filter counts
     const countAll = document.getElementById('ops-filter-count-all');
-    if (countAll) countAll.innerText = `(${data.filters?.all ?? 53})`;
+    if (countAll) countAll.innerText = `(${data.filters?.all ?? 61})`;
     const countToolsets = document.getElementById('ops-filter-count-toolsets');
     if (countToolsets) countToolsets.innerText = `(${data.filters?.toolsets ?? 29})`;
 
     // 3. Render Categories sidebar
     renderOpsSkillsCategories(opsSkillsState.categories);
 
-    // 4. Update Active Header
+    // 4. Update Active Header & Count
     const activeIcon = document.getElementById('ops-active-cat-icon');
     const activeTitle = document.getElementById('ops-active-cat-title');
     const paneCount = document.getElementById('ops-skills-pane-count');
     if (activeTitle) {
       activeTitle.innerText = opsSkillsState.activeCategory === 'all' 
-        ? (opsSkillsState.activeFilter === 'toolsets' ? 'TOOLSETS' : (opsSkillsState.activeFilter === 'browse_hub' ? 'BROWSE HUB' : 'ALL'))
+        ? (opsSkillsState.activeFilter === 'toolsets' ? 'TOOLSETS' : (opsSkillsState.activeFilter === 'browse_hub' ? 'BROWSE HUB' : (opsSkillsState.activeFilter === 'enabled' ? 'ACTIVE FLEET' : 'ALL')))
         : opsSkillsState.activeCategory.toUpperCase();
     }
     if (activeIcon) {
-      activeIcon.innerText = opsSkillsState.activeFilter === 'toolsets' ? '🔧' : '⬡';
+      activeIcon.innerText = opsSkillsState.activeFilter === 'toolsets' ? '🔧' : (opsSkillsState.activeFilter === 'enabled' ? '⚡' : '⬡');
     }
     if (paneCount) {
       paneCount.innerText = `${opsSkillsState.allSkills.length} skills`;
     }
 
-    // 5. Render Skills Rows
+    // 5. Sync Sort Select
+    const sortSelect = document.getElementById('ops-skills-sort-select');
+    if (sortSelect) sortSelect.value = opsSkillsState.sortBy;
+
+    // 6. Sync View Mode Toggle
+    const gridBtn = document.getElementById('btn-view-grid');
+    const listBtn = document.getElementById('btn-view-list');
+    if (gridBtn && listBtn) {
+      gridBtn.classList.toggle('active', opsSkillsState.viewMode === 'grid');
+      listBtn.classList.toggle('active', opsSkillsState.viewMode === 'list');
+    }
+
+    // 7. Render Skills Rows / Cards
     renderOpsSkillsRows(opsSkillsState.allSkills);
   } catch (err) {
     console.error('Error loading ops skills:', err);
@@ -1243,27 +1268,129 @@ function renderOpsSkillsRows(skills) {
     return;
   }
 
-  listPane.innerHTML = skills.map(s => {
-    const isEnabled = s.is_enabled === 1 || s.is_enabled === true;
-    return `
-      <div class="ops-skill-entry-row" id="skill-row-${s.id}">
-        <div class="ops-skill-tile-box ${isEnabled ? '' : 'disabled'}" onclick="toggleOpsSkillTile('${s.id}')" title="${isEnabled ? 'Disable skill' : 'Enable skill'}">
-          <div class="tile-inner"></div>
-        </div>
-        <div class="ops-skill-entry-body" onclick="openSkillDetailModal('${s.id}')" style="cursor:pointer;">
-          <div class="ops-skill-entry-name">
-            <span>${escapeHtml(s.name)}</span>
-            ${s.is_toolset ? '<span style="font-size:0.68rem; padding:1px 5px; border-radius:3px; background:rgba(56,189,248,0.12); color:#38bdf8; font-weight:500;">TOOLSET</span>' : ''}
+  if (opsSkillsState.viewMode === 'grid') {
+    listPane.classList.add('grid-mode');
+    listPane.innerHTML = skills.map(s => {
+      const isEnabled = s.is_enabled === 1 || s.is_enabled === true;
+      const triggers = Array.isArray(s.triggers) ? s.triggers : [];
+      const displayTriggers = triggers.slice(0, 3);
+      return `
+        <div class="ops-skill-card ${isEnabled ? '' : 'disabled'}" id="skill-card-${s.id}">
+          <div class="skill-card-top">
+            <div class="skill-card-title-group">
+              <div class="skill-card-icon">${escapeHtml(s.icon || '📦')}</div>
+              <div>
+                <div class="skill-card-name" onclick="openSkillDetailModal('${s.id}')" style="cursor:pointer;" title="সম্পূর্ণ তথ্য ও টেস্ট চালান">${escapeHtml(s.name)}</div>
+                <div class="skill-card-cat-badge">${escapeHtml(s.category || 'General')}</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              ${s.is_toolset ? '<span class="badge-toolset">TOOLSET</span>' : ''}
+              <label class="cyber-switch" title="${isEnabled ? 'Disable skill' : 'Enable skill'}">
+                <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleOpsSkillTile('${s.id}')">
+                <span class="slider round"></span>
+              </label>
+            </div>
           </div>
-          <div class="ops-skill-entry-desc">${escapeHtml(s.description)}</div>
+
+          <div class="skill-card-desc" onclick="openSkillDetailModal('${s.id}')" style="cursor:pointer;" title="${escapeHtml(s.description || '')}">
+            ${escapeHtml(s.description || 'বিশেষায়িত অপারেশনাল সক্ষমতা।')}
+          </div>
+
+          ${displayTriggers.length > 0 ? `
+            <div class="skill-card-triggers">
+              ${displayTriggers.map(t => `<span class="skill-trigger-tag">#${escapeHtml(t)}</span>`).join('')}
+              ${triggers.length > 3 ? `<span style="font-size:0.68rem; color:#64748b;">+${triggers.length - 3}</span>` : ''}
+            </div>
+          ` : ''}
+
+          <div class="skill-card-footer">
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="card-action-btn" onclick="openSkillDetailModal('${s.id}')" title="সম্পূর্ণ তথ্য ও প্রম্পট গাইডলাইন দেখুন">
+                <span>🔍 বিস্তারিত</span>
+              </button>
+              <button type="button" class="card-action-btn btn-test" onclick="quickTestSkill('${s.id}')" title="তাৎক্ষণিক টেস্ট চালান">
+                <span>⚡ টেস্ট</span>
+              </button>
+            </div>
+            <div>
+              ${!s.is_system ? `<button type="button" class="ops-action-icon-btn danger" onclick="deleteOpsSkill('${s.id}')" title="Delete skill">🗑️</button>` : '<span style="font-size:0.7rem; color:#475569;" title="Built-in System Skill">🔒 System</span>'}
+            </div>
+          </div>
         </div>
-        <button type="button" class="ops-skill-edit-btn" onclick="editOpsSkill('${s.id}')" title="Edit skill">
-          ✏️
-        </button>
-        ${!s.is_system ? `<button type="button" class="ops-action-icon-btn danger" onclick="deleteOpsSkill('${s.id}')" title="Delete">🗑️</button>` : ''}
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+  } else {
+    listPane.classList.remove('grid-mode');
+    listPane.innerHTML = skills.map(s => {
+      const isEnabled = s.is_enabled === 1 || s.is_enabled === true;
+      return `
+        <div class="ops-skill-entry-row" id="skill-row-${s.id}">
+          <div class="ops-skill-tile-box ${isEnabled ? '' : 'disabled'}" onclick="toggleOpsSkillTile('${s.id}')" title="${isEnabled ? 'Disable skill' : 'Enable skill'}">
+            <div class="tile-inner"></div>
+          </div>
+          <div class="ops-skill-entry-body" onclick="openSkillDetailModal('${s.id}')" style="cursor:pointer;">
+            <div class="ops-skill-entry-name">
+              <span style="font-size:1.1rem; margin-right:4px;">${escapeHtml(s.icon || '📦')}</span>
+              <span>${escapeHtml(s.name)}</span>
+              ${s.is_toolset ? '<span class="badge-toolset" style="margin-left:6px;">TOOLSET</span>' : ''}
+              <span class="skill-card-cat-badge" style="margin-left:6px;">${escapeHtml(s.category || 'General')}</span>
+            </div>
+            <div class="ops-skill-entry-desc">${escapeHtml(s.description)}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="card-action-btn btn-test" onclick="quickTestSkill('${s.id}')" title="তাৎক্ষণিক টেস্ট চালান">
+              <span>⚡ টেস্ট</span>
+            </button>
+            <button type="button" class="ops-skill-edit-btn" onclick="openSkillDetailModal('${s.id}')" title="Inspect / Details">
+              🔍
+            </button>
+            ${!s.is_system ? `<button type="button" class="ops-action-icon-btn danger" onclick="deleteOpsSkill('${s.id}')" title="Delete">🗑️</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function toggleSkillsViewMode(mode) {
+  opsSkillsState.viewMode = mode;
+  localStorage.setItem('myagent_skills_view_mode', mode);
+
+  const gridBtn = document.getElementById('btn-view-grid');
+  const listBtn = document.getElementById('btn-view-list');
+  if (gridBtn && listBtn) {
+    gridBtn.classList.toggle('active', mode === 'grid');
+    listBtn.classList.toggle('active', mode === 'list');
+  }
+
+  renderOpsSkillsRows(opsSkillsState.allSkills);
+}
+
+function handleOpsSkillSort(val) {
+  opsSkillsState.sortBy = val;
+  loadOpsSkills();
+}
+
+function setOpsSkillStatusFilter(status, el) {
+  document.querySelectorAll('.kpi-metric-card').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  opsSkillsState.activeFilter = status;
+  opsSkillsState.activeCategory = 'all';
+
+  document.querySelectorAll('.ops-skill-filter-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.ops-cat-row-btn').forEach(b => b.classList.remove('active'));
+
+  if (status === 'all') {
+    const allBtn = document.getElementById('ops-filter-btn-all');
+    if (allBtn) allBtn.classList.add('active');
+  } else if (status === 'toolsets') {
+    const toolBtn = document.getElementById('ops-filter-btn-toolsets');
+    if (toolBtn) toolBtn.classList.add('active');
+  }
+
+  loadOpsSkills();
 }
 
 function setOpsSkillFilter(filterType, btnEl) {
@@ -1273,6 +1400,15 @@ function setOpsSkillFilter(filterType, btnEl) {
   document.querySelectorAll('.ops-skill-filter-item').forEach(b => b.classList.remove('active'));
   if (btnEl) btnEl.classList.add('active');
   document.querySelectorAll('.ops-cat-row-btn').forEach(b => b.classList.remove('active'));
+
+  document.querySelectorAll('.kpi-metric-card').forEach(c => c.classList.remove('active'));
+  if (filterType === 'all') {
+    const card = document.getElementById('kpi-card-all');
+    if (card) card.classList.add('active');
+  } else if (filterType === 'toolsets') {
+    const card = document.getElementById('kpi-card-toolsets');
+    if (card) card.classList.add('active');
+  }
 
   loadOpsSkills();
 }
@@ -1285,6 +1421,7 @@ function setOpsSkillCategory(catName, btnEl) {
   document.querySelectorAll('.ops-cat-row-btn').forEach(b => b.classList.remove('active'));
   if (btnEl) btnEl.classList.add('active');
 
+  document.querySelectorAll('.kpi-metric-card').forEach(c => c.classList.remove('active'));
   loadOpsSkills();
 }
 
@@ -1298,11 +1435,165 @@ async function toggleOpsSkillTile(skillId) {
     const res = await opsFetch(`/api/ops/skills/${skillId}/toggle`, { method: 'PUT' });
     const data = await res.json();
     if (data.success) {
+      // Update local state item
+      const s = opsSkillsState.allSkills.find(item => item.id === skillId);
+      if (s) s.is_enabled = data.is_enabled ? 1 : 0;
+      
+      // If modal is open for this skill, sync its toggle
+      if (opsSkillsState.activeModalSkillId === skillId) {
+        const modalToggle = document.getElementById('detail-skill-toggle');
+        if (modalToggle) modalToggle.checked = Boolean(data.is_enabled);
+      }
+      
       loadOpsSkills();
+      if (typeof showToast === 'function') {
+        showToast(`স্কিল '${s ? s.name : skillId}' এখন ${data.is_enabled ? 'সক্রিয় (Enabled)' : 'নিষ্ক্রিয় (Disabled)'}`, 'success');
+      }
     }
   } catch (err) {
     console.error(err);
+    if (typeof showToast === 'function') showToast('স্কিল স্ট্যাটাস পরিবর্তন ব্যর্থ হয়েছে', 'error');
   }
+}
+
+async function openSkillDetailModal(skillId) {
+  opsSkillsState.activeModalSkillId = skillId;
+  const modal = document.getElementById('modal-skill-detail');
+  if (!modal) return;
+
+  let skill = opsSkillsState.allSkills.find(s => s.id === skillId);
+  try {
+    const res = await opsFetch(`/api/ops/skills/${skillId}`);
+    const data = await res.json();
+    if (data.success && data.skill) {
+      skill = data.skill;
+    }
+  } catch (err) {
+    console.warn('Could not fetch fresh skill details:', err);
+  }
+
+  if (!skill) return;
+
+  const iconEl = document.getElementById('detail-skill-icon');
+  if (iconEl) iconEl.innerText = skill.icon || '📦';
+
+  const nameEl = document.getElementById('detail-skill-name');
+  if (nameEl) nameEl.innerText = skill.name;
+
+  const catEl = document.getElementById('detail-skill-cat');
+  if (catEl) catEl.innerText = skill.category || 'Software Development';
+
+  const toolBadge = document.getElementById('detail-skill-toolset-badge');
+  if (toolBadge) toolBadge.style.display = skill.is_toolset ? 'inline-block' : 'none';
+
+  const sysBadge = document.getElementById('detail-skill-system-badge');
+  if (sysBadge) sysBadge.style.display = skill.is_system ? 'inline-block' : 'none';
+
+  const toggleEl = document.getElementById('detail-skill-toggle');
+  if (toggleEl) toggleEl.checked = Boolean(skill.is_enabled);
+
+  const descEl = document.getElementById('detail-skill-desc');
+  if (descEl) descEl.innerText = skill.description || 'বিবরণ নেই।';
+
+  const triggersEl = document.getElementById('detail-skill-triggers');
+  if (triggersEl) {
+    const triggers = Array.isArray(skill.triggers) ? skill.triggers : [];
+    if (triggers.length > 0) {
+      triggersEl.innerHTML = triggers.map(t => `<span class="skill-trigger-tag">#${escapeHtml(t)}</span>`).join('');
+    } else {
+      triggersEl.innerHTML = `<span style="font-size:0.75rem; color:#64748b;">কোনো নির্দিষ্ট কিওয়ার্ড নির্ধারিত নেই (Universal Default)</span>`;
+    }
+  }
+
+  const instEl = document.getElementById('detail-skill-instructions');
+  if (instEl) instEl.innerText = skill.instructions || 'Standard operation instructions.';
+
+  // Reset test runner
+  const testInput = document.getElementById('detail-test-input');
+  if (testInput) testInput.value = `Execute ${skill.name} operational validation`;
+  const terminal = document.getElementById('detail-test-terminal');
+  if (terminal) terminal.style.display = 'none';
+  const latency = document.getElementById('detail-test-latency');
+  if (latency) latency.style.display = 'none';
+
+  modal.style.display = 'flex';
+}
+
+function closeSkillDetailModal() {
+  const modal = document.getElementById('modal-skill-detail');
+  if (modal) modal.style.display = 'none';
+  opsSkillsState.activeModalSkillId = null;
+}
+
+function toggleDetailSkillFromModal() {
+  if (opsSkillsState.activeModalSkillId) {
+    toggleOpsSkillTile(opsSkillsState.activeModalSkillId);
+  }
+}
+
+async function executeDetailSkillTest() {
+  const skillId = opsSkillsState.activeModalSkillId;
+  if (!skillId) return;
+
+  const btn = document.getElementById('btn-run-detail-test');
+  const inputPrompt = document.getElementById('detail-test-input')?.value || '';
+  const terminal = document.getElementById('detail-test-terminal');
+  const output = document.getElementById('detail-test-output');
+  const latency = document.getElementById('detail-test-latency');
+
+  if (btn) btn.disabled = true;
+  if (terminal) terminal.style.display = 'block';
+  if (output) output.innerText = '⚡ ভেরিফিকেশন ও সিমুলেশন চলছে... অনুগ্রহ করে অপেক্ষা করুন...';
+
+  try {
+    const res = await opsFetch(`/api/ops/skills/${skillId}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ input_prompt: inputPrompt })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (latency) {
+        latency.style.display = 'inline-block';
+        latency.innerText = `${data.latency_ms}ms`;
+      }
+      if (output) {
+        output.innerText = data.analysis;
+      }
+    } else {
+      if (output) output.innerText = `❌ টেস্ট ব্যর্থ হয়েছে: ${data.detail || data.message || 'Unknown error'}`;
+    }
+  } catch (err) {
+    if (output) output.innerText = `❌ সংযোগ ত্রুটি: ${err.message}`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function quickTestSkill(skillId) {
+  openSkillDetailModal(skillId);
+  setTimeout(() => {
+    executeDetailSkillTest();
+  }, 150);
+}
+
+function openSkillInChatFromModal() {
+  const skill = opsSkillsState.allSkills.find(s => s.id === opsSkillsState.activeModalSkillId);
+  closeSkillDetailModal();
+  if (typeof switchTab === 'function') {
+    switchTab('chat');
+    const input = document.getElementById('chat-input');
+    if (input) {
+      input.value = `Execute skill: ${skill ? skill.name : 'targeted skill'} with autonomous analysis`;
+      input.focus();
+    }
+  }
+}
+
+function copyDetailInstructions() {
+  const text = document.getElementById('detail-skill-instructions')?.innerText || '';
+  navigator.clipboard.writeText(text).then(() => {
+    if (typeof showToast === 'function') showToast('ইন্সট্রাকশন ক্লিপবোর্ডে কপি করা হয়েছে', 'success');
+  });
 }
 
 function openOpsLearnSkillModal() {
@@ -1382,15 +1673,10 @@ async function deleteOpsSkill(skillId) {
   try {
     await opsFetch(`/api/ops/skills/${skillId}`, { method: 'DELETE' });
     loadOpsSkills();
+    if (typeof showToast === 'function') showToast('স্কিল মুছে ফেলা হয়েছে', 'success');
   } catch (err) {
     alert('Failed to delete skill');
   }
-}
-
-function openSkillDetailModal(skillId) {
-  const skill = opsSkillsState.allSkills.find(s => s.id === skillId);
-  if (!skill) return;
-  alert(`Skill: ${skill.name}\nCategory: ${skill.category}\nToolset: ${skill.is_toolset ? 'Yes' : 'No'}\n\n${skill.description}\n\nInstructions:\n${skill.instructions || 'Standard operation instructions.'}`);
 }
 
 function editOpsSkill(skillId) {
@@ -1408,7 +1694,6 @@ function openSkillAssistantPrompt() {
   }
 }
 
-// ==============================================================================
 // 5. PLUGINS MODULE
 // ==============================================================================
 async function loadOpsPlugins() {

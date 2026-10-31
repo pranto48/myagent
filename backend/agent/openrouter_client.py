@@ -249,3 +249,4 @@ class OpenRouterService:
         except Exception as e:
             logger.warning(f"Failed to fetch live OpenRouter catalog: {e}")
         return []
+
