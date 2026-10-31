@@ -393,6 +393,16 @@
                 <option value="seed-2.1-turbo">seed-2.1-turbo</option>
                 <option value="muse-spark-1.1">muse-spark-1.1</option>
               </optgroup>
+              <optgroup label="🌐 OpenRouter 100% Free Models (ফ্রি মডেল)">
+                <option value="openrouter/free">openrouter/free (Auto-Router Free)</option>
+                <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free (Gemini 2.0 Flash)</option>
+                <option value="google/gemini-2.0-pro-exp-02-05:free">google/gemini-2.0-pro-exp-02-05:free (Gemini 2.0 Pro)</option>
+                <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (DeepSeek R1 Reasoning)</option>
+                <option value="deepseek/deepseek-chat:free">deepseek/deepseek-chat:free (DeepSeek V3 Chat)</option>
+                <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free (Llama 3.3 70B)</option>
+                <option value="qwen/qwen-2.5-coder-32b-instruct:free">qwen/qwen-2.5-coder-32b-instruct:free (Qwen 2.5 Coder)</option>
+                <option value="mistralai/mistral-small-24b-instruct-2501:free">mistralai/mistral-small-24b-instruct-2501:free (Mistral Small)</option>
+              </optgroup>
             </select>
           </div>
 
@@ -1111,12 +1121,26 @@
                 </div>
               </div>
 
-              <!-- Featured OpenRouter Models Grid -->
+              <!-- Featured & Free OpenRouter Models Grid -->
               <div style="margin-top:18px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                  <h4 style="margin:0; font-size:0.95rem; color:#f1e7d0;">⭐ শীর্ষ ওপেনরাউটার ফ্রন্টিয়ার মডেলসমূহ (১-ক্লিকে সিলেক্ট করুন)</h4>
-                  <span style="font-size:0.75rem; color:#94a3b8;">সরাসরি ক্লিক করে সক্রিয় করুন</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+                  <div>
+                    <h4 style="margin:0; font-size:0.95rem; color:#f1e7d0;">⭐ ওপেনরাউটার মডেল ক্যাটালগ (১-ক্লিকে সিলেক্ট করুন)</h4>
+                    <span style="font-size:0.75rem; color:#94a3b8;" id="openrouter-models-count-label">সকল ফ্রি ও ফ্রন্টিয়ার মডেল লোড হচ্ছে...</span>
+                  </div>
+                  <!-- Category Filter Tabs -->
+                  <div class="openrouter-filter-tabs">
+                    <button type="button" class="or-filter-btn free-glow active" id="or-filter-free" onclick="filterOpenRouterCategory('free', this)">🎁 ১০০% ফ্রি মডেল (Free)</button>
+                    <button type="button" class="or-filter-btn" id="or-filter-featured" onclick="filterOpenRouterCategory('featured', this)">⭐ শীর্ষ ফ্রন্টিয়ার (Featured)</button>
+                    <button type="button" class="or-filter-btn" id="or-filter-Reasoning" onclick="filterOpenRouterCategory('Reasoning', this)">🧠 রিজনিং (Reasoning)</button>
+                    <button type="button" class="or-filter-btn" id="or-filter-all" onclick="filterOpenRouterCategory('all', this)">🌐 সকল মডেল (All)</button>
+                  </div>
                 </div>
+
+                <div class="openrouter-search-bar" style="margin-bottom:12px;">
+                  <input type="text" id="openrouter-search-input" class="text-input" placeholder="🔍 ফ্রি বা ফ্রন্টিয়ার মডেল খুঁজুন (যেমন: gemini, r1, llama, qwen, free)..." oninput="searchOpenRouterModels(this.value)" style="width:100%; font-size:0.85rem; padding:8px 12px;">
+                </div>
+
                 <div class="openrouter-models-grid" id="openrouter-models-grid">
                   <!-- Dynamically rendered OpenRouter model cards -->
                 </div>
@@ -1125,11 +1149,21 @@
               <!-- Live Test Generator Box -->
               <div class="openrouter-test-box" style="margin-top:16px; background:rgba(0,0,0,0.25); padding:12px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                  <select id="openrouter-test-model-select" class="text-input" style="max-width:240px; cursor:pointer;">
-                    <option value="deepseek/deepseek-r1">deepseek/deepseek-r1</option>
-                    <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
-                    <option value="openai/gpt-4o">openai/gpt-4o</option>
-                    <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free</option>
+                  <select id="openrouter-test-model-select" class="text-input" style="max-width:280px; cursor:pointer;">
+                    <optgroup label="100% Free Models (ফ্রি মডেলসমূহ)">
+                      <option value="google/gemini-2.0-flash-exp:free" selected>google/gemini-2.0-flash-exp:free (Gemini Flash)</option>
+                      <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (DeepSeek R1 Reasoning)</option>
+                      <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free (Llama 3.3 70B)</option>
+                      <option value="deepseek/deepseek-chat:free">deepseek/deepseek-chat:free (DeepSeek V3 Chat)</option>
+                      <option value="qwen/qwen-2.5-coder-32b-instruct:free">qwen/qwen-2.5-coder-32b-instruct:free (Qwen 2.5 Coder)</option>
+                      <option value="openrouter/free">openrouter/free (Auto-Router Free)</option>
+                    </optgroup>
+                    <optgroup label="Frontier Models">
+                      <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
+                      <option value="openai/gpt-4o">openai/gpt-4o</option>
+                      <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
+                      <option value="deepseek/deepseek-r1">deepseek/deepseek-r1</option>
+                    </optgroup>
                   </select>
                   <input type="text" id="openrouter-test-prompt-input" class="text-input" style="flex:1; min-width:200px;" value="Say hello in Bengali and state your model name.">
                   <button type="button" class="btn-primary" onclick="runOpenRouterTestPrompt()">⚡ টেস্ট রান করুন</button>

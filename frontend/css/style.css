@@ -8213,3 +8213,54 @@ body.light-theme .reasoning-body,
   margin: 0;
   line-height: 1.4;
 }
+
+/* ============================================================================== */
+/* OPENROUTER FREE MODELS & FILTER TABS                                           */
+/* ============================================================================== */
+.openrouter-filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.or-filter-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 0.78rem;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.or-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1e7d0;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.or-filter-btn.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.or-filter-btn.free-glow.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--emerald-glow);
+  color: var(--emerald-glow);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+}
+
+.badge-free {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--emerald-glow);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+}

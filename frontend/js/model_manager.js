@@ -6,52 +6,10 @@
  * ============================================================================== */
 
 let currentOpenRouterModels = [];
-
-async function loadModelsOverview() {
-  try {
-    const res = await fetch('/api/models', {
-      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const currentLabel = document.getElementById('hub-current-model');
-      if (currentLabel) currentLabel.innerText = data.active_model;
-
-      const serverInput = document.getElementById('hub-server-url');
-      if (serverInput) serverInput.value = data.base_url;
-
-      // Update provider pill buttons
-      const isOR = data.active_provider === 'openrouter' || (data.active_model && data.active_model.includes('/'));
-      const btnDef = document.getElementById('btn-provider-default');
-      const btnOR = document.getElementById('btn-provider-openrouter');
-      if (btnDef) btnDef.classList.toggle('active', !isOR);
-      if (btnOR) btnOR.classList.toggle('active', isOR);
-
-      const modelSelect = document.getElementById('hub-model-select');
-      let models = (data.available_models && data.available_models.length > 2)
-        ? data.available_models
-        : (typeof ALL_OXIONAI_MODELS !== 'undefined' ? ALL_OXIONAI_MODELS : []);
-      if (data.active_model && !models.includes(data.active_model)) {
-        models = [data.active_model, ...models];
-      }
-      if (modelSelect) {
-        modelSelect.innerHTML = models.map(m => `
-          <option value="${m}" ${m === data.active_model ? 'selected' : ''}>${m}</option>
-        `).join('');
-      }
-
-      // Automatically sync available models to topbar dropdown
-      if (typeof updateModelDropdown === 'function') {
-        updateModelDropdown(models, data.active_model);
-      }
-
-      // Load OpenRouter Status
-      loadOpenRouterStatus(data.openrouter);
-    }
-  } catch (err) {
-    console.warn('Error loading models hub:', err);
-  }
-}
+let openRouterFreeModelsList = [];
+let openRouterFeaturedList = [];
+let openRouterActiveCategory = 'free';
+let openRouterSearchQuery = '';
 
 async function loadOpenRouterStatus(preloaded = null) {
   try {
@@ -67,27 +25,26 @@ async function loadOpenRouterStatus(preloaded = null) {
 
     if (!orData) return;
 
-    // 1. Status badge
+    // 1. Status badge & Account Telemetry
     const badge = document.getElementById('openrouter-status-badge');
     const tierBadge = document.getElementById('openrouter-tier-badge');
     const usageSub = document.getElementById('openrouter-usage-sub');
     const keyInput = document.getElementById('openrouter-key-input');
 
-    if (orData.configured) {
+    const ver = orData.verification || {};
+    if (orData.configured && ver.valid) {
       if (badge) {
         badge.className = 'status-pill status-online';
         badge.innerText = 'CONNECTED';
       }
       if (tierBadge) {
-        const ver = orData.verification || {};
-        tierBadge.innerText = ver.is_free_tier ? 'Free Tier Account' : 'Active Paid Account';
+        tierBadge.innerText = ver.is_free_tier ? 'Free Tier Account' : 'Active Account';
         tierBadge.style.color = '#22c55e';
       }
       if (usageSub) {
-        const ver = orData.verification || {};
         const limitText = ver.limit ? `$${ver.limit}` : 'Pay-as-you-go';
-        const usageText = ver.usage !== undefined ? `$${Number(ver.usage).toFixed(3)} used` : '';
-        usageSub.innerText = `${limitText} • ${usageText}`;
+        const usageText = ver.usage !== undefined ? `$${Number(ver.usage).toFixed(4)} used` : '';
+        usageSub.innerText = `${ver.label || 'Default Key'} • ${limitText} • ${usageText}`;
       }
       if (keyInput && !keyInput.value && orData.key_masked) {
         keyInput.placeholder = orData.key_masked;
@@ -95,43 +52,125 @@ async function loadOpenRouterStatus(preloaded = null) {
     } else {
       if (badge) {
         badge.className = 'status-pill status-ready';
-        badge.innerText = 'NOT CONFIGURED';
+        badge.innerText = orData.configured ? 'KEY UNVERIFIED' : 'NOT CONFIGURED';
       }
       if (tierBadge) {
-        tierBadge.innerText = 'API Key Required';
+        tierBadge.innerText = orData.configured ? 'Unverified Key' : 'API Key Required';
         tierBadge.style.color = '#f59e0b';
+      }
+      if (usageSub) {
+        usageSub.innerText = orData.configured ? (ver.message || 'Verification needed') : 'কী যুক্ত করে ১০০% ফ্রি মডেল ব্যবহার করুন';
       }
     }
 
-    // 2. Render Featured Models
-    const models = orData.featured_models || [];
-    currentOpenRouterModels = models;
-    renderOpenRouterModelsGrid(models, orData.active_model);
+    // 2. Cache models
+    openRouterFeaturedList = orData.featured_models || [];
+    openRouterFreeModelsList = orData.free_models || [];
+    
+    // Default to free models if available, otherwise featured
+    filterOpenRouterCategory(openRouterActiveCategory, null, orData.active_model);
+
   } catch (err) {
     console.error('Error loading OpenRouter status:', err);
   }
+}
+
+function filterOpenRouterCategory(category, btnEl = null, activeModel = null) {
+  openRouterActiveCategory = category;
+
+  // Update tabs active state
+  document.querySelectorAll('.or-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) {
+    btnEl.classList.add('active');
+  } else {
+    const tab = document.getElementById(`or-filter-${category}`);
+    if (tab) tab.classList.add('active');
+  }
+
+  let list = [];
+  if (category === 'free') {
+    list = openRouterFreeModelsList.length ? openRouterFreeModelsList : openRouterFeaturedList.filter(m => m.category === 'Free' || m.id.includes(':free'));
+  } else if (category === 'featured') {
+    list = openRouterFeaturedList;
+  } else if (category === 'Reasoning') {
+    list = [...openRouterFeaturedList, ...openRouterFreeModelsList].filter(m => m.category === 'Reasoning' || m.id.includes('r1') || m.id.includes('reasoning'));
+  } else {
+    // All
+    const map = new Map();
+    [...openRouterFreeModelsList, ...openRouterFeaturedList].forEach(m => map.set(m.id, m));
+    list = Array.from(map.values());
+  }
+
+  // Deduplicate
+  const uniqueMap = new Map();
+  list.forEach(m => uniqueMap.set(m.id, m));
+  currentOpenRouterModels = Array.from(uniqueMap.values());
+
+  // Apply search query if any
+  applyOpenRouterSearchAndRender(activeModel);
+}
+
+function searchOpenRouterModels(query) {
+  openRouterSearchQuery = (query || '').trim().toLowerCase();
+  applyOpenRouterSearchAndRender();
+}
+
+function applyOpenRouterSearchAndRender(activeModel = null) {
+  let filtered = currentOpenRouterModels;
+  if (openRouterSearchQuery) {
+    filtered = filtered.filter(m => 
+      m.id.toLowerCase().includes(openRouterSearchQuery) || 
+      (m.name && m.name.toLowerCase().includes(openRouterSearchQuery)) ||
+      (m.description && m.description.toLowerCase().includes(openRouterSearchQuery)) ||
+      (m.provider && m.provider.toLowerCase().includes(openRouterSearchQuery))
+    );
+  }
+
+  // Update count label
+  const countLabel = document.getElementById('openrouter-models-count-label');
+  if (countLabel) {
+    countLabel.innerText = `মোট ${filtered.length} টি মডেল প্রদর্শিত হচ্ছে (${openRouterActiveCategory === 'free' ? '১০০% ফ্রি' : openRouterActiveCategory})`;
+  }
+
+  renderOpenRouterModelsGrid(filtered, activeModel);
 }
 
 function renderOpenRouterModelsGrid(models, activeModel) {
   const container = document.getElementById('openrouter-models-grid');
   if (!container) return;
 
+  if (!models || models.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column:1/-1; padding:32px; text-align:center; color:#94a3b8; background:rgba(0,0,0,0.2); border-radius:8px;">
+        <div style="font-size:1.8rem; margin-bottom:6px;">🔍</div>
+        <div>কোনো মডেল পাওয়া যায়নি। অনুগ্রহ করে ফিল্টার পরিবর্তন করুন।</div>
+      </div>
+    `;
+    return;
+  }
+
+  const currentAct = activeModel || (document.getElementById('sidebar-model-name')?.innerText || '');
+
   container.innerHTML = models.map(m => {
-    const isActive = m.id === activeModel;
-    const badgeClass = m.category === 'Free' ? 'badge-free' : (m.category === 'Reasoning' ? 'badge-reasoning' : '');
+    const isActive = m.id === currentAct;
+    const isFree = m.category === 'Free' || m.id.includes(':free') || m.pricing === 'free';
+    const badgeClass = isFree ? 'badge-free' : (m.category === 'Reasoning' ? 'badge-reasoning' : '');
+    const badgeText = isFree ? '100% FREE' : (m.badge || m.category);
 
     return `
       <div class="openrouter-model-card ${isActive ? 'active-model' : ''}" onclick="selectOpenRouterModel('${escapeHtml(m.id)}')">
         <div>
           <div class="openrouter-card-header">
-            <h5 class="openrouter-model-title">${escapeHtml(m.name)}</h5>
-            <span class="openrouter-badge ${badgeClass}">${escapeHtml(m.badge || m.category)}</span>
+            <h5 class="openrouter-model-title">${escapeHtml(m.name || m.id)}</h5>
+            <span class="openrouter-badge ${badgeClass}">${escapeHtml(badgeText)}</span>
           </div>
-          <p class="openrouter-model-desc">${escapeHtml(m.description)}</p>
+          <p class="openrouter-model-desc">${escapeHtml(m.description || 'OpenRouter এআই মডেল।')}</p>
         </div>
         <div class="openrouter-model-footer">
-          <span>${escapeHtml(m.id)}</span>
-          <span style="color:#38bdf8;">${isActive ? '✓ ACTIVE' : '⚡ 1-Click Use'}</span>
+          <span style="font-family:'Fira Code',monospace; font-size:0.75rem; word-break:break-all;">${escapeHtml(m.id)}</span>
+          <span style="color:${isActive ? '#10b981' : '#38bdf8'}; font-weight:600; white-space:nowrap; margin-left:6px;">
+            ${isActive ? '✓ ACTIVE' : '⚡ 1-Click Use'}
+          </span>
         </div>
       </div>
     `;
@@ -164,6 +203,17 @@ async function selectOpenRouterModel(modelId) {
         }
         topSelect.value = modelId;
       }
+
+      // Update test model select
+      const testSelect = document.getElementById('openrouter-test-model-select');
+      if (testSelect) {
+        let topt = Array.from(testSelect.options).find(o => o.value === modelId);
+        if (!topt) {
+          topt = new Option(modelId, modelId, true, true);
+          testSelect.add(topt);
+        }
+        testSelect.value = modelId;
+      }
     } else {
       showToast(data.message || 'মডেল পরিবর্তন ব্যর্থ হয়েছে', 'error');
     }
@@ -191,6 +241,7 @@ async function saveOpenRouterKey() {
     if (data.success) {
       showToast('OpenRouter API Key সফলভাবে সেভ হয়েছে!', 'success');
       keyInput.value = '';
+      if (data.key_masked) keyInput.placeholder = data.key_masked;
       loadModelsOverview();
     } else {
       showToast('API Key সংরক্ষণ ব্যর্থ হয়েছে', 'error');
@@ -202,23 +253,63 @@ async function saveOpenRouterKey() {
 
 async function verifyOpenRouterKey(showAlert = false) {
   const badge = document.getElementById('openrouter-status-badge');
-  if (badge) badge.innerText = 'VERIFYING...';
+  const keyInput = document.getElementById('openrouter-key-input');
+  const inputKey = keyInput ? keyInput.value.trim() : '';
+
+  if (badge) {
+    badge.className = 'status-pill status-ready';
+    badge.innerText = 'VERIFYING...';
+  }
 
   try {
-    const res = await fetch('/api/models/openrouter/status', {
-      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    const res = await fetch('/api/models/openrouter/verify', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: inputKey, save_if_valid: Boolean(inputKey) })
     });
     const data = await res.json();
-    if (data.configured && data.verification?.valid) {
-      if (showAlert) showToast(`OpenRouter সংযোগ সফল! (${data.verification.label || 'Active'})`, 'success');
+    const ver = data.verification || {};
+
+    if (ver.valid) {
+      if (badge) {
+        badge.className = 'status-pill status-online';
+        badge.innerText = 'VERIFIED & ACTIVE';
+      }
+      const tierBadge = document.getElementById('openrouter-tier-badge');
+      if (tierBadge) {
+        tierBadge.innerText = ver.is_free_tier ? 'Free Tier Account' : 'Active Account';
+        tierBadge.style.color = '#22c55e';
+      }
+      const usageSub = document.getElementById('openrouter-usage-sub');
+      if (usageSub) {
+        const limitText = ver.limit ? `$${ver.limit}` : 'Pay-as-you-go';
+        const usageText = ver.usage !== undefined ? `$${Number(ver.usage).toFixed(4)} used` : '';
+        usageSub.innerText = `${ver.label || 'Default Key'} • ${limitText} • ${usageText}`;
+      }
+      if (keyInput) {
+        keyInput.value = '';
+        if (data.key_masked) keyInput.placeholder = data.key_masked;
+      }
+      if (showAlert) {
+        showToast(`✓ OpenRouter কী সফলভাবে ভেরিফাই ও সক্রিয় করা হয়েছে! (${ver.label || 'Active'})`, 'success');
+      }
+      loadModelsOverview();
     } else {
-      if (showAlert) showToast(`সংযোগ ব্যর্থ: ${data.verification?.message || 'Invalid key'}`, 'error');
+      if (badge) {
+        badge.className = 'status-pill';
+        badge.style.background = 'rgba(244,63,94,0.15)';
+        badge.style.color = '#f43f5e';
+        badge.innerText = 'INVALID KEY';
+      }
+      if (showAlert) {
+        showToast(ver.message || 'OpenRouter API Key ভেরিফিকেশন ব্যর্থ হয়েছে', 'error');
+      }
     }
-    loadOpenRouterStatus(data);
   } catch (err) {
     if (showAlert) showToast(`নেটওয়ার্ক ত্রুটি: ${err.message}`, 'error');
   }
 }
+
 
 async function switchActiveProvider(provider) {
   try {

@@ -66,7 +66,7 @@ class CompanyAIAgent:
             or (target_model and target_model.startswith("openrouter/"))
         )
 
-        if is_openrouter and OpenRouterService.is_configured():
+        if is_openrouter:
             clean_model = target_model.replace("openrouter/", "") if target_model else "deepseek/deepseek-r1"
             return OpenRouterService.get_client(), clean_model
 
@@ -612,6 +612,30 @@ def get_shared_agent() -> CompanyAIAgent:
                             await asyncio.sleep(0.015)
                         yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
                         return
+                    elif "401" in err_lower or "user not found" in err_lower or "api_key" in err_lower or "not-configured" in err_lower or "credentials" in err_lower:
+                        if language == "en":
+                            auth_msg = (
+                                f"⚠️ **[OpenRouter Authentication Required]**\n\n"
+                                f"The target model (`{target_model}`) requires a valid OpenRouter API Key.\n\n"
+                                f"**How to configure:**\n"
+                                f"1. Go to **AI Models** in the left menu.\n"
+                                f"2. Enter your OpenRouter API Key (`sk-or-v1-...`) and click **Save Key**.\n"
+                                f"3. You can then use both 100% Free models and Frontier AI models seamlessly."
+                            )
+                        else:
+                            auth_msg = (
+                                f"⚠️ **[ওপেনরাউটার API Key কনফিগারেশন প্রয়োজন]**\n\n"
+                                f"আপনার নির্বাচিত মডেলটি (`{target_model}`) চালানোর জন্য একটি সক্রিয় OpenRouter API Key প্রয়োজন।\n\n"
+                                f"**কীভাবে কী সেট করবেন:**\n"
+                                f"1. বামপাশের মেনু থেকে **মডেল ম্যানেজমেন্ট (AI Models)** পেজে যান।\n"
+                                f"2. আপনার OpenRouter API Key (`sk-or-v1-...`) বক্সে পেস্ট করে **Save Key** বা **Test Key** ক্লিক করুন।\n"
+                                f"3. কী সক্রিয় হলে আপনি সব ১০০% ফ্রি মডেল ও ফ্রন্টিয়ার মডেল অনায়াসে ব্যবহার করতে পারবেন।"
+                            )
+                        for word in auth_msg.split(" "):
+                            yield f"data: {json.dumps({'type': 'token', 'token': word + ' '})}\n\n"
+                            await asyncio.sleep(0.015)
+                        yield f"data: {json.dumps({'type': 'done', 'model': target_model})}\n\n"
+                        return
                     elif "service_upgrading" in err_lower or "503" in err_lower or "maintenance" in err_lower:
                         if language == "en":
                             upgrade_msg = (
@@ -663,6 +687,11 @@ def get_shared_agent() -> CompanyAIAgent:
                                 tool_calls_map[idx]["name"] += tc.function.name
                             if tc.function and tc.function.arguments:
                                 tool_calls_map[idx]["arguments"] += tc.function.arguments
+
+                    # Capture OpenRouter frontier reasoning stream tokens (e.g. DeepSeek R1 reasoning_content)
+                    reasoning_token = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+                    if reasoning_token:
+                        yield f"data: {json.dumps({'type': 'thought', 'thought': reasoning_token})}\n\n"
 
                     # Regular token delta with live thought streaming support (<thought> and <think> tags)
                     if delta and delta.content:
