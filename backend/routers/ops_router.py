@@ -1666,7 +1666,7 @@ async def get_ping_subagent_status(user=Depends(get_optional_current_user)):
         await db.close()
 
 @router.post("/subagents/ping/run")
-async def run_ping_diagnostics(req: PingExecuteRequest, user=Depends(get_current_user)):
+async def run_ping_diagnostics(req: PingExecuteRequest, user=Depends(get_optional_current_user)):
     """
     Triggers the Network Ping Sub-Agent to ping target IP(s) from Agent Server IP (192.168.9.9)
     and record the telemetry logs.
@@ -1731,7 +1731,7 @@ async def run_ping_diagnostics(req: PingExecuteRequest, user=Depends(get_current
         await db.close()
 
 @router.post("/subagents/ping/targets")
-async def add_ping_target(req: PingTargetCreateRequest, user=Depends(get_current_user)):
+async def add_ping_target(req: PingTargetCreateRequest, user=Depends(get_optional_current_user)):
     """Adds a new monitored IP target."""
     db = await get_ops_db()
     try:
@@ -1747,7 +1747,7 @@ async def add_ping_target(req: PingTargetCreateRequest, user=Depends(get_current
         await db.close()
 
 @router.delete("/subagents/ping/targets/{target_id}")
-async def delete_ping_target(target_id: str, user=Depends(get_current_user)):
+async def delete_ping_target(target_id: str, user=Depends(get_optional_current_user)):
     """Removes a monitored target."""
     db = await get_ops_db()
     try:
