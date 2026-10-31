@@ -50,6 +50,24 @@ class SettingsUpdateRequest(BaseModel):
     llm_model: Optional[str] = None
     agent_temperature: Optional[float] = None
     top_k_results: Optional[int] = None
+    llm_provider: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+    openrouter_model: Optional[str] = None
+
+class OpenRouterConfigRequest(BaseModel):
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
+
+class SubAgentTaskRunRequest(BaseModel):
+    task: str
+    model: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+class SwarmMissionRequest(BaseModel):
+    goal: str
+    selected_agents: Optional[List[str]] = None
+    model: Optional[str] = None
 
 class DocumentInfo(BaseModel):
     doc_id: str

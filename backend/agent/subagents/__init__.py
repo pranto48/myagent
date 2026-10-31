@@ -3,6 +3,6 @@
 # Subagents Package
 # ==============================================================================
 from .ping_agent import NetworkPingSubAgent
+from .work_engine import SubAgentWorkEngine
 
-__all__ = ["NetworkPingSubAgent"]
-
+__all__ = ["NetworkPingSubAgent", "SubAgentWorkEngine"]

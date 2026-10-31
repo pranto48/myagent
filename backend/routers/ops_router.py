@@ -1637,6 +1637,57 @@ async def toggle_subagent(agent_id: str, user=Depends(get_optional_current_user)
     finally:
         await db.close()
 
+class SubAgentRunPayload(BaseModel):
+    task: str
+    model: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+class SwarmMissionPayload(BaseModel):
+    goal: str
+    selected_agents: Optional[List[str]] = None
+    model: Optional[str] = None
+
+@router.get("/subagents/models")
+async def get_subagent_executable_models(user=Depends(get_optional_current_user)):
+    """Returns combined list of local models and OpenRouter models for subagent selection."""
+    from agent.openrouter_client import FEATURED_OPENROUTER_MODELS, OpenRouterService
+    
+    local_models = [settings.LLM_MODEL, "gemini-3.7-flash", "llama3.3", "deepseek-r1", "qwen2.5"]
+    openrouter_models = [m["id"] for m in FEATURED_OPENROUTER_MODELS]
+    
+    return {
+        "success": True,
+        "default_model": settings.LLM_MODEL,
+        "active_provider": getattr(settings, "LLM_PROVIDER", "default"),
+        "openrouter_configured": OpenRouterService.is_configured(),
+        "local_models": list(dict.fromkeys(local_models)),
+        "openrouter_models": openrouter_models,
+        "featured": FEATURED_OPENROUTER_MODELS
+    }
+
+@router.post("/subagents/{agent_id}/run")
+async def run_subagent_task_endpoint(agent_id: str, payload: SubAgentRunPayload, user=Depends(get_optional_current_user)):
+    """Dispatches a discrete task to a specialized subagent and returns live telemetry & synthesis."""
+    from agent.subagents.work_engine import SubAgentWorkEngine
+    result = await SubAgentWorkEngine.execute_subagent_task(
+        agent_id=agent_id,
+        task_instruction=payload.task,
+        model_override=payload.model,
+        context=payload.context
+    )
+    return result
+
+@router.post("/subagents/swarm/execute")
+async def execute_swarm_mission_endpoint(payload: SwarmMissionPayload, user=Depends(get_optional_current_user)):
+    """Launches an autonomous multi-subagent swarm mission to achieve a user goal."""
+    from agent.subagents.work_engine import SubAgentWorkEngine
+    mission_res = await SubAgentWorkEngine.orchestrate_swarm_mission(
+        goal=payload.goal,
+        selected_agents=payload.selected_agents,
+        model_override=payload.model
+    )
+    return mission_res
+
 @router.get("/subagents/ping/status")
 async def get_ping_subagent_status(user=Depends(get_optional_current_user)):
     """

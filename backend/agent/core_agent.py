@@ -55,6 +55,24 @@ class CompanyAIAgent:
         """Re-initializes client after settings update."""
         self._init_llm_client()
 
+    def get_client_for_model(self, model_name: Optional[str] = None):
+        """Dynamically routes requests to either OpenRouter or the default LLM server."""
+        from agent.openrouter_client import OpenRouterService
+        
+        target_model = model_name or settings.LLM_MODEL
+        is_openrouter = (
+            getattr(settings, "LLM_PROVIDER", "default") == "openrouter"
+            or (target_model and "/" in target_model)
+            or (target_model and target_model.startswith("openrouter/"))
+        )
+
+        if is_openrouter and OpenRouterService.is_configured():
+            clean_model = target_model.replace("openrouter/", "") if target_model else "deepseek/deepseek-r1"
+            return OpenRouterService.get_client(), clean_model
+
+        return self.client, target_model
+
+
     async def test_llm_connection(self) -> Dict[str, Any]:
         """Tests connectivity to the remote LLM server and checks available models."""
         try:
@@ -411,7 +429,7 @@ def get_shared_agent() -> CompanyAIAgent:
                     except Exception as save_err:
                         logger.warning(f"Autonomous memory save notice: {save_err}")
 
-        target_model = model or settings.LLM_MODEL
+        active_client, target_model = self.get_client_for_model(model)
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE
 
         sources: List[SourceCitation] = []
@@ -503,7 +521,7 @@ def get_shared_agent() -> CompanyAIAgent:
         for turn in range(max_tool_turns):
             try:
                 # First attempt with tools parameter
-                stream = await self.client.chat.completions.create(
+                stream = await active_client.chat.completions.create(
                     model=target_model,
                     messages=messages,
                     temperature=target_temp,
@@ -515,7 +533,7 @@ def get_shared_agent() -> CompanyAIAgent:
                 # If model doesn't support tools parameter, fallback to plain stream
                 logger.info(f"Model {target_model} does not support native function calling, falling back: {tool_call_err}")
                 try:
-                    stream = await self.client.chat.completions.create(
+                    stream = await active_client.chat.completions.create(
                         model=target_model,
                         messages=messages,
                         temperature=target_temp,
@@ -892,7 +910,7 @@ def get_shared_agent() -> CompanyAIAgent:
         language: str = "bn"
     ) -> Dict[str, Any]:
         """Non-streaming generation for API consumers."""
-        target_model = model or settings.LLM_MODEL
+        active_client, target_model = self.get_client_for_model(model)
         target_temp = temperature if temperature is not None else settings.AGENT_TEMPERATURE
 
         sources: List[SourceCitation] = []
@@ -945,7 +963,7 @@ def get_shared_agent() -> CompanyAIAgent:
 
         messages.append({"role": "user", "content": user_content})
 
-        response = await self.client.chat.completions.create(
+        response = await active_client.chat.completions.create(
             model=target_model,
             messages=messages,
             temperature=target_temp

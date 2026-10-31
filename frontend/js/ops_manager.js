@@ -2328,18 +2328,288 @@ function renderPingBatchResult(batch) {
   `;
 }
 
+// ==============================================================================
+// Interactive Sub-Agent Task Runner & Swarm Mission Engine
+// ==============================================================================
+
+const SUBAGENT_PROMPT_PRESETS = {
+  net_ping_subagent: [
+    "Ping NAS Storage 192.168.9.5 and check packet loss",
+    "Run fleet batch ping across all company servers",
+    "Test TCP port 445 on 192.168.9.5 for SMB share availability",
+    "Check Google DNS 8.8.8.8 and Cloudflare 1.1.1.1 internet route latency"
+  ],
+  task_planner_agent: [
+    "Create an autonomous execution plan for network and security hardening",
+    "Decompose daily backup and database compaction workflow into stages",
+    "Plan automated disaster recovery procedure for server 192.168.9.9"
+  ],
+  memory_synthesizer_agent: [
+    "Search and summarize all saved server and network credentials",
+    "Distill company memory chunks related to NAS deployment and IP allocations",
+    "Review vector store index health and recommend compaction priorities"
+  ],
+  security_auditor_agent: [
+    "Scan for exposed API tokens, JWT secrets, and DLP compliance in system logs",
+    "Audit prompt injection vulnerabilities and test firewall rules",
+    "Check OWASP security posture across docker exposed ports"
+  ],
+  devops_fleet_agent: [
+    "Inspect docker containers status, RAM usage, and disk volume quotas",
+    "Check Linux host uptime, load average, and thermal status on 192.168.9.9",
+    "Review myagent-web and myagent-backend container restart policies"
+  ],
+  executive_briefing_agent: [
+    "Draft daily executive intelligence briefing on infrastructure health",
+    "Synthesize all recent subagent findings and network metrics into a report",
+    "Compile weekly system performance summary for IT management"
+  ]
+};
+
 function executeSubAgentTask(agentId, agentName) {
-  if (agentId === 'net_ping_subagent') {
-    triggerFleetBatchPing();
-    if (typeof showToast === 'function') showToast(`সাব-এজেন্ট '${agentName}': ফ্লিট পিং পরীক্ষা শুরু হয়েছে`, 'info');
-  } else {
-    if (typeof switchTab === 'function') switchTab('chat');
-    const inputEl = document.getElementById('chat-input') || document.getElementById('prompt-input');
-    if (inputEl) {
-      inputEl.value = `@${agentId} Analyze network status and review active infrastructure metrics.`;
-      inputEl.focus();
+  openSubAgentTaskModal(agentId, agentName);
+}
+
+function openSubAgentTaskModal(agentId, agentName = null) {
+  const modal = document.getElementById('modal-subagent-task');
+  if (!modal) return;
+
+  const agent = opsSubAgentsState.subagents.find(a => a.id === agentId) || { id: agentId, name: agentName || agentId, icon: '🤖', role: 'Specialized Sub-Agent' };
+
+  document.getElementById('modal-agent-id').value = agent.id;
+  document.getElementById('modal-agent-name').innerText = agent.name;
+  document.getElementById('modal-agent-role').innerText = agent.role || 'Autonomous Sentinel';
+  document.getElementById('modal-agent-icon').innerText = agent.icon || '🤖';
+
+  const taskInput = document.getElementById('modal-subagent-task-input');
+  const termWrap = document.getElementById('modal-terminal-wrap');
+  if (termWrap) termWrap.style.display = 'none';
+
+  // Render quick prompt chips
+  const chipsContainer = document.getElementById('modal-subagent-sample-prompts');
+  if (chipsContainer) {
+    const presets = SUBAGENT_PROMPT_PRESETS[agent.id] || ["Analyze status and report recommendations", "Run health inspection"];
+    chipsContainer.innerHTML = presets.map(p => `
+      <button type="button" class="prompt-chip-sm" onclick="setModalPrompt('${escapeHtml(p)}')">
+        💡 ${escapeHtml(p)}
+      </button>
+    `).join('');
+
+    if (taskInput) {
+      taskInput.value = presets[0];
     }
-    if (typeof showToast === 'function') showToast(`সাব-এজেন্ট '${agentName}' অ্যাক্টিভেট করা হয়েছে`, 'success');
+  }
+
+  modal.style.display = 'flex';
+}
+
+function setModalPrompt(text) {
+  const taskInput = document.getElementById('modal-subagent-task-input');
+  if (taskInput) {
+    taskInput.value = text;
+    taskInput.focus();
+  }
+}
+
+function closeSubAgentTaskModal() {
+  const modal = document.getElementById('modal-subagent-task');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitSubAgentModalTask() {
+  const agentId = document.getElementById('modal-agent-id').value;
+  const taskInput = document.getElementById('modal-subagent-task-input');
+  const modelSelect = document.getElementById('modal-subagent-model-select');
+  const btn = document.getElementById('btn-run-modal-task');
+  const termWrap = document.getElementById('modal-terminal-wrap');
+  const termStatus = document.getElementById('modal-terminal-status');
+  const termTime = document.getElementById('modal-terminal-time');
+  const termBody = document.getElementById('modal-terminal-body');
+
+  const taskText = taskInput ? taskInput.value.trim() : '';
+  if (!taskText) {
+    if (typeof showToast === 'function') showToast('অনুগ্রহ করে টাস্কের বিবরণ লিখুন', 'error');
+    return;
+  }
+
+  const selectedModel = modelSelect ? modelSelect.value : null;
+
+  btn.disabled = true;
+  btn.innerText = '⚡ এক্সিকিউট হচ্ছে...';
+  if (termWrap) termWrap.style.display = 'block';
+  if (termStatus) {
+    termStatus.className = 'status-pill status-ready';
+    termStatus.innerText = 'EXECUTING...';
+  }
+  if (termTime) termTime.innerText = 'Running...';
+  if (termBody) termBody.innerHTML = `<span style="color:#38bdf8;">[Dispatcher]: সাব-এজেন্ট '${agentId}'-এ টাস্ক পাঠানো হয়েছে...
+মডেল: ${selectedModel}
+কমান্ড: ${escapeHtml(taskText)}
+
+অপেক্ষা করুন...</span>`;
+
+  const startTime = Date.now();
+  try {
+    const res = await opsFetch(`/api/ops/subagents/${agentId}/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        task: taskText,
+        model: selectedModel
+      })
+    });
+
+    const data = await res.json();
+    const elapsed = Date.now() - startTime;
+
+    if (data.success) {
+      if (termStatus) {
+        termStatus.className = 'status-pill status-online';
+        termStatus.innerText = 'COMPLETED';
+      }
+      if (termTime) termTime.innerText = `${data.execution_time_ms || elapsed} ms`;
+      if (termBody) {
+        let toolOut = '';
+        if (data.tool_summary) {
+          toolOut = `[Tool Result]: ${data.tool_summary}
+
+`;
+        }
+        termBody.innerHTML = `<span style="color:#22c55e;">[Success]: সাব-এজেন্ট সফলভাবে কাজ সম্পন্ন করেছে (${data.model_used || selectedModel})
+
+</span>` +
+                             toolOut +
+                             `<span style="color:#f1e7d0;">${escapeHtml(data.output || 'No text output returned.')}</span>`;
+      }
+      if (typeof showToast === 'function') showToast('সাব-এজেন্ট টাস্ক সফলভাবে সম্পন্ন হয়েছে!', 'success');
+      // Refresh subagents telemetry metrics
+      loadOpsSubAgents();
+    } else {
+      if (termStatus) {
+        termStatus.className = 'status-pill status-offline';
+        termStatus.innerText = 'FAILED';
+      }
+      if (termBody) termBody.innerHTML = `<span style="color:#f43f5e;">[Error]: ${escapeHtml(data.error || 'Execution failed')}</span>`;
+      if (typeof showToast === 'function') showToast('টাস্ক এক্সেকিউশন ব্যর্থ হয়েছে', 'error');
+    }
+  } catch (err) {
+    if (termStatus) {
+      termStatus.className = 'status-pill status-offline';
+      termStatus.innerText = 'NETWORK ERROR';
+    }
+    if (termBody) termBody.innerHTML = `<span style="color:#f43f5e;">[Network Error]: ${escapeHtml(err.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '⚡ কাজ শুরু করুন (Run Task)';
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Swarm Mission Orchestrator
+// ------------------------------------------------------------------------------
+function setSwarmGoalPreset(type) {
+  const input = document.getElementById('swarm-goal-input');
+  if (!input) return;
+
+  if (type === 'ping') {
+    input.value = 'নেটওয়ার্ক সেন্টিনেল সাব-এজেন্ট দিয়ে সার্ভার 192.168.9.5 এবং 192.168.9.9 এর কানেকশন ও লেটেন্সি টেস্ট করো এবং ব্রিফিং প্রদান করো।';
+  } else if (type === 'devops') {
+    input.value = 'ডেভঅপস সেন্টিনেল দিয়ে ডকার কন্টেইনার স্ট্যাটাস, রিসোর্স ইউসেজ ও মেমোরি পরীক্ষা করে রিপোর্ট দাও।';
+  } else if (type === 'security') {
+    input.value = 'সিকিউরিটি সেন্টিনেল দিয়ে সম্ভাব্য টোকেন লিক, ডিএলপি ফিল্টারিং ও সিস্টেম কমপ্লায়েন্স অডিট চালাও।';
+  } else if (type === 'full') {
+    input.value = 'সার্ভার 192.168.9.5 এ পিং টেস্ট করো, ডকার কন্টেইনার স্ট্যাটাস দেখো, সিকিউরিটি স্ক্যান চালাও এবং একটি পরিপূর্ণ এক্সিকিউটিভ সামারি রিপোর্ট তৈরি করো।';
+  }
+  input.focus();
+}
+
+async function launchSwarmMission() {
+  const goalInput = document.getElementById('swarm-goal-input');
+  const modelSelect = document.getElementById('swarm-model-select');
+  const btn = document.getElementById('btn-launch-swarm');
+  const panel = document.getElementById('swarm-execution-result-panel');
+  const titleEl = document.getElementById('swarm-result-title');
+  const timeEl = document.getElementById('swarm-result-time');
+  const iconEl = document.getElementById('swarm-result-status-icon');
+  const stagesContainer = document.getElementById('swarm-stages-container');
+  const summaryBox = document.getElementById('swarm-executive-summary');
+
+  const goal = goalInput ? goalInput.value.trim() : '';
+  if (!goal) {
+    if (typeof showToast === 'function') showToast('অনুগ্রহ করে মিশনের মূল লক্ষ্য লিখুন', 'error');
+    return;
+  }
+
+  const model = modelSelect ? modelSelect.value : null;
+
+  btn.disabled = true;
+  btn.innerText = '🚀 সোয়ার্ম অর্কেস্ট্রেশন চলছে...';
+  if (panel) panel.style.display = 'block';
+  if (titleEl) titleEl.innerText = 'মাস্টার ওয়ার্ক এজেন্ট কাজ বিশ্লেষণ ও সাব-এজেন্টদের নিয়োজিত করছে...';
+  if (iconEl) iconEl.innerText = '⏳';
+  if (timeEl) timeEl.innerText = 'Running...';
+  if (stagesContainer) stagesContainer.innerHTML = '<div style="padding:16px; text-align:center; color:#38bdf8;">⚡ সাব-এজেন্ট সোয়ার্ম পাইপলাইন ইনিশিয়ালাইজ হচ্ছে...</div>';
+  if (summaryBox) summaryBox.style.display = 'none';
+
+  const startTime = Date.now();
+  try {
+    const res = await opsFetch('/api/ops/subagents/swarm/execute', {
+      method: 'POST',
+      body: JSON.stringify({
+        goal: goal,
+        model: model !== 'default' ? model : null
+      })
+    });
+
+    const data = await res.json();
+    const elapsed = Date.now() - startTime;
+
+    if (data.success) {
+      if (titleEl) titleEl.innerText = `সোয়ার্ম মিশন সফলভাবে সম্পন্ন! (মিশন ID: ${data.mission_id})`;
+      if (iconEl) iconEl.innerText = '✅';
+      if (timeEl) timeEl.innerText = `${data.total_duration_ms || elapsed} ms`;
+
+      // Render stages
+      const stages = data.stages || [];
+      if (stagesContainer) {
+        stagesContainer.innerHTML = stages.map((stg, idx) => `
+          <div class="swarm-stage-item stage-completed">
+            <div class="swarm-stage-top">
+              <span class="swarm-stage-name">
+                <span>${escapeHtml(stg.icon || '🤖')}</span>
+                <span>Stage ${idx + 1}: ${escapeHtml(stg.agent_name || stg.agent_id)}</span>
+              </span>
+              <span class="swarm-stage-time">${stg.execution_time_ms || 0} ms • ${escapeHtml(stg.model_used || 'default')}</span>
+            </div>
+            ${stg.tool_summary ? `<div style="font-size:0.75rem; color:#22c55e;">🛠️ ${escapeHtml(stg.tool_summary)}</div>` : ''}
+            <div class="swarm-stage-summary">${escapeHtml(stg.output || '')}</div>
+          </div>
+        `).join('');
+      }
+
+      // Render Executive Summary
+      if (summaryBox && data.executive_summary) {
+        summaryBox.style.display = 'block';
+        summaryBox.innerHTML = `
+          <div style="font-weight:700; color:#22c55e; margin-bottom:8px; font-size:1rem;">📊 এক্সিকিউটিভ ইন্টেলিজেন্স ব্রিফিং (Unified Mission Synthesis):</div>
+          ${escapeHtml(data.executive_summary)}
+        `;
+      }
+
+      if (typeof showToast === 'function') showToast('সোয়ার্ম মিশন সফলভাবে সম্পন্ন হয়েছে!', 'success');
+      loadOpsSubAgents();
+    } else {
+      if (titleEl) titleEl.innerText = 'সোয়ার্ম মিশন ব্যর্থ হয়েছে';
+      if (iconEl) iconEl.innerText = '❌';
+      if (stagesContainer) stagesContainer.innerHTML = `<div style="color:#f43f5e; padding:12px;">ত্রুটি: ${escapeHtml(data.error || 'Swarm execution failed')}</div>`;
+      if (typeof showToast === 'function') showToast('সোয়ার্ম মিশন ব্যর্থ হয়েছে', 'error');
+    }
+  } catch (err) {
+    if (titleEl) titleEl.innerText = 'নেটওয়ার্ক ত্রুটি';
+    if (iconEl) iconEl.innerText = '❌';
+    if (stagesContainer) stagesContainer.innerHTML = `<div style="color:#f43f5e; padding:12px;">নেটওয়ার্ক এরর: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '🚀 মিশন শুরু করুন (Launch Mission)';
   }
 }
 
@@ -2350,4 +2620,17 @@ window.handlePingTypeChange = handlePingTypeChange;
 window.selectPingPreset = selectPingPreset;
 window.triggerPingDiagnosis = triggerPingDiagnosis;
 window.triggerFleetBatchPing = triggerFleetBatchPing;
+// Export window methods
+window.switchSkillsSubTab = switchSkillsSubTab;
+window.loadOpsSubAgents = loadOpsSubAgents;
+window.handlePingTypeChange = handlePingTypeChange;
+window.selectPingPreset = selectPingPreset;
+window.triggerPingDiagnosis = triggerPingDiagnosis;
+window.triggerFleetBatchPing = triggerFleetBatchPing;
 window.executeSubAgentTask = executeSubAgentTask;
+window.openSubAgentTaskModal = openSubAgentTaskModal;
+window.closeSubAgentTaskModal = closeSubAgentTaskModal;
+window.submitSubAgentModalTask = submitSubAgentModalTask;
+window.setModalPrompt = setModalPrompt;
+window.setSwarmGoalPreset = setSwarmGoalPreset;
+window.launchSwarmMission = launchSwarmMission;

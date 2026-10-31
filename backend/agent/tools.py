@@ -723,6 +723,40 @@ class AgentTools:
         except Exception as e:
             return f"Chart generator error: {str(e)}"
 
+    @classmethod
+    async def delegate_to_subagent(cls, subagent_id: str, task: str) -> str:
+        """Dispatches work to a specialized subagent and returns synthesized results."""
+        from agent.subagents.work_engine import SubAgentWorkEngine
+        try:
+            res = await SubAgentWorkEngine.execute_subagent_task(
+                agent_id=subagent_id,
+                task_instruction=task
+            )
+            return json.dumps({
+                "agent_id": subagent_id,
+                "agent_name": res.get("agent_name"),
+                "status": "COMPLETED",
+                "tool_summary": res.get("tool_summary"),
+                "findings": res.get("output")
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"agent_id": subagent_id, "error": str(e)})
+
+    @classmethod
+    async def execute_subagent_swarm(cls, goal: str) -> str:
+        """Coordinates a multi-agent swarm mission across qualified subagents to accomplish a user goal."""
+        from agent.subagents.work_engine import SubAgentWorkEngine
+        try:
+            res = await SubAgentWorkEngine.orchestrate_swarm_mission(goal=goal)
+            return json.dumps({
+                "mission_id": res.get("mission_id"),
+                "agents_engaged": res.get("agents_engaged"),
+                "total_duration_ms": res.get("total_duration_ms"),
+                "executive_summary": res.get("executive_summary")
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"goal": goal, "error": str(e)})
+
     @staticmethod
     async def ping_network_diagnostics(target: str, ping_type: str = "icmp", port: Optional[int] = None, count: int = 3) -> str:
         """
@@ -849,6 +883,13 @@ class AgentTools:
             elif tool_name == "system_info":
                 return cls.system_info()
 
+            elif tool_name == "delegate_to_subagent":
+                return await cls.delegate_to_subagent(
+                    subagent_id=args.get("subagent_id", "task_planner_agent"),
+                    task=args.get("task", "")
+                )
+            elif tool_name == "execute_subagent_swarm":
+                return await cls.execute_subagent_swarm(goal=args.get("goal", ""))
             elif tool_name == "ping_network_diagnostics":
                 return await cls.ping_network_diagnostics(
                     target=args.get("target") or args.get("ip") or "192.168.9.1",

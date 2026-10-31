@@ -1076,6 +1076,68 @@
               <div id="hub-ping-result" class="ping-indicator-box" style="display:none; margin-top: 14px;"></div>
             </div>
 
+            <!-- OpenRouter Frontier AI Model Hub Panel -->
+            <div class="card-panel openrouter-hub-panel" style="grid-column: 1 / -1; border-color: rgba(56, 189, 248, 0.35); background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 0.95));">
+              <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h3 style="color:#38bdf8;" data-i18n="openrouter_title">🌐 OpenRouter Frontier AI Model Hub</h3>
+                    <span class="status-pill status-ready" id="openrouter-status-badge">Checking...</span>
+                  </div>
+                  <p data-i18n="openrouter_desc">DeepSeek R1, Claude 3.5 Sonnet, GPT-4o, Gemini 2.0 Flash সহ বিশ্বের শীর্ষ ক্লাউড এআই মডেলসমূহ যুক্ত ও নিয়ন্ত্রণ করুন।</p>
+                </div>
+                <div class="provider-switch-pillbox">
+                  <button type="button" class="provider-pill-btn active" id="btn-provider-default" onclick="switchActiveProvider('default')">🏢 Default / Local</button>
+                  <button type="button" class="provider-pill-btn" id="btn-provider-openrouter" onclick="switchActiveProvider('openrouter')">🌐 OpenRouter</button>
+                </div>
+              </div>
+
+              <!-- OpenRouter API Key & Telemetry Row -->
+              <div class="openrouter-config-row">
+                <div class="form-group" style="flex:1; min-width:280px; margin-bottom:0;">
+                  <label data-i18n="openrouter_key_label">OpenRouter API Key (<code>sk-or-v1-...</code>)</label>
+                  <div style="display:flex; gap:8px;">
+                    <input type="password" id="openrouter-key-input" class="text-input" placeholder="sk-or-v1-xxxxxxxxxxxxxxxx">
+                    <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="toggleOpenRouterKeyVisibility()">👁️</button>
+                    <button type="button" class="btn-primary" style="white-space:nowrap;" onclick="saveOpenRouterKey()">💾 Save Key</button>
+                    <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="verifyOpenRouterKey(true)">⚡ Test Key</button>
+                  </div>
+                  <small id="openrouter-key-hint" style="color:var(--text-muted);">কী সেট করার পর সরাসরি যে কোনো ওপেনরাউটার মডেল নির্বাচন করতে পারবেন।</small>
+                </div>
+                <div class="openrouter-telemetry-badge" id="openrouter-account-telemetry">
+                  <span class="telemetry-lbl">Account Status:</span>
+                  <strong id="openrouter-tier-badge" style="color:#38bdf8;">Checking...</strong>
+                  <span class="telemetry-sub" id="openrouter-usage-sub">Limit: Unlimited</span>
+                </div>
+              </div>
+
+              <!-- Featured OpenRouter Models Grid -->
+              <div style="margin-top:18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <h4 style="margin:0; font-size:0.95rem; color:#f1e7d0;">⭐ শীর্ষ ওপেনরাউটার ফ্রন্টিয়ার মডেলসমূহ (১-ক্লিকে সিলেক্ট করুন)</h4>
+                  <span style="font-size:0.75rem; color:#94a3b8;">সরাসরি ক্লিক করে সক্রিয় করুন</span>
+                </div>
+                <div class="openrouter-models-grid" id="openrouter-models-grid">
+                  <!-- Dynamically rendered OpenRouter model cards -->
+                </div>
+              </div>
+
+              <!-- Live Test Generator Box -->
+              <div class="openrouter-test-box" style="margin-top:16px; background:rgba(0,0,0,0.25); padding:12px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                  <select id="openrouter-test-model-select" class="text-input" style="max-width:240px; cursor:pointer;">
+                    <option value="deepseek/deepseek-r1">deepseek/deepseek-r1</option>
+                    <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
+                    <option value="openai/gpt-4o">openai/gpt-4o</option>
+                    <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free</option>
+                  </select>
+                  <input type="text" id="openrouter-test-prompt-input" class="text-input" style="flex:1; min-width:200px;" value="Say hello in Bengali and state your model name.">
+                  <button type="button" class="btn-primary" onclick="runOpenRouterTestPrompt()">⚡ টেস্ট রান করুন</button>
+                </div>
+                <div id="openrouter-test-output" class="openrouter-test-output-box" style="display:none; margin-top:10px;"></div>
+              </div>
+            </div>
+
             <div class="card-panel">
               <div class="panel-header">
                 <h3 data-i18n="models_active_card_title">সক্রিয় মডেল নির্বাচন ও টেম্পারেচার</h3>
@@ -2236,6 +2298,68 @@
               </div>
             </div>
 
+            <!-- 0. Autonomous Swarm Mission Command Center -->
+            <div class="swarm-mission-card">
+              <div class="swarm-header">
+                <div class="swarm-title-group">
+                  <span class="swarm-icon">🚀</span>
+                  <div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <h4 style="margin:0; font-size:1.1rem; color:#f1e7d0;" data-i18n="swarm_mission_title">Autonomous Swarm Mission Command</h4>
+                      <span class="pulse-badge">Work Agent Coordinator</span>
+                    </div>
+                    <p style="margin:3px 0 0 0; font-size:0.8rem; color:#94a3b8;" data-i18n="swarm_mission_desc">
+                      যেকোনো বড় কাজ বা নির্দেশ দিন — মাস্টার ওয়ার্ক এজেন্ট স্বয়ংক্রিয়ভাবে সাব-এজেন্টদের মাঝে দায়িত্ব ভাগ করে প্যারালালে এক্সিকিউট করবে।
+                    </p>
+                  </div>
+                </div>
+                <div class="swarm-model-picker">
+                  <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:2px;">Orchestrator Model:</label>
+                  <select id="swarm-model-select" class="ping-select" style="min-width:180px;">
+                    <option value="default">Default Enterprise Agent</option>
+                    <option value="deepseek/deepseek-r1">DeepSeek R1 (OpenRouter)</option>
+                    <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (OpenRouter)</option>
+                    <option value="openai/gpt-4o">GPT-4o (OpenRouter)</option>
+                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (Free)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="swarm-input-box">
+                <textarea id="swarm-goal-input" class="swarm-textarea" rows="2" placeholder="আপনার টাস্ক বা মিশন লিখুন (যেমন: সার্ভার 192.168.9.5 এবং 192.168.9.9 এর কানেকশন চেক করো, ডকার কন্টেইনার স্ট্যাটাস দেখ এবং একটি এক্সিকিউটিভ রিপোর্ট তৈরি করো)..."></textarea>
+                <div class="swarm-preset-row">
+                  <span style="font-size:0.75rem; color:#64748b;">কুইক মিশন:</span>
+                  <button type="button" class="preset-chip" onclick="setSwarmGoalPreset('ping')">📡 নেটওয়ার্ক ও পিং হেলথ চেক</button>
+                  <button type="button" class="preset-chip" onclick="setSwarmGoalPreset('devops')">🐳 ডকার কন্টেইনার ও রিসোর্স অডিট</button>
+                  <button type="button" class="preset-chip" onclick="setSwarmGoalPreset('security')">🛡️ সিকিউরিটি ও টোকেন লিক স্ক্যান</button>
+                  <button type="button" class="preset-chip" onclick="setSwarmGoalPreset('full')">⚡ ফুল সিস্টেম সোয়ার্ম ডায়াগনস্টিক</button>
+                </div>
+              </div>
+
+              <div class="swarm-actions-row">
+                <div class="swarm-agents-selector">
+                  <span style="font-size:0.75rem; color:#94a3b8; margin-right:6px;">অংশগ্রহণকারী এজেন্টস:</span>
+                  <label class="agent-checkbox-lbl"><input type="checkbox" id="chk-agent-all" checked> স্বয়ংক্রিয় সোয়ার্ম সমন্বয় (Auto-Swarm)</label>
+                </div>
+                <button type="button" class="btn-primary pulse-btn" id="btn-launch-swarm" onclick="launchSwarmMission()">
+                  🚀 মিশন শুরু করুন (Launch Mission)
+                </button>
+              </div>
+
+              <!-- Real-time Swarm Mission Execution Panel -->
+              <div id="swarm-execution-result-panel" class="swarm-result-panel" style="display:none;">
+                <div class="swarm-result-header">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span id="swarm-result-status-icon">⏳</span>
+                    <strong id="swarm-result-title" style="color:#f1e7d0;">সোয়ার্ম মিশন চলমান...</strong>
+                  </div>
+                  <span class="status-pill status-ready" id="swarm-result-time">0 ms</span>
+                </div>
+                <div class="swarm-stages-list" id="swarm-stages-container"></div>
+                <div class="swarm-executive-summary-box" id="swarm-executive-summary" style="display:none;"></div>
+              </div>
+            </div>
+
             <!-- 1. Dedicated Network Ping Sub-Agent Control Deck -->
             <div class="ping-subagent-card">
               <div class="ping-card-header">
@@ -3380,5 +3504,58 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
   <script src="js/reports_manager.js"></script>
   <script src="js/ops_manager.js"></script>
   <script src="js/app.js"></script>
+    <!-- Subagent Interactive Task Runner Modal -->
+    <div class="modal-overlay" id="modal-subagent-task" style="display:none;">
+      <div class="modal-box cyber-modal" style="max-width:680px; width:92%;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="modal-agent-avatar" id="modal-agent-icon" style="font-size:1.8rem;">🤖</span>
+            <div>
+              <h4 id="modal-agent-name" style="margin:0; font-size:1.1rem; color:#f1e7d0;">Sub-Agent Task Execution</h4>
+              <span id="modal-agent-role" style="font-size:0.75rem; color:#94a3b8;">Specialized Sentinel</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close-modal" onclick="closeSubAgentTaskModal()">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:16px 20px;">
+          <input type="hidden" id="modal-agent-id" value="">
+          
+          <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+              <label style="font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:4px;">এক্সিকিউশন মডেল (Model Override):</label>
+              <select id="modal-subagent-model-select" class="ping-select" style="width:100%;">
+                <option value="gemini-3.7-flash">gemini-3.7-flash (Default)</option>
+                <option value="deepseek/deepseek-r1">deepseek/deepseek-r1 (OpenRouter)</option>
+                <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet (OpenRouter)</option>
+                <option value="openai/gpt-4o">openai/gpt-4o (OpenRouter)</option>
+                <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free (OpenRouter Free)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:0.78rem; color:#cbd5e1; display:block; margin-bottom:6px;">টাস্ক বা কাজের বিবরণ (Task Instruction):</label>
+            <textarea id="modal-subagent-task-input" class="text-input" rows="3" placeholder="সাব-এজেন্টকে কী কাজ দিতে চান বিস্তারিত লিখুন..."></textarea>
+            <div class="modal-prompt-chips" id="modal-subagent-sample-prompts" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:14px;">
+            <button type="button" class="btn-secondary" onclick="closeSubAgentTaskModal()">বাতিল</button>
+            <button type="button" class="btn-primary" id="btn-run-modal-task" onclick="submitSubAgentModalTask()">⚡ কাজ শুরু করুন (Run Task)</button>
+          </div>
+
+          <!-- Execution Terminal Console -->
+          <div class="modal-terminal-wrap" id="modal-terminal-wrap" style="display:none;">
+            <div class="modal-terminal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span id="modal-terminal-status" class="status-pill status-ready">RUNNING</span>
+              <span id="modal-terminal-time" style="font-size:0.75rem; color:#94a3b8;">0 ms</span>
+            </div>
+            <div class="modal-terminal-body" id="modal-terminal-body" style="background:#090d16; border:1px solid #1e293b; border-radius:6px; padding:12px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#cbd5e1; max-height:260px; overflow-y:auto; white-space:pre-wrap;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
 </body>
 </html>

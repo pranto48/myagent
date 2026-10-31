@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gemini-3.7-flash"
     LLM_VERIFY_SSL: bool = False
 
+    # OpenRouter Frontier Multi-Provider AI Settings
+    LLM_PROVIDER: str = "default"  # "default" (OxionAI / local) or "openrouter"
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "deepseek/deepseek-r1"
+    OPENROUTER_SITE_URL: str = "http://192.168.9.9:3399"
+    OPENROUTER_APP_NAME: str = "MyAgent Enterprise" 
+
     # Agent Persona & Behavior
     AGENT_NAME: str = "Company Data Intelligence Agent"
     AGENT_TEMPERATURE: float = 0.3
