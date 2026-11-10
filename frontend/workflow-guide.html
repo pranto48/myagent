@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyAgent — Daily Auto Work Tasks & Workflow Documentation</title>
+  <meta name="description" content="Step-by-step guide and reference documentation for creating daily autonomous AI work tasks and n8n-style workflows in MyAgent.">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body.wfd-standalone-body {
+      overflow-y: auto !important;
+      display: block !important;
+      min-height: 100vh;
+      background: var(--bg-main);
+      color: var(--text-primary);
+    }
+    .wfd-standalone-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .wfd-standalone-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+    .wfd-standalone-wrap {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 20px 24px 48px;
+    }
+  </style>
+</head>
+<body class="wfd-standalone-body">
+  <header class="wfd-standalone-topbar">
+    <a href="/" class="wfd-standalone-brand">
+      <span>⚡</span>
+      <span>MyAgent • Daily Auto Tasks &amp; Workflow Documentation</span>
+    </a>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button type="button" class="btn-secondary" onclick="toggleStandaloneTheme()">🌗 Theme</button>
+      <a href="/?tab=workflows" class="btn-primary" style="text-decoration:none;">⚡ Workflows Studio-তে যান</a>
+    </div>
+  </header>
+
+  <main class="wfd-standalone-wrap">
+    <div id="wf-docs-root"></div>
+  </main>
+
+  <script src="js/workflow_docs.js"></script>
+  <script>
+    (function initStandaloneDocs() {
+      const savedTheme = localStorage.getItem('myagent_theme');
+      if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+      }
+      renderWorkflowDocsPage('wf-docs-root');
+    })();
+
+    function toggleStandaloneTheme() {
+      document.body.classList.toggle('light-theme');
+      localStorage.setItem('myagent_theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>

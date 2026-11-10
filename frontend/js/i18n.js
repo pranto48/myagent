@@ -925,6 +925,9 @@ const I18N_TRANSLATIONS = {
     tab_workflows_desc: "প্রতিদিনের অটোমেটেড এআই এজেন্ট কাজ, ভিজ্যুয়াল নোড পাইপলাইন, কন্ডিশন, রিপোর্ট ও চ্যাট ডাইজেস্ট",
     wf_studio_title: "n8n-স্টাইল অটোনোমাস ওয়ার্কফ্লো ও দৈনিক টাস্ক স্টুডিও",
     wf_studio_desc: "প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট",
+    nav_workflow_docs: "AUTO GUIDE (গাইড)",
+    tab_workflow_docs_title: "📖 দৈনিক অটো কাজ ও ওয়ার্কফ্লো ডকুমেন্টেশন",
+    tab_workflow_docs_desc: "প্রতিদিনের স্বয়ংক্রিয় এআই টাস্ক তৈরি করার ধাপ, ১৩টি নোডের বিবরণ, ভেরিয়েবল, ওয়েবহুক ও প্রম্পট রেসিপি",
   },
 
   en: {
@@ -1845,6 +1848,9 @@ const I18N_TRANSLATIONS = {
     tab_workflows_desc: "Schedule daily AI agent tasks, build visual DAG pipelines, condition branches, reports & notifications",
     wf_studio_title: "n8n-Style Autonomous Workflow & Daily Task Studio",
     wf_studio_desc: "Automate daily AI agent work — visual node graph, IF/Else branching, tool execution, reports & digests",
+    nav_workflow_docs: "AUTO GUIDE & DOCS",
+    tab_workflow_docs_title: "📖 Daily Auto Work Tasks Guide & Documentation",
+    tab_workflow_docs_desc: "Step-by-step instructions, 13-node catalog reference, template variables, webhooks & recipes",
   }
 };
 

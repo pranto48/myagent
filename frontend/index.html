@@ -144,6 +144,14 @@
           <span data-i18n="nav_workflows">WORKFLOWS (অটো)</span>
         </button>
 
+        <!-- 0.1 WORKFLOW GUIDE & DOCS -->
+        <button class="nav-btn ops-btn" id="nav-workflow-docs-btn" onclick="switchTab('workflow-docs')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+          <span data-i18n="nav_workflow_docs">AUTO GUIDE (গাইড)</span>
+        </button>
+
         <!-- SESSIONS -->
         <button class="nav-btn ops-btn" id="nav-sessions-btn" onclick="switchTab('sessions')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
@@ -2969,6 +2977,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
               <p data-i18n="wf_studio_desc">প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট</p>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-secondary" onclick="switchTab('workflow-docs')" title="দৈনিক অটো টাস্ক তৈরির গাইড ও ডকুমেন্টেশন">📖 ডকুমেন্টেশন ও গাইড</button>
               <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক ডেইলি বিল্ডার</button>
               <button type="button" class="btn-secondary" onclick="document.getElementById('wf-import-file').click()" title="Export করা JSON ওয়ার্কফ্লো ইমপোর্ট করুন">⬆️ ইমপোর্ট JSON</button>
               <input type="file" id="wf-import-file" accept=".json" style="display:none;" onchange="importWorkflowFromFile(event)">
@@ -3150,6 +3159,13 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
           <div id="wf-subtab-templates" style="display:none;">
             <div id="wf-templates-grid" class="wf-templates-grid"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- Ops View: WORKFLOW DOCS & DAILY TASK GUIDE -->
+      <section class="tab-view" id="view-workflow-docs">
+        <div class="ops-view-layout" id="wf-docs-root">
+          <!-- Rendered cleanly by workflow_docs.js -->
         </div>
       </section>
 
@@ -4190,6 +4206,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
   <script src="js/reports_manager.js"></script>
   <script src="js/ops_manager.js"></script>
   <script src="js/workflows_manager.js"></script>
+  <script src="js/workflow_docs.js"></script>
   <script src="js/app.js"></script>
     <!-- Subagent Interactive Task Runner Modal -->
     <div class="modal-overlay" id="modal-subagent-task" style="display:none;">

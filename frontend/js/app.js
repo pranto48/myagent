@@ -61,6 +61,18 @@ async function initApp() {
   await loadChatSessions();
   attachChatEventListeners();
   setupChatDragDropAndPaste();
+
+  // Support deep-link query params e.g. ?tab=workflow-docs or ?tab=workflows&recipe=fleet_ping
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const reqTab = params.get('tab');
+    const reqRecipe = params.get('recipe');
+    if (reqRecipe && typeof launchRecipeInStudio === 'function') {
+      launchRecipeInStudio(reqRecipe);
+    } else if (reqTab) {
+      switchTab(reqTab);
+    }
+  } catch (_) {}
 }
 
 /**
@@ -352,7 +364,7 @@ function toggleMobileSidebar() {
 // Tab Switching across all views (including Autonomous Operations Suite, Full-Page Admin & Settings)
 function switchTab(tabName) {
   const tabs = [
-    'chat', 'workflows', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
+    'chat', 'workflows', 'workflow-docs', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
     'channels', 'webhooks', 'pairing', 'profiles', 
     'admin', 'dashboard', 'reports', 'users', 'knowledge', 'security', 'backup', 'settings'
   ];
@@ -380,6 +392,7 @@ function switchTab(tabName) {
   const tabTitles = {
     chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
     workflows: { title: 'tab_workflows_title', desc: 'tab_workflows_desc' },
+    'workflow-docs': { title: 'tab_workflow_docs_title', desc: 'tab_workflow_docs_desc' },
     sessions: { title: 'tab_sessions_title', desc: 'tab_sessions_desc' },
     files: { title: 'tab_files_title', desc: 'tab_files_desc' },
     models: { title: 'tab_models_title', desc: 'tab_models_desc' },
@@ -409,6 +422,7 @@ function switchTab(tabName) {
 
   // Autonomous Operations Module Loaders
   if (tabName === 'workflows' && typeof loadWorkflowsStudio === 'function') loadWorkflowsStudio();
+  else if (tabName === 'workflow-docs' && typeof renderWorkflowDocsPage === 'function') renderWorkflowDocsPage('wf-docs-root');
   else if (tabName === 'sessions' && typeof loadOpsSessions === 'function') loadOpsSessions();
   else if (tabName === 'files') {
     if (typeof loadOpsFilesExplorer === 'function') loadOpsFilesExplorer();
@@ -1735,6 +1749,7 @@ window.addEventListener('appLanguageChanged', (e) => {
       const tabTitles = {
         chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
         workflows: { title: 'tab_workflows_title', desc: 'tab_workflows_desc' },
+        'workflow-docs': { title: 'tab_workflow_docs_title', desc: 'tab_workflow_docs_desc' },
         admin: { title: 'tab_admin_title', desc: 'tab_admin_desc' },
         dashboard: { title: 'tab_dash_title', desc: 'tab_dash_desc' },
         users: { title: 'tab_users_title', desc: 'tab_users_desc' },
