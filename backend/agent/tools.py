@@ -1,11 +1,14 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.1.0
 import os
+import re
 import sys
 import math
 import time
 import json
+import asyncio
 import sqlite3
 import logging
+import subprocess
 from typing import Dict, Any, List, Optional
 import httpx
 from bs4 import BeautifulSoup
@@ -883,6 +886,334 @@ class AgentTools:
             "memories": mems
         }, ensure_ascii=False, indent=2)
 
+    @staticmethod
+    def enhance_prompt(prompt: str, mode: str = "developer", target_audience: str = "ai_agent") -> str:
+        """
+        Transforms any rough or brief prompt into an elite, highly structured,
+        constraint-hardened prompt following industry best practices.
+        """
+        clean_p = prompt.strip()
+        modes_config = {
+            "developer": {
+                "role": "Senior Principal Software Engineer & Systems Architect",
+                "focus": "Production-grade code, strict error handling, modularity, optimal Big-O complexity, and zero technical debt.",
+                "format": "Executable code blocks with exact file paths, dependency lists, edge-case handling, and verification test commands."
+            },
+            "architect": {
+                "role": "Chief Enterprise Solutions & Cloud Infrastructure Architect",
+                "focus": "Scalability, high availability, Docker/containerization, zero-trust security, and low-latency data pipelines.",
+                "format": "Mermaid architecture diagrams, service boundaries, schema blueprints, failure recovery workflows, and deployment plans."
+            },
+            "analysis": {
+                "role": "Lead Data Scientist & Quantitative Intelligence Analyst",
+                "focus": "Statistical accuracy, anomaly detection, distribution metrics, correlations, and executive KPI synthesis.",
+                "format": "Structured Markdown comparison tables, percentile breakdowns, trend diagnostics, and data-driven recommendations."
+            },
+            "executive": {
+                "role": "Chief Technology Officer (CTO) & Strategic Technical Advisor",
+                "focus": "ROI, risk mitigation, engineering velocity, cross-team alignment, and clear business impact.",
+                "format": "Executive brief summary, priority matrix, timeline milestones, and critical risk callouts."
+            },
+            "concise": {
+                "role": "Ultra-Direct Precision Engineering Assistant",
+                "focus": "Zero fluff, highest signal-to-noise ratio, immediate actionable output.",
+                "format": "Bulleted atomic commands, minimal diffs, and verified facts."
+            }
+        }
+        cfg = modes_config.get(mode.lower(), modes_config["developer"])
+
+        return (
+            f"### ✨ [ENHANCED MASTER PROMPT — {mode.upper()} MODE]\n\n"
+            f"**1. ROLE & EXPERT PERSONA:**\n"
+            f"Act as a **{cfg['role']}**. Prioritize {cfg['focus']}\n\n"
+            f"**2. OPERATIONAL CONTEXT & TARGET:**\n"
+            f"- **Target Consumer:** `{target_audience}`\n"
+            f"- **Core Intent:** {clean_p}\n\n"
+            f"**3. EXECUTION CONSTRAINTS & GUARDRAILS:**\n"
+            f"- **Step-by-Step Reasoning:** Deconstruct prerequisites, hidden dependencies, and edge cases before implementation.\n"
+            f"- **Zero Hallucination:** Only reference real APIs, validated file paths, and verified schemas.\n"
+            f"- **Production Completeness:** Provide complete, runnable implementations — never omit error handling or leave placeholder stubs.\n"
+            f"- **Security Hardening:** Avoid hardcoded secrets, SQL injection risks, XSS, or unsafe shell evaluations.\n\n"
+            f"**4. REQUIRED OUTPUT SPECIFICATION:**\n"
+            f"{cfg['format']}\n\n"
+            f"**5. REFINED TASK DIRECTIVE:**\n"
+            f"```text\n{clean_p}\n```\n\n"
+            f"Execute this directive thoroughly with clear verification proof."
+        )
+
+    @staticmethod
+    async def network_port_scan(target: str, ports: Optional[List[int]] = None, timeout_sec: float = 0.8) -> str:
+        """
+        Asynchronously probes TCP ports on a target IP address or hostname from the Docker server
+        to discover open listening services, measure TCP handshake latency, and identify risks.
+        """
+        default_ports = [21, 22, 53, 80, 443, 1433, 3306, 3389, 3399, 5432, 6379, 8000, 8008, 8080, 8443, 9000, 27017]
+        target_ports = ports if ports and len(ports) > 0 else default_ports
+        service_map = {
+            21: "FTP", 22: "SSH", 53: "DNS", 80: "HTTP", 443: "HTTPS",
+            1433: "MSSQL", 3306: "MySQL", 3389: "RDP", 3399: "MyAgent Web (Nginx)",
+            5432: "PostgreSQL", 6379: "Redis", 8000: "FastAPI / Uvicorn",
+            8008: "MyAgent Backend API", 8080: "HTTP Alt", 8443: "HTTPS Alt",
+            9000: "Portainer / Admin", 27017: "MongoDB"
+        }
+
+        async def probe_port(p: int):
+            t0 = time.perf_counter()
+            try:
+                conn = asyncio.open_connection(target, p)
+                reader, writer = await asyncio.wait_for(conn, timeout=timeout_sec)
+                lat = round((time.perf_counter() - t0) * 1000, 2)
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                return (p, True, lat)
+            except Exception:
+                return (p, False, 0.0)
+
+        results = await asyncio.gather(*[probe_port(int(p)) for p in target_ports[:30]])
+        open_ports = [r for r in results if r[1]]
+        closed_count = len(results) - len(open_ports)
+
+        lines = [
+            f"### 🔭 নেটওয়ার্ক TCP পোর্ট ও সার্ভিস স্ক্যান রিপোর্ট: `{target}`",
+            f"- **উৎস সার্ভার (Source):** Docker Container (`192.168.9.9`)",
+            f"- **মোট স্ক্যানকৃত পোর্ট:** `{len(results)}` | 🟢 **খোলা পোর্ট (Open):** `{len(open_ports)}` | 🔴 **বন্ধ/ফিল্টার্ড:** `{closed_count}`",
+            "",
+            "| পোর্ট (Port) | স্টেটাস (Status) | সার্ভিস (Service) | ল্যাটেন্সি (Latency) |",
+            "| :--- | :--- | :--- | :--- |"
+        ]
+        for p, is_open, lat in open_ports:
+            svc = service_map.get(p, "Custom TCP Service")
+            lines.append(f"| **{p}** | 🟢 OPEN | {svc} | `{lat} ms` |")
+
+        if not open_ports:
+            lines.append("| — | 🔴 ALL CLOSED / FILTERED | No responsive TCP ports detected | — |")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def sqlite_schema_inspector(db_name: str = "chat_history.db", table_name: Optional[str] = None, explain_sql: Optional[str] = None) -> str:
+        """
+        Inspects SQLite database tables, columns, row counts, indexes,
+        or explains a SQL query execution plan (EXPLAIN QUERY PLAN).
+        """
+        db_path = os.path.join(settings.DATA_DIR, os.path.basename(db_name))
+        if not os.path.exists(db_path):
+            db_path = os.path.join("./data", os.path.basename(db_name))
+        if not os.path.exists(db_path):
+            return f"Database file '{db_name}' not found in data storage."
+
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            if explain_sql:
+                if not explain_sql.strip().lower().startswith("select"):
+                    return "Security block: EXPLAIN QUERY PLAN only accepts SELECT statements."
+                cur.execute(f"EXPLAIN QUERY PLAN {explain_sql}")
+                plan_rows = [dict(r) for r in cur.fetchall()]
+                conn.close()
+                return f"### ⚡ SQL Execution Plan (`{db_name}`)\n```json\n{json.dumps(plan_rows, indent=2)}\n```"
+
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            tables = [r["name"] for r in cur.fetchall()]
+
+            if table_name:
+                if table_name not in tables:
+                    conn.close()
+                    return f"Table '{table_name}' does not exist in '{db_name}'. Available tables: {', '.join(tables)}"
+                cur.execute(f"PRAGMA table_info({table_name})")
+                cols = [dict(r) for r in cur.fetchall()]
+                cur.execute(f"SELECT COUNT(*) as cnt FROM {table_name}")
+                row_cnt = cur.fetchone()["cnt"]
+                cur.execute(f"PRAGMA index_list({table_name})")
+                idxs = [dict(r) for r in cur.fetchall()]
+                conn.close()
+                return json.dumps({
+                    "database": db_name,
+                    "table": table_name,
+                    "row_count": row_cnt,
+                    "columns": cols,
+                    "indexes": idxs
+                }, indent=2, ensure_ascii=False)
+
+            overview = []
+            for t in tables:
+                try:
+                    cur.execute(f"SELECT COUNT(*) as cnt FROM {t}")
+                    cnt = cur.fetchone()["cnt"]
+                except Exception:
+                    cnt = -1
+                overview.append({"table": t, "rows": cnt})
+            conn.close()
+            return f"### 🗄️ Database Schema Overview: `{db_name}`\n" + json.dumps(overview, indent=2)
+        except Exception as e:
+            return f"Database schema inspection error: {str(e)}"
+
+    @staticmethod
+    def code_quality_and_security_audit(code: str, language: str = "python") -> str:
+        """
+        Audits source code snippets for security risks (hardcoded keys, SQL injection, eval/exec,
+        shell injection), missing error handling, and code quality best practices.
+        """
+        findings = []
+        lines = code.splitlines()
+
+        secret_patterns = [
+            (r"(api[_-]?key|secret|password|token)\s*=\s*['\"][A-Za-z0-9_\-]{8,}['\"]", "CRITICAL: Potential hardcoded credential or API secret detected."),
+            (r"sk-[a-zA-Z0-9]{20,}", "CRITICAL: Exposed OpenAI/OpenRouter style secret key detected.")
+        ]
+        vuln_patterns = [
+            (r"\beval\s*\(", "HIGH: Use of `eval()` allows arbitrary code execution."),
+            (r"\bexec\s*\(", "HIGH: Use of `exec()` allows arbitrary code execution."),
+            (r"subprocess\.(run|Popen|call).*shell\s*=\s*True", "HIGH: `shell=True` in subprocess introduces command injection risk."),
+            (r"f['\"]SELECT\s+.*\{.*\}", "HIGH: String-interpolated SQL query introduces SQL injection vulnerability. Use parameterized queries (`?`)."),
+            (r"except\s*:", "MEDIUM: Bare `except:` catches SystemExit/KeyboardInterrupt silently; catch `Exception` explicitly."),
+            (r"TODO|FIXME|HACK", "LOW: Unresolved technical debt marker (TODO/FIXME) present.")
+        ]
+
+        for idx, line in enumerate(lines, 1):
+            for pat, msg in secret_patterns + vuln_patterns:
+                if re.search(pat, line, re.IGNORECASE):
+                    findings.append(f"- **Line {idx}:** {msg}\n  `{line.strip()[:100]}`")
+
+        loc = len(lines)
+        non_empty = len([l for l in lines if l.strip()])
+        score = max(0, 100 - (len(findings) * 15))
+
+        report = [
+            f"### 🛡️ কোড কোয়ালিটি ও সিকিউরিটি অডিট রিপোর্ট ({language.upper()})",
+            f"- **মোট লাইন:** `{loc}` (কার্যকর লাইন: `{non_empty}`)",
+            f"- **সিকিউরিটি ও কোয়ালিটি স্কোর:** `{score}/100`",
+            ""
+        ]
+        if findings:
+            report.append("#### ⚠️ শনাক্তকৃত ঝুঁকি ও পরামর্শসমূহ:")
+            report.extend(findings)
+        else:
+            report.append("✅ **চমৎকার!** কোনো স্পষ্ট হার্ডকোডেড সিক্রেট বা সিকিউরিটি ঝুঁকি পাওয়া যায়নি।")
+
+        return "\n".join(report)
+
+    @staticmethod
+    def git_repo_inspector(max_commits: int = 5) -> str:
+        """
+        Inspects local Git workspace branch, latest commit history, uncommitted changes,
+        and remote origin tracking URL.
+        """
+        try:
+            def run_git(cmd_args):
+                res = subprocess.run(
+                    ["git"] + cmd_args,
+                    capture_output=True, text=True, timeout=5
+                )
+                return res.stdout.strip() if res.returncode == 0 else f"(Git info unavailable: {res.stderr.strip()})"
+
+            branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+            status = run_git(["status", "--short"])
+            commits = run_git(["log", f"-n{max_commits}", "--oneline", "--decorate"])
+            remote = run_git(["remote", "get-url", "origin"])
+
+            return (
+                f"### 🌿 গিট রিপোজিটরি ইন্সপেক্টর\n"
+                f"- **রিমোট অরিজিন:** `{remote}`\n"
+                f"- **বর্তমান ব্রাঞ্চ:** `{branch}`\n\n"
+                f"**সাম্প্রতিক কমিটস (Top {max_commits}):**\n```text\n{commits}\n```\n"
+                f"**অপরিবর্তিত/আনকমিটেড ফাইলস:**\n```text\n{status or 'Working tree clean'}\n```"
+            )
+        except Exception as e:
+            return f"Git inspection note: {str(e)}"
+
+    @staticmethod
+    def generate_task_breakdown(goal: str, sprint_hours: int = 4) -> str:
+        """
+        Decomposes a high-level feature or engineering goal into structured,
+        time-boxed sprint phases with priorities and verification checklists.
+        """
+        clean_goal = goal.strip()
+        return (
+            f"### 📅 স্ট্রাকচার্ড স্প্রিন্ট ও টাস্ক ব্রেকডাউন প্ল্যান ({sprint_hours}h Box)\n\n"
+            f"**🎯 মূল লক্ষ্য (Goal):** {clean_goal}\n\n"
+            f"| ধাপ (Phase) | সময় বরাদ্দ | অ্যাকশন আইটেম (Actionable Deliverables) | যাচাইকরণ (Verification Criteria) |\n"
+            f"| :--- | :--- | :--- | :--- |\n"
+            f"| **Phase 1: Discovery & Design** | 20% (~{round(sprint_hours*0.2, 1)}h) | প্রজেক্টের বিদ্যমান আর্কিটেকচার ও ডেটাবেজ স্কিমা বিশ্লেষণ (`get_project_info`) | আর্কিটেকচার ব্লুপ্রিন্ট ও স্কিমা ডায়াগ্রাম নিশ্চিত করা |\n"
+            f"| **Phase 2: Core Implementation** | 50% (~{round(sprint_hours*0.5, 1)}h) | ব্যাকএন্ড API লজিক, টুল ডিসপ্যাচার এবং ইউনিট মডিউল তৈরি | সিনট্যাক্স কম্পাইল ও লজিক্যাল এন্ডপয়েন্ট টেস্ট |\n"
+            f"| **Phase 3: Integration & UI** | 20% (~{round(sprint_hours*0.2, 1)}h) | ফ্রন্টএন্ড UI কানেক্টিভিটি এবং এরর হ্যান্ডলিং যুক্ত করা | ব্রাউজার ও API-তে সম্পূর্ণ ইউজার ফ্লো টেস্ট |\n"
+            f"| **Phase 4: Audit & Deployment** | 10% (~{round(sprint_hours*0.1, 1)}h) | সিকিউরিটি অডিট, মেমোরিতে সেভ (`save_project_memory`) ও ডিপ্লয়মেন্ট | লাইভ সার্ভারে HTTP 200 ও স্ট্যাটাস ভেরিফিকেশন |"
+        )
+
+    @staticmethod
+    async def list_available_skills(category: Optional[str] = None) -> str:
+        """
+        Lists all active domain skills stored in MyAgent's Operations Hub (ops_skills),
+        optionally filtered by domain category.
+        """
+        try:
+            from routers.ops_router import get_ops_db
+            db = await get_ops_db()
+            try:
+                sql = "SELECT id, name, description, category, icon, triggers, is_toolset FROM ops_skills WHERE is_enabled = 1"
+                params = []
+                if category:
+                    sql += " AND LOWER(category) LIKE ?"
+                    params.append(f"%{category.strip().lower()}%")
+                sql += " ORDER BY category, name"
+                async with db.execute(sql, params) as cursor:
+                    rows = await cursor.fetchall()
+                    skills = [dict(r) for r in rows]
+                    return json.dumps({
+                        "total_active_skills": len(skills),
+                        "category_filter": category or "ALL",
+                        "skills": skills
+                    }, ensure_ascii=False, indent=2)
+            finally:
+                await db.close()
+        except Exception as e:
+            return f"Failed to load skills library: {str(e)}"
+
+    @staticmethod
+    async def invoke_agent_skill(skill_name: str, task_context: str = "") -> str:
+        """
+        Retrieves full expert instructions, architecture rules, and trigger patterns
+        for a specific skill from MyAgent Skills Library and prepares an execution directive.
+        """
+        try:
+            from routers.ops_router import get_ops_db
+            db = await get_ops_db()
+            try:
+                clean_s = skill_name.strip().lower()
+                async with db.execute(
+                    "SELECT * FROM ops_skills WHERE LOWER(name) = ? OR LOWER(id) = ? LIMIT 1",
+                    (clean_s, clean_s)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if not row:
+                        async with db.execute(
+                            "SELECT * FROM ops_skills WHERE LOWER(name) LIKE ? OR LOWER(description) LIKE ? LIMIT 1",
+                            (f"%{clean_s}%", f"%{clean_s}%")
+                        ) as cursor2:
+                            row = await cursor2.fetchone()
+                    if not row:
+                        return f"Skill '{skill_name}' not found in Skills Library. Call list_available_skills first."
+                    skill = dict(row)
+            finally:
+                await db.close()
+
+            return (
+                f"### {skill.get('icon', '✨')} [SKILL ACTIVATED: {skill['name']}]\n"
+                f"- **ক্যাটাগরি:** `{skill.get('category')}` | **সক্রিয় অবস্থা:** `{'ENABLED' if skill.get('is_enabled') else 'DISABLED'}`\n"
+                f"- **বিবরণ:** {skill.get('description')}\n\n"
+                f"#### 📋 এক্সিকিউশন গাইডলাইন ও নিয়মাবলী (Skill Instructions):\n"
+                f"{skill.get('instructions')}\n\n"
+                f"#### 🎯 প্রয়োগকৃত টাস্ক কনটেক্সট (Target Task):\n"
+                f"{task_context or 'Apply this skill strictly to the current operational task.'}"
+            )
+        except Exception as e:
+            return f"Skill invocation error: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -1032,6 +1363,47 @@ class AgentTools:
                     context=args.get("context"),
                     query=args.get("query")
                 )
+            elif tool_name == "enhance_prompt":
+                return cls.enhance_prompt(
+                    prompt=args.get("prompt", ""),
+                    mode=args.get("mode", "developer"),
+                    target_audience=args.get("target_audience", "ai_agent")
+                )
+            elif tool_name == "network_port_scan":
+                return await cls.network_port_scan(
+                    target=args.get("target", "192.168.9.9"),
+                    ports=args.get("ports"),
+                    timeout_sec=float(args.get("timeout_sec", 0.8))
+                )
+            elif tool_name == "sqlite_schema_inspector":
+                return cls.sqlite_schema_inspector(
+                    db_name=args.get("db_name", "chat_history.db"),
+                    table_name=args.get("table_name"),
+                    explain_sql=args.get("explain_sql")
+                )
+            elif tool_name == "code_quality_and_security_audit":
+                return cls.code_quality_and_security_audit(
+                    code=args.get("code", ""),
+                    language=args.get("language", "python")
+                )
+            elif tool_name == "git_repo_inspector":
+                return cls.git_repo_inspector(
+                    max_commits=int(args.get("max_commits", 5))
+                )
+            elif tool_name == "generate_task_breakdown":
+                return cls.generate_task_breakdown(
+                    goal=args.get("goal", ""),
+                    sprint_hours=int(args.get("sprint_hours", 4))
+                )
+            elif tool_name == "list_available_skills":
+                return await cls.list_available_skills(
+                    category=args.get("category")
+                )
+            elif tool_name == "invoke_agent_skill":
+                return await cls.invoke_agent_skill(
+                    skill_name=args.get("skill_name", ""),
+                    task_context=args.get("task_context", "")
+                )
 
             else:
                 # Check dynamic MCP manager
@@ -1159,6 +1531,128 @@ class AgentTools:
                             "context": {"type": "string", "description": "Optional context filter (e.g. production, local)"},
                             "query": {"type": "string", "description": "Keyword search across memory keys, titles, content, and tags"}
                         }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "enhance_prompt",
+                    "description": "Prompt Engineering Optimizer: Transforms rough instructions into elite, multi-layered, constraint-hardened AI prompts tailored to developer, architect, analysis, executive, or concise mode.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {"type": "string", "description": "Raw user prompt or goal to enhance"},
+                            "mode": {"type": "string", "enum": ["developer", "architect", "analysis", "executive", "concise"], "description": "Optimization persona/mode (default: developer)"},
+                            "target_audience": {"type": "string", "description": "Target AI or reader e.g. ai_agent, claude, cursor"}
+                        },
+                        "required": ["prompt"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "network_port_scan",
+                    "description": "Asynchronously scans TCP ports on a target server IP from the Docker container (192.168.9.9) to detect open listening services and latency.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "target": {"type": "string", "description": "Target IP or hostname (e.g. 192.168.9.9, 192.168.9.5, 192.168.9.1)"},
+                            "ports": {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                                "description": "Optional custom list of port numbers (defaults to common service ports: 21, 22, 80, 443, 3306, 3399, 5432, 6379, 8000, 8080)"
+                            },
+                            "timeout_sec": {"type": "number", "description": "Socket connection timeout in seconds (default 0.8)"}
+                        },
+                        "required": ["target"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "sqlite_schema_inspector",
+                    "description": "Inspects internal SQLite database schemas, table row counts, indexes, or executes EXPLAIN QUERY PLAN for SQL optimization.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "db_name": {"type": "string", "description": "Database filename (e.g. chat_history.db, ops.db, security_audit.db)"},
+                            "table_name": {"type": "string", "description": "Optional specific table name to inspect columns and indexes"},
+                            "explain_sql": {"type": "string", "description": "Optional SELECT query to analyze via EXPLAIN QUERY PLAN"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "code_quality_and_security_audit",
+                    "description": "Static code analyzer auditing snippets for hardcoded secrets, SQL injection, eval/exec, insecure subprocesses, and code quality.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string", "description": "Source code string to audit"},
+                            "language": {"type": "string", "description": "Programming language (e.g. python, javascript, sql, bash)"}
+                        },
+                        "required": ["code"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "git_repo_inspector",
+                    "description": "Inspects current Git workspace branch, recent commits log, uncommitted changes, and remote tracking URL.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "max_commits": {"type": "integer", "description": "Number of recent commits to display (default 5)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "generate_task_breakdown",
+                    "description": "Agile Sprint Planner: Decomposes complex goals into time-boxed 1h/4h milestone sprints with verification checklists.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "goal": {"type": "string", "description": "Feature or project goal to break down"},
+                            "sprint_hours": {"type": "integer", "description": "Time box duration in hours (default 4)"}
+                        },
+                        "required": ["goal"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_available_skills",
+                    "description": "Lists all 67+ specialized domain skills available in MyAgent's Operations Hub (Software Development, Productivity, Autonomous AI, Research, Creative).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "category": {"type": "string", "description": "Optional category filter (e.g. Software Development, Productivity, Autonomous AI Agents)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "invoke_agent_skill",
+                    "description": "Activates a specific domain skill from MyAgent's Skills Library (e.g. dockerfile-optimizer, prompt-engineering-optimizer, sql-query-profiler) and applies its instructions to a task.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "skill_name": {"type": "string", "description": "Exact skill name or keyword (e.g. prompt-engineering-optimizer, git-conflict-resolver, security-ast-scanner)"},
+                            "task_context": {"type": "string", "description": "Specific task details to apply the skill onto"}
+                        },
+                        "required": ["skill_name"]
                     }
                 }
             },

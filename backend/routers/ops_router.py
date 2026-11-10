@@ -361,6 +361,20 @@ async def _seed_ops_defaults(db: aiosqlite.Connection):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, ops_53_skills)
 
+    # Ensure new MCP & Productivity skills exist even on upgraded databases
+    mcp_boost_skills = [
+        ("skill_prompt_optimizer", "prompt-engineering-optimizer", "Transform rough instructions into elite, multi-layered, constraint-hardened AI prompts.", "✨", "Autonomous AI Agents", "Deconstruct user intent, inject expert role persona, define edge cases, enforce JSON/Markdown constraints, and output precision prompts.", "[\"prompt\", \"enhance\", \"optimize\"]", 1, 1, 1, now_str),
+        ("skill_mcp_universal", "mcp-universal-bridge", "Expose agent capabilities, subagents, and local databases seamlessly over MCP SSE/RPC.", "🔌", "Autonomous AI Agents", "Serve Model Context Protocol handshakes, tool schemas, project resources, and prompt templates to Antigravity, Claude, ChatGPT, Cursor, and OpenClaw.", "[\"mcp\", \"sse\", \"bridge\", \"rpc\"]", 1, 1, 1, now_str),
+        ("skill_project_vault", "project-memory-architect", "Maintain per-project blueprints, tech stacks, and hierarchical key-value vaults.", "🏢", "Productivity", "Persist architectural blueprints, credentials, and environment metadata indexed by Project -> Category -> Context -> Key.", "[\"project\", \"memory\", \"vault\", \"blueprint\"]", 1, 1, 1, now_str),
+        ("skill_port_scanner", "tcp-port-service-scanner", "Scan target servers for open TCP ports, service banners, and egress latencies.", "🔭", "Software Development", "Run asynchronous TCP socket probes across critical infrastructure ports (SSH, HTTP, DBs, Docker) and flag exposure risks.", "[\"port\", \"scan\", \"tcp\", \"firewall\"]", 1, 1, 1, now_str),
+        ("skill_git_auditor", "git-repository-auditor", "Inspect git commits, branch divergence, uncommitted diffs, and remote sync state.", "🌿", "Software Development", "Audit git commit timelines, clean working tree status, and automated changelog synthesis.", "[\"git\", \"commit\", \"branch\"]", 1, 1, 1, now_str),
+        ("skill_sprint_planner", "agile-sprint-task-planner", "Convert high-level objectives into 1-hour / 4-hour time-boxed sprint tasks.", "📅", "Productivity", "Break ambiguous specs into atomic tasks with dependencies, validation criteria, and milestone checkpoints.", "[\"sprint\", \"plan\", \"tasks\", \"roadmap\"]", 1, 1, 1, now_str)
+    ]
+    await db.executemany("""
+        INSERT OR IGNORE INTO ops_skills (id, name, description, icon, category, instructions, triggers, is_toolset, is_enabled, is_system, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, mcp_boost_skills)
+
     # 2. Seed Plugins if empty
     async with db.execute("SELECT COUNT(*) as cnt FROM ops_plugins") as cursor:
         row = await cursor.fetchone()

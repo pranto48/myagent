@@ -315,6 +315,46 @@ async function runMyAgentMcpTest(testType) {
         }
       }
     };
+  } else if (testType === 'enhance_prompt') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "enhance_prompt",
+        arguments: {
+          prompt: "Build a fast REST API with user login and SQLite database.",
+          mode: "architect"
+        }
+      }
+    };
+  } else if (testType === 'port_scan') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "network_port_scan",
+        arguments: { target: "192.168.9.9" }
+      }
+    };
+  } else if (testType === 'list_skills') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "list_available_skills",
+        arguments: {}
+      }
+    };
+  } else if (testType === 'prompts/list') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "prompts/list",
+      params: {}
+    };
   }
 
   try {

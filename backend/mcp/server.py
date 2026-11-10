@@ -208,12 +208,13 @@ class MyAgentMCPServer:
                         },
                         "instructions": (
                             "Connected to MyAgent Docker MCP Server on 192.168.9.9. "
-                            "You have access to Per-Project Memory Vault (save_project_memory, get_project_memory, search_project_memory) "
-                            "and Project Architecture Blueprints (save_project_info, get_project_info, list_all_projects), "
-                            "corporate network diagnostic ping (ping_network_diagnostics), "
-                            "hybrid memory RAG retrieval and storage (query_company_memory, save_company_memory), "
-                            "data analytics (analyze_big_data, smart_data_summarizer), Python calculations "
-                            "(python_runner), document readers (PDF, Word, Excel, OCR), and autonomous agents."
+                            "You have access to 30+ high-efficiency tools and 67+ specialized domain skills:\n"
+                            "- Prompt Engineering: enhance_prompt (developer/architect/analysis/executive modes)\n"
+                            "- Project Memory Vault: save_project_memory, get_project_memory, search_project_memory, save_project_info, get_project_info, list_all_projects\n"
+                            "- Autonomous Skills Hub: list_available_skills, invoke_agent_skill\n"
+                            "- Network Diagnostics: ping_network_diagnostics, network_port_scan\n"
+                            "- DevOps & Code Quality: code_quality_and_security_audit, sqlite_schema_inspector, git_repo_inspector, generate_task_breakdown\n"
+                            "- Data Analytics & RAG: query_company_memory, save_company_memory, analyze_big_data, smart_data_summarizer, python_runner, document readers."
                         )
                     }
                 }
@@ -293,10 +294,48 @@ class MyAgentMCPServer:
                     "result": {
                         "prompts": [
                             {
-                                "name": "network_ping_audit",
-                                "description": "Sub-agent workflow to ping an internal or external IP and test connectivity",
+                                "name": "prompt_optimizer_meta",
+                                "description": "Transforms any raw user prompt into an elite, multi-layered, constraint-hardened AI prompt",
+                                "arguments": [
+                                    {"name": "prompt", "description": "Raw prompt draft to optimize", "required": True},
+                                    {"name": "mode", "description": "developer, architect, analysis, executive, or concise", "required": False}
+                                ]
+                            },
+                            {
+                                "name": "project_context_discovery",
+                                "description": "Fetch project architecture blueprint, credentials, and past memories before starting tasks on a project",
+                                "arguments": [
+                                    {"name": "project_name", "description": "Project name (e.g. myagent, 48_otnarp, ampshop)", "required": True}
+                                ]
+                            },
+                            {
+                                "name": "network_deep_diagnostic",
+                                "description": "Full ICMP ping + asynchronous TCP port scan audit of an internal or external IP",
                                 "arguments": [
                                     {"name": "target", "description": "Target IP address or domain (e.g. 192.168.9.1)", "required": True}
+                                ]
+                            },
+                            {
+                                "name": "code_security_and_quality_audit",
+                                "description": "Deep static security scan for leaked API secrets, SQLi, eval risks, and architectural flaws",
+                                "arguments": [
+                                    {"name": "code", "description": "Code snippet to inspect", "required": True},
+                                    {"name": "language", "description": "Language e.g. python, javascript", "required": False}
+                                ]
+                            },
+                            {
+                                "name": "database_performance_tuning",
+                                "description": "SQLite schema audit, index review, and query plan bottleneck resolution",
+                                "arguments": [
+                                    {"name": "db_name", "description": "Database filename e.g. chat_history.db, ops.db", "required": False}
+                                ]
+                            },
+                            {
+                                "name": "project_sprint_task_planner",
+                                "description": "Decompose a feature or project goal into structured 1h/4h sprint plans",
+                                "arguments": [
+                                    {"name": "goal", "description": "Feature or milestone objective", "required": True},
+                                    {"name": "sprint_hours", "description": "Sprint duration in hours (default 4)", "required": False}
                                 ]
                             },
                             {
@@ -307,18 +346,9 @@ class MyAgentMCPServer:
                                 ]
                             },
                             {
-                                "name": "data_file_profiler",
-                                "description": "Perform deep automated EDA and statistical profiling on a data file",
-                                "arguments": [
-                                    {"name": "filepath", "description": "Data file path (e.g. sales.csv)", "required": True}
-                                ]
-                            },
-                            {
-                                "name": "project_context_discovery",
-                                "description": "Fetch project architecture blueprint, credentials, and past memories before starting tasks on a project",
-                                "arguments": [
-                                    {"name": "project_name", "description": "Project name (e.g. myagent, 48_otnarp, ampshop)", "required": True}
-                                ]
+                                "name": "executive_daily_briefing",
+                                "description": "Aggregate system diagnostics, active projects, and git logs into an executive status report",
+                                "arguments": []
                             }
                         ]
                     }
@@ -329,19 +359,133 @@ class MyAgentMCPServer:
                 p_name = params.get("name")
                 p_args = params.get("arguments", {})
                 
-                if p_name == "network_ping_audit":
-                    tgt = p_args.get("target", "192.168.9.1")
+                if p_name == "prompt_optimizer_meta":
+                    raw_p = p_args.get("prompt", "")
+                    mode = p_args.get("mode", "developer")
                     return {
                         "jsonrpc": "2.0",
                         "id": req_id,
                         "result": {
-                            "description": f"Network ping audit for {tgt}",
+                            "description": f"Optimize prompt in {mode} mode",
                             "messages": [
                                 {
                                     "role": "user",
                                     "content": {
                                         "type": "text",
-                                        "text": f"Please use ping_network_diagnostics tool to check connectivity and latency to target '{tgt}' from MyAgent server (192.168.9.9) and provide a health report."
+                                        "text": (
+                                            f"Call the `enhance_prompt` tool with prompt='{raw_p}' and mode='{mode}'. "
+                                            f"Also review any relevant skills via `list_available_skills` and return the finalized elite master prompt."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "network_deep_diagnostic":
+                    tgt = p_args.get("target", "192.168.9.1")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"Deep network ping + TCP port scan audit for {tgt}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"Perform a comprehensive network audit on target '{tgt}' from MyAgent Server (192.168.9.9):\n"
+                                            f"1. Call `ping_network_diagnostics` on '{tgt}' (count=3).\n"
+                                            f"2. Call `network_port_scan` on '{tgt}'.\n"
+                                            f"Synthesize latency, packet loss, open services, and potential firewall/security risks."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "code_security_and_quality_audit":
+                    lang = p_args.get("language", "python")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"Code security and static quality audit ({lang})",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"1. Run `code_quality_and_security_audit` on the provided {lang} code.\n"
+                                            f"2. Run `invoke_agent_skill` for skill_name='security-ast-scanner' to check OWASP patterns.\n"
+                                            f"Provide concrete remediations and hardened code fixes."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "database_performance_tuning":
+                    db_n = p_args.get("db_name", "chat_history.db")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"Database schema & performance audit for {db_n}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"Inspect `{db_n}` using `sqlite_schema_inspector` to dump tables and row counts, "
+                                            f"and apply `invoke_agent_skill` with 'database-query-optimizer' to suggest index optimizations."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "project_sprint_task_planner":
+                    goal = p_args.get("goal", "Implement new enterprise microservice")
+                    hrs = p_args.get("sprint_hours", 4)
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"Sprint breakdown for: {goal}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"Use `generate_task_breakdown` for goal='{goal}' (sprint_hours={hrs}), "
+                                            f"and check `list_all_projects` to align milestones with existing project blueprints."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "executive_daily_briefing":
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": "Executive daily technical & infrastructure briefing",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            "Synthesize an executive status briefing by running:\n"
+                                            "1. `system_info` for container CPU/RAM/Disk status\n"
+                                            "2. `git_repo_inspector` for recent commits\n"
+                                            "3. `list_all_projects` for active project health and memory metrics."
+                                        )
                                     }
                                 }
                             ]
