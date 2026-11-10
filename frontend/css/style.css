@@ -10200,9 +10200,101 @@ body.light-theme .wf-modal-list-row {
 .wf-tg-log-badge.err { background: rgba(244, 63, 94, 0.2); color: #fda4af; }
 .wf-tg-log-badge.muted { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
 
+.wf-tg-chat-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+}
+.wf-tg-chat-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.wf-tg-chat-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  white-space: nowrap;
+}
+.wf-tg-chat-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.wf-tg-chat-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.58);
+}
+.wf-tg-chat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.wf-tg-intent-pill {
+  font-size: 0.71rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+}
+.wf-tg-chat-user {
+  font-size: 0.81rem;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+}
+.wf-tg-chat-reply {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.wf-tg-chat-wfbar {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #34d399;
+}
+
 [data-theme="light"] .wf-tg-status-pill,
 body.light-theme .wf-tg-status-pill,
 [data-theme="light"] .wf-tg-status-banner,
-body.light-theme .wf-tg-status-banner {
+body.light-theme .wf-tg-status-banner,
+[data-theme="light"] .wf-tg-chat-strip,
+body.light-theme .wf-tg-chat-strip,
+[data-theme="light"] .wf-tg-chat-item,
+body.light-theme .wf-tg-chat-item {
   background: #f8fafc;
+}
+[data-theme="light"] .wf-tg-chat-reply,
+body.light-theme .wf-tg-chat-reply {
+  background: #f1f5f9;
+  color: #0f172a;
 }

@@ -1569,6 +1569,10 @@ class WorkflowStore:
                 bot_username TEXT DEFAULT '',
                 bot_first_name TEXT DEFAULT '',
                 is_enabled INTEGER DEFAULT 0,
+                interactive_chat_enabled INTEGER DEFAULT 1,
+                auto_send_reports INTEGER DEFAULT 1,
+                allowed_chat_ids TEXT DEFAULT '',
+                last_update_id INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'Disconnected',
                 last_verified_at TEXT DEFAULT '',
                 last_tested_at TEXT DEFAULT '',
@@ -1576,6 +1580,19 @@ class WorkflowStore:
                 updated_at TEXT NOT NULL
             )
         """)
+        # Safe schema migration for existing ops.db databases
+        async with db.execute("PRAGMA table_info(ops_telegram_config)") as pcur:
+            existing_cols = {r[1] for r in await pcur.fetchall()}
+        migrations = [
+            ("interactive_chat_enabled", "INTEGER DEFAULT 1"),
+            ("auto_send_reports", "INTEGER DEFAULT 1"),
+            ("allowed_chat_ids", "TEXT DEFAULT ''"),
+            ("last_update_id", "INTEGER DEFAULT 0"),
+        ]
+        for col_name, col_def in migrations:
+            if col_name not in existing_cols:
+                await db.execute(f"ALTER TABLE ops_telegram_config ADD COLUMN {col_name} {col_def}")
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ops_telegram_logs (
                 id TEXT PRIMARY KEY,
@@ -1595,6 +1612,23 @@ class WorkflowStore:
             )
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_tg_logs_created ON ops_telegram_logs(created_at DESC)")
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ops_telegram_chats (
+                id TEXT PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                sender_name TEXT DEFAULT '',
+                direction TEXT NOT NULL,
+                intent TEXT DEFAULT '',
+                user_message TEXT DEFAULT '',
+                reply_message TEXT DEFAULT '',
+                workflow_status_summary TEXT DEFAULT '',
+                linked_workflow_id TEXT DEFAULT '',
+                status TEXT DEFAULT 'SUCCESS',
+                latency_ms INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tg_chats_created ON ops_telegram_chats(created_at DESC)")
 
     @staticmethod
     def mask_telegram_token(token: str) -> str:
@@ -1659,11 +1693,19 @@ class WorkflowStore:
                 FROM ops_telegram_logs
             """) as scur:
                 srow = await scur.fetchone()
+            async with db.execute("SELECT COUNT(*) as cnt FROM ops_telegram_chats") as ccur:
+                crow = await ccur.fetchone()
 
+            raw_inter = raw.get("interactive_chat_enabled")
+            raw_autorep = raw.get("auto_send_reports")
             res = {
                 "connected": connected,
                 "status": status,
                 "is_enabled": is_enabled,
+                "interactive_chat_enabled": True if raw_inter is None else bool(raw_inter),
+                "auto_send_reports": True if raw_autorep is None else bool(raw_autorep),
+                "allowed_chat_ids": (raw.get("allowed_chat_ids") or "").strip(),
+                "last_update_id": int(raw.get("last_update_id") or 0),
                 "has_token": bool(plain_tok),
                 "token_preview": cls.mask_telegram_token(plain_tok),
                 "chat_id": chat_id,
@@ -1677,6 +1719,7 @@ class WorkflowStore:
                 "total_logs": int(srow["total_logs"] or 0) if srow else 0,
                 "sent_count": int(srow["sent_count"] or 0) if srow else 0,
                 "failed_count": int(srow["failed_count"] or 0) if srow else 0,
+                "total_chats": int(crow["cnt"] or 0) if crow else 0,
                 "last_log_at": (srow["last_log_at"] or "") if srow else "",
             }
             if include_plaintext_token:
@@ -1691,6 +1734,10 @@ class WorkflowStore:
         bot_token: Optional[str] = None,
         chat_id: Optional[str] = None,
         is_enabled: Optional[bool] = None,
+        interactive_chat_enabled: Optional[bool] = None,
+        auto_send_reports: Optional[bool] = None,
+        allowed_chat_ids: Optional[str] = None,
+        last_update_id: Optional[int] = None,
         status: Optional[str] = None,
         bot_id: Optional[str] = None,
         bot_username: Optional[str] = None,
@@ -1713,6 +1760,10 @@ class WorkflowStore:
 
         final_chat_id = current["chat_id"] if chat_id is None else chat_id.strip()
         final_enabled = current["is_enabled"] if is_enabled is None else bool(is_enabled)
+        final_interactive = current["interactive_chat_enabled"] if interactive_chat_enabled is None else bool(interactive_chat_enabled)
+        final_autoreport = current["auto_send_reports"] if auto_send_reports is None else bool(auto_send_reports)
+        final_allowed = current["allowed_chat_ids"] if allowed_chat_ids is None else str(allowed_chat_ids).strip()
+        final_upd_id = current["last_update_id"] if last_update_id is None else int(last_update_id)
         final_status = current["status"] if status is None else status.strip()
         if clear_token or not final_token:
             final_enabled = False
@@ -1734,11 +1785,15 @@ class WorkflowStore:
             await db.execute("""
                 UPDATE ops_telegram_config
                 SET bot_token_enc = ?, chat_id = ?, bot_id = ?, bot_username = ?, bot_first_name = ?,
-                    is_enabled = ?, status = ?, last_verified_at = ?, last_tested_at = ?, last_error = ?, updated_at = ?
+                    is_enabled = ?, interactive_chat_enabled = ?, auto_send_reports = ?,
+                    allowed_chat_ids = ?, last_update_id = ?,
+                    status = ?, last_verified_at = ?, last_tested_at = ?, last_error = ?, updated_at = ?
                 WHERE id = 'default'
             """, (
                 tok_enc, final_chat_id, final_bot_id, final_bot_user, final_bot_name,
-                1 if final_enabled else 0, final_status, final_verified, final_tested, final_err, now_s
+                1 if final_enabled else 0, 1 if final_interactive else 0, 1 if final_autoreport else 0,
+                final_allowed, final_upd_id,
+                final_status, final_verified, final_tested, final_err, now_s
             ))
             await db.execute("""
                 UPDATE ops_channels
@@ -1842,6 +1897,133 @@ class WorkflowStore:
             return cur.rowcount or 0
         finally:
             await db.close()
+
+    @classmethod
+    async def record_telegram_chat(
+        cls,
+        chat_id: str,
+        sender_name: str = "",
+        direction: str = "incoming",
+        intent: str = "",
+        user_message: str = "",
+        reply_message: str = "",
+        workflow_status_summary: str = "",
+        linked_workflow_id: str = "",
+        status: str = "SUCCESS",
+        latency_ms: int = 0,
+    ) -> Dict[str, Any]:
+        cid = f"tgchat_{uuid.uuid4().hex[:10]}"
+        now_s = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            await db.execute("""
+                INSERT INTO ops_telegram_chats
+                (id, chat_id, sender_name, direction, intent, user_message, reply_message,
+                 workflow_status_summary, linked_workflow_id, status, latency_ms, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                cid,
+                str(chat_id or ""),
+                (sender_name or "")[:120],
+                (direction or "incoming").strip(),
+                (intent or "").strip(),
+                (user_message or "")[:2000],
+                (reply_message or "")[:4000],
+                (workflow_status_summary or "")[:1200],
+                (linked_workflow_id or "").strip(),
+                (status or "SUCCESS").strip(),
+                int(latency_ms or 0),
+                now_s,
+            ))
+            await db.execute("""
+                DELETE FROM ops_telegram_chats WHERE id NOT IN (
+                    SELECT id FROM ops_telegram_chats ORDER BY created_at DESC, rowid DESC LIMIT 120
+                )
+            """)
+            await db.commit()
+        finally:
+            await db.close()
+        return {
+            "id": cid,
+            "chat_id": str(chat_id or ""),
+            "sender_name": sender_name,
+            "direction": direction,
+            "intent": intent,
+            "user_message": user_message,
+            "reply_message": reply_message,
+            "workflow_status_summary": workflow_status_summary,
+            "linked_workflow_id": linked_workflow_id,
+            "status": status,
+            "latency_ms": latency_ms,
+            "created_at": now_s,
+        }
+
+    @classmethod
+    async def list_telegram_chats(cls, limit: int = 40) -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            async with db.execute(
+                "SELECT * FROM ops_telegram_chats ORDER BY created_at DESC, rowid DESC LIMIT ?",
+                (int(limit),)
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        finally:
+            await db.close()
+
+    @classmethod
+    async def clear_telegram_chats(cls) -> int:
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            cur = await db.execute("DELETE FROM ops_telegram_chats")
+            await db.commit()
+            return cur.rowcount or 0
+        finally:
+            await db.close()
+
+    @classmethod
+    async def build_workflows_status_report(cls, max_workflows: int = 6, max_runs: int = 4) -> Dict[str, Any]:
+        """Builds a compact live WORKFLOWS (Auto) status digest + formatted report text for Telegram/UI."""
+        wfs = await cls.list_workflows()
+        runs = await cls.list_runs(limit=max_runs)
+        active_wfs = [w for w in wfs if w.get("is_enabled")]
+        total_runs = sum(int(w.get("run_count") or 0) for w in wfs)
+        total_ok = sum(int(w.get("success_count") or 0) for w in wfs)
+        rate = round((total_ok / total_runs) * 100) if total_runs > 0 else 100
+
+        lines = [
+            f"📊 WORKFLOWS (Auto) Status Report",
+            f"• Total Workflows: {len(wfs)} | Active Auto: {len(active_wfs)} | Total Runs: {total_runs} ({rate}% OK)",
+        ]
+        if wfs:
+            lines.append("\n⚙️ Active & Recent Workflows:")
+            for w in wfs[:max_workflows]:
+                en_badge = "🟢 ON" if w.get("is_enabled") else "⏸️ OFF"
+                st = w.get("last_status") or "IDLE"
+                nxt = w.get("next_run") or "-"
+                lines.append(f"- {w.get('name')} [{en_badge}] | Last: {st} | Next: {nxt}")
+
+        if runs:
+            lines.append("\n🕒 Recent Executions:")
+            for r in runs[:max_runs]:
+                icon = "✅" if r.get("status") == "SUCCESS" else ("⚠️" if r.get("status") == "PARTIAL" else "🔴")
+                lines.append(f"- {icon} {r.get('workflow_name')} ({r.get('status')}, {r.get('duration_ms', 0)}ms) @ {r.get('started_at')}")
+
+        summary_line = f"Workflows: {len(wfs)} Total ({len(active_wfs)} Active) | Runs: {total_runs} ({rate}% OK)"
+        if runs:
+            r0 = runs[0]
+            summary_line += f" | Latest: {r0.get('workflow_name')}={r0.get('status')}"
+
+        return {
+            "total_workflows": len(wfs),
+            "active_workflows": len(active_wfs),
+            "total_runs": total_runs,
+            "success_rate": rate,
+            "summary_line": summary_line,
+            "report_text": "\n".join(lines),
+        }
 
     @classmethod
     async def install_template(cls, template_id: str) -> Optional[Dict[str, Any]]:

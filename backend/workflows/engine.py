@@ -614,7 +614,7 @@ class WorkflowEngine:
         except Exception as save_err:
             logger.error(f"Error persisting workflow run '{run_id}': {save_err}")
 
-        return {
+        run_summary = {
             "success": overall_status in ("SUCCESS", "PARTIAL"),
             "run_id": run_id,
             "workflow_id": workflow_id,
@@ -627,8 +627,48 @@ class WorkflowEngine:
             "next_run": next_str,
             "node_results": node_results,
             "final_output": final_output,
-            "error_message": error_message
+            "error_message": error_message,
         }
+
+        # Auto-dispatch WORKFLOWS (Auto) Report to connected Telegram if enabled & not already notified
+        if not dry_run and trigger_source not in ("sub_workflow", "telegram_chat"):
+            try:
+                already_tg = any(
+                    s.get("type") == "notify_channel"
+                    and s.get("status") == "SUCCESS"
+                    and any("Telegram(" in str(d) for d in (s.get("data") or {}).get("delivered_to", []))
+                    for s in node_results
+                )
+                if not already_tg:
+                    tg_cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=True)
+                    if tg_cfg.get("connected") and tg_cfg.get("auto_send_reports") and tg_cfg.get("chat_id") and tg_cfg.get("_bot_token"):
+                        from workflows.telegram_service import telegram_send_message, format_workflow_execution_report
+                        report_txt = format_workflow_execution_report(run_summary)
+                        await WorkflowStore.record_telegram_chat(
+                            chat_id=tg_cfg["chat_id"],
+                            sender_name=f"AutoReport: {wf['name']}",
+                            direction="report",
+                            intent="workflow_report",
+                            user_message=f"[Auto Report] {wf['name']} ({overall_status})",
+                            reply_message=report_txt,
+                            workflow_status_summary=f"{wf['name']} -> {overall_status} ({duration_ms}ms)",
+                            linked_workflow_id=workflow_id,
+                            status=overall_status,
+                            latency_ms=duration_ms,
+                        )
+                        await telegram_send_message(
+                            token=tg_cfg["_bot_token"],
+                            chat_id=tg_cfg["chat_id"],
+                            text=report_txt,
+                            event_type="workflow_report",
+                            workflow_id=workflow_id,
+                            workflow_name=wf["name"],
+                            bot_username=tg_cfg.get("bot_username") or "",
+                        )
+            except Exception as auto_tg_err:
+                logger.debug(f"Auto workflow Telegram report note: {auto_tg_err}")
+
+        return run_summary
 
     async def execute_single_node(
         self,

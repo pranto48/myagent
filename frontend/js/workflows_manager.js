@@ -11,6 +11,8 @@ let wfState = {
   variables: [],
   telegram: null,
   telegramLogs: [],
+  telegramChats: [],
+  tgLiveTimer: null,
   templates: [],
   nodeCatalog: [],
   tools: [],
@@ -116,11 +118,12 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
   }
 
   try {
-    const [wfRes, tplRes, varsRes, tgRes] = await Promise.all([
+    const [wfRes, tplRes, varsRes, tgRes, tgChatsRes] = await Promise.all([
       wfFetch('/api/workflows'),
       wfFetch('/api/workflows/templates'),
       wfFetch('/api/workflows/vars/list'),
-      wfFetch('/api/workflows/telegram/status')
+      wfFetch('/api/workflows/telegram/status'),
+      wfFetch('/api/workflows/telegram/chats?limit=25')
     ]);
 
     const wfData = await wfRes.json();
@@ -159,6 +162,15 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
       if (tgData && tgData.success) {
         wfState.telegram = tgData.telegram || null;
         renderTelegramStatusUI();
+      }
+    }
+
+    if (tgChatsRes && tgChatsRes.ok) {
+      const tgcData = await tgChatsRes.json();
+      if (tgcData && tgcData.success) {
+        wfState.telegramChats = tgcData.chats || [];
+        renderTelegramLatestStrip(tgcData.workflow_digest || null);
+        if (wfState.subTab === 'telegram') renderTelegramChatFeed();
       }
     }
 
@@ -221,12 +233,24 @@ function switchWorkflowsSubTab(tabName) {
     if (btn) btn.classList.toggle('active', t === tabName);
   });
 
+  if (wfState.tgLiveTimer) {
+    clearInterval(wfState.tgLiveTimer);
+    wfState.tgLiveTimer = null;
+  }
+
   if (tabName === 'studio') {
     setTimeout(drawWorkflowEdges, 40);
   } else if (tabName === 'history') {
     refreshRecentWorkflowRuns();
   } else if (tabName === 'telegram') {
+    refreshWorkflowTelegramChats();
     refreshWorkflowTelegramLogs(true);
+    wfState.tgLiveTimer = setInterval(() => {
+      if (wfState.subTab === 'telegram') {
+        refreshWorkflowTelegramChats();
+        refreshWorkflowTelegramLogs(false);
+      }
+    }, 4500);
   }
 }
 
@@ -2432,10 +2456,11 @@ function renderTelegramStatusUI() {
     const parts = [];
     if (tg.chat_id) parts.push(`Chat ID: <code>${wfEsc(tg.chat_id)}</code>`);
     if (tg.token_preview) parts.push(`Token: <code>${wfEsc(tg.token_preview)}</code>`);
-    parts.push(`Sent: <strong style="color:#10b981;">${tg.sent_count || 0}</strong> • Failed: <strong style="color:#f43f5e;">${tg.failed_count || 0}</strong>`);
+    if (tg.polling_active) parts.push('<span style="color:#34d399; font-weight:700;">📡 Two-Way Chat: LIVE</span>');
+    parts.push(`Sent: <strong style="color:#10b981;">${tg.sent_count || 0}</strong> • Failed: <strong style="color:#f43f5e;">${tg.failed_count || 0}</strong> • Chats: <strong>${tg.total_chats || 0}</strong>`);
     if (tg.last_verified_at) parts.push(`Verified: ${wfEsc(tg.last_verified_at)}`);
     if (tg.last_tested_at) parts.push(`Tested: ${wfEsc(tg.last_tested_at)}`);
-    if (tg.last_error) parts.push(`<span style="color:#fda4af;">ত্রুটি: ${wfEsc(tg.last_error)}</span>`);
+    if (tg.last_error || tg.poll_error) parts.push(`<span style="color:#fda4af;">ত্রুটি: ${wfEsc(tg.last_error || tg.poll_error)}</span>`);
     metaEl.innerHTML = parts.length ? parts.join(' &nbsp;|&nbsp; ') : 'নিচের ফর্মে @BotFather টোকেন ও Chat ID দিয়ে কানেক্ট করুন।';
   }
 
@@ -2444,6 +2469,9 @@ function renderTelegramStatusUI() {
   const tokenHint = document.getElementById('wf-tg-token-hint');
   const chatInput = document.getElementById('wf-tg-chatid-input');
   const enChk = document.getElementById('wf-tg-enabled-chk');
+  const interChk = document.getElementById('wf-tg-interactive-chk');
+  const autoRepChk = document.getElementById('wf-tg-autoreport-chk');
+  const allowedInput = document.getElementById('wf-tg-allowed-chats');
 
   if (tokenInput && tg.has_token) {
     tokenInput.placeholder = `Saved: ${tg.token_preview} (নতুন না দিলে এটিই থাকবে)`;
@@ -2458,8 +2486,17 @@ function renderTelegramStatusUI() {
   if (chatInput && document.activeElement !== chatInput && !chatInput.value && tg.chat_id) {
     chatInput.value = tg.chat_id;
   }
+  if (allowedInput && document.activeElement !== allowedInput && !allowedInput.value && tg.allowed_chat_ids) {
+    allowedInput.value = tg.allowed_chat_ids;
+  }
   if (enChk) {
     enChk.checked = tg.has_token ? !!tg.is_enabled : true;
+  }
+  if (interChk) {
+    interChk.checked = tg.interactive_chat_enabled !== false;
+  }
+  if (autoRepChk) {
+    autoRepChk.checked = tg.auto_send_reports !== false;
   }
 }
 
@@ -2499,6 +2536,9 @@ async function connectWorkflowTelegram(event) {
   const chat_id = document.getElementById('wf-tg-chatid-input')?.value?.trim() || '';
   const is_enabled = !!document.getElementById('wf-tg-enabled-chk')?.checked;
   const verify_live = !!document.getElementById('wf-tg-verify-chk')?.checked;
+  const interactive_chat_enabled = !!document.getElementById('wf-tg-interactive-chk')?.checked;
+  const auto_send_reports = !!document.getElementById('wf-tg-autoreport-chk')?.checked;
+  const allowed_chat_ids = document.getElementById('wf-tg-allowed-chats')?.value?.trim() || '';
 
   const btn = document.getElementById('btn-wf-tg-connect');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ যাচাই ও কানেক্ট হচ্ছে...'; }
@@ -2506,7 +2546,15 @@ async function connectWorkflowTelegram(event) {
   try {
     const res = await wfFetch('/api/workflows/telegram/connect', {
       method: 'POST',
-      body: JSON.stringify({ bot_token, chat_id, is_enabled, verify_live })
+      body: JSON.stringify({
+        bot_token,
+        chat_id,
+        is_enabled,
+        verify_live,
+        interactive_chat_enabled,
+        auto_send_reports,
+        allowed_chat_ids
+      })
     });
     const data = await res.json();
     if (data.telegram) {
@@ -2707,6 +2755,148 @@ async function clearWorkflowTelegramLogs() {
   }
 }
 
+function renderTelegramLatestStrip(digest = null) {
+  const el = document.getElementById('wf-tg-latest-chat-text');
+  if (!el) return;
+  const chats = wfState.telegramChats || [];
+  if (chats.length > 0) {
+    const c = chats[0];
+    const firstReplyLine = String(c.reply_message || '').split('\n').slice(0, 2).join(' — ');
+    el.innerHTML = `<strong>[${wfEsc((c.intent || c.direction || 'CHAT').toUpperCase())}]</strong> “${wfEsc((c.user_message || '').slice(0, 70))}” &nbsp;➔&nbsp; <span style="color:#34d399;">${wfEsc(firstReplyLine.slice(0, 140))}</span> <span style="color:var(--text-muted); font-size:0.72rem;">(${wfEsc(c.created_at)})</span>`;
+  } else if (digest && digest.summary_line) {
+    el.innerHTML = `📊 ${wfEsc(digest.summary_line)} — Telegram বটে <code>ping 192.168.9.2</code> বা <code>/status</code> লিখে চ্যাট করুন!`;
+  }
+}
+
+async function refreshWorkflowTelegramChats() {
+  const feedEl = document.getElementById('wf-tg-chat-feed');
+  try {
+    const res = await wfFetch('/api/workflows/telegram/chats?limit=35');
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Chat load failed');
+    wfState.telegramChats = data.chats || [];
+    if (data.telegram) {
+      wfState.telegram = data.telegram;
+      renderTelegramStatusUI();
+    }
+    renderTelegramLatestStrip(data.workflow_digest || null);
+    renderTelegramChatFeed();
+  } catch (err) {
+    if (feedEl) feedEl.innerHTML = `<div style="color:#f43f5e; padding:12px;">${wfEsc(err.message)}</div>`;
+  }
+}
+
+function renderTelegramChatFeed() {
+  const feedEl = document.getElementById('wf-tg-chat-feed');
+  if (!feedEl) return;
+  const chats = wfState.telegramChats || [];
+  if (!chats.length) {
+    feedEl.innerHTML = '<div class="wf-empty-hint">এখনও কোনো Telegram চ্যাট বা ওয়ার্কফ্লো রিপোর্ট নেই। উপরের বক্সে যেমন <code>ping 192.168.9.2 server and let me show status</code> লিখে টেস্ট করুন বা টেলিগ্রাম বটে মেসেজ দিন!</div>';
+    return;
+  }
+
+  feedEl.innerHTML = chats.map(c => {
+    const st = String(c.status || 'SUCCESS').toUpperCase();
+    const badgeCls = (st === 'SUCCESS' || st === 'SENT' || st === 'CONNECTED') ? 'ok' : (st === 'WARN' ? 'muted' : 'err');
+    const intentIcon = {
+      ping: '📡 Ping & Status',
+      port_scan: '🔍 Port Scan',
+      workflow_status: '📊 WORKFLOWS Status',
+      workflow_report: '📢 Auto Report',
+      workflow_run: '⚡ Workflow Run',
+      workflow_create: '🧠 Created Workflow',
+      help: 'ℹ️ Help / ID',
+      ai_chat: '🤖 AI Reply'
+    }[c.intent] || `💬 ${c.intent || 'Chat'}`;
+
+    return `
+      <div class="wf-tg-chat-item">
+        <div class="wf-tg-chat-head">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="wf-tg-intent-pill">${wfEsc(intentIcon)}</span>
+            <strong style="font-size:0.8rem; color:var(--text-primary);">${wfEsc(c.sender_name || c.chat_id)}</strong>
+            <code style="font-size:0.71rem;">Chat: ${wfEsc(c.chat_id)}</code>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.71rem; color:var(--text-muted);">🕒 ${wfEsc(c.created_at)}${c.latency_ms ? ' • ' + c.latency_ms + 'ms' : ''}</span>
+            <span class="wf-tg-log-badge ${badgeCls}">${wfEsc(st)}</span>
+          </div>
+        </div>
+        <div class="wf-tg-chat-user">👤 <strong>Chat Message:</strong> ${wfEsc(c.user_message)}</div>
+        <pre class="wf-tg-chat-reply">${wfEsc(c.reply_message)}</pre>
+        ${c.workflow_status_summary ? `<div class="wf-tg-chat-wfbar">⚡ WORKFLOWS (Auto): ${wfEsc(c.workflow_status_summary)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function submitTelegramChatCommand(event) {
+  if (event) event.preventDefault();
+  const inp = document.getElementById('wf-tg-cmd-input');
+  const sendChk = document.getElementById('wf-tg-cmd-send-tg-chk');
+  const btn = document.getElementById('btn-wf-tg-cmd-run');
+  const message = inp?.value?.trim();
+  if (!message) {
+    wfToast('কমান্ড বা প্রশ্ন লিখুন (যেমন: ping 192.168.9.2 server and show status)', 'warning');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ চলছে...'; }
+  try {
+    const res = await wfFetch('/api/workflows/telegram/chat/command', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        send_to_telegram: !!sendChk?.checked
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Command failed');
+    if (inp) inp.value = '';
+    const sentNote = data.delivery ? (data.delivery.ok ? ' + Telegram-এ পাঠানো হয়েছে!' : ` (Telegram error: ${data.delivery.error})`) : '';
+    wfToast(`✅ কমান্ড সম্পন্ন (${data.intent})${sentNote}`, 'success');
+    await refreshWorkflowTelegramChats();
+    await refreshWorkflowTelegramLogs(false);
+  } catch (err) {
+    wfToast('কমান্ড ব্যর্থ: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ কমান্ড ও স্ট্যাটাস চালান'; }
+  }
+}
+
+async function sendWorkflowReportToTelegram(workflowId = '') {
+  try {
+    const res = await wfFetch('/api/workflows/telegram/send-report', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_id: workflowId || '' })
+    });
+    const data = await res.json();
+    if (data.delivery && data.delivery.ok) {
+      wfToast(`📤 WORKFLOWS (Auto) রিপোর্ট Telegram-এ পাঠানো হয়েছে (Msg #${data.delivery.telegram_message_id || 'OK'})!`, 'success');
+    } else if (data.delivery && !data.delivery.ok) {
+      wfToast(`⚠️ রিপোর্ট ফিডে যোগ হয়েছে, তবে Telegram ডেলিভারি ব্যর্থ: ${data.delivery.error}`, 'warning');
+    } else {
+      wfToast('📊 WORKFLOWS (Auto) রিপোর্ট Telegram Chat Feed-এ তৈরি হয়েছে (লাইভ সেন্ডের জন্য Bot Token ও Chat ID কানেক্ট করুন)।', 'info');
+    }
+    await refreshWorkflowTelegramChats();
+    await refreshWorkflowTelegramLogs(false);
+  } catch (err) {
+    wfToast('রিপোর্ট পাঠাতে ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+async function clearWorkflowTelegramChats() {
+  try {
+    const res = await wfFetch('/api/workflows/telegram/chats', { method: 'DELETE' });
+    if (res.ok) {
+      wfToast('🗑️ Telegram চ্যাট ইতিহাস মুছে ফেলা হয়েছে।', 'info');
+      await refreshWorkflowTelegramChats();
+    }
+  } catch (err) {
+    wfToast('চ্যাট মুছতে ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
 // Global exports
 window.loadWorkflowsStudio = loadWorkflowsStudio;
 window.switchWorkflowsSubTab = switchWorkflowsSubTab;
@@ -2769,3 +2959,7 @@ window.testWorkflowTelegramMessage = testWorkflowTelegramMessage;
 window.disconnectWorkflowTelegram = disconnectWorkflowTelegram;
 window.refreshWorkflowTelegramLogs = refreshWorkflowTelegramLogs;
 window.clearWorkflowTelegramLogs = clearWorkflowTelegramLogs;
+window.refreshWorkflowTelegramChats = refreshWorkflowTelegramChats;
+window.submitTelegramChatCommand = submitTelegramChatCommand;
+window.sendWorkflowReportToTelegram = sendWorkflowReportToTelegram;
+window.clearWorkflowTelegramChats = clearWorkflowTelegramChats;

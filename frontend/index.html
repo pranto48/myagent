@@ -3011,6 +3011,20 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             </div>
           </div>
 
+          <!-- Live Telegram Chat & WORKFLOWS (Auto) Report Strip -->
+          <div id="wf-tg-latest-chat-strip" class="wf-tg-chat-strip">
+            <div class="wf-tg-chat-strip-left">
+              <span class="wf-tg-chat-badge">💬 Telegram Live Chat &amp; Report</span>
+              <span id="wf-tg-latest-chat-text" style="font-size:0.8rem; color:var(--text-secondary);">
+                Telegram বটে <code>ping 192.168.9.2</code> বা <code>/status</code> লিখে চ্যাট করলে এখানে এবং Telegram-এ WORKFLOWS (Auto) স্ট্যাটাস ও রিপোর্ট দেখাবে।
+              </span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <button type="button" class="btn-sm-action-cyber" onclick="sendWorkflowReportToTelegram()" title="বর্তমান WORKFLOWS (Auto) রিপোর্ট Telegram-এ পাঠান">📤 Send Report</button>
+              <button type="button" class="btn-sm-action-cyber" onclick="switchWorkflowsSubTab('telegram')">💬 Chat &amp; Logs</button>
+            </div>
+          </div>
+
           <!-- Hero Quick Daily Auto-Task Builder -->
           <div class="wf-quick-card" id="wf-quick-daily-card">
             <div class="wf-quick-header" onclick="toggleQuickDailyBuilder()">
@@ -3180,7 +3194,36 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
               </div>
               <div class="wf-tg-banner-actions">
                 <button type="button" class="btn-sm-action-cyber" onclick="refreshWorkflowTelegramStatus(true)" title="api.telegram.org/getMe দিয়ে লাইভ যাচাই">🔄 Live Check (getMe)</button>
+                <button type="button" class="btn-sm-action-cyber" onclick="sendWorkflowReportToTelegram()" title="WORKFLOWS (Auto) স্ট্যাটাস রিপোর্ট টেলিগ্রামে পাঠান">📊 Send Report</button>
                 <button type="button" class="btn-sm-action-cyber" onclick="testWorkflowTelegramMessage()" title="সংযুক্ত টেলিগ্রাম চ্যাটে টেস্ট মেসেজ পাঠান">📨 Send Test</button>
+              </div>
+            </div>
+
+            <!-- Live Two-Way Telegram Chat & WORKFLOWS (Auto) Report Console -->
+            <div class="ops-card wf-tg-card" style="margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <div>
+                  <h4 style="margin:0; font-size:0.95rem;">💬 টেলিগ্রাম টু-ওয়ে চ্যাট ও WORKFLOWS (Auto) রিপোর্ট ফিড</h4>
+                  <span style="font-size:0.74rem; color:var(--text-muted);">
+                    Telegram বটে লিখুন: <code>ping 192.168.9.2 server status</code>, <code>/port 192.168.9.2</code>, <code>/status</code>, <code>/run &lt;name&gt;</code> অথবা এখান থেকেই সরাসরি কমান্ড টেস্ট করুন!
+                  </span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button type="button" class="btn-sm-action-cyber" onclick="refreshWorkflowTelegramChats()">🔄 রিফ্রেশ চ্যাট</button>
+                  <button type="button" class="btn-sm-danger" onclick="clearWorkflowTelegramChats()" title="চ্যাট ইতিহাস মুছুন">🗑️</button>
+                </div>
+              </div>
+
+              <form onsubmit="submitTelegramChatCommand(event)" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+                <input type="text" id="wf-tg-cmd-input" class="text-input" style="flex:1; min-width:240px;" placeholder="যেমন: ping 192.168.9.2 server and let me show status">
+                <label style="font-size:0.77rem; white-space:nowrap; cursor:pointer;" title="সক্রিয় Telegram চ্যাটেও এই রেসপন্স পাঠাবে">
+                  <input type="checkbox" id="wf-tg-cmd-send-tg-chk" checked> ✈️ Telegram-এও পাঠান
+                </label>
+                <button type="submit" id="btn-wf-tg-cmd-run" class="btn-primary">⚡ কমান্ড ও স্ট্যাটাস চালান</button>
+              </form>
+
+              <div id="wf-tg-chat-feed" class="wf-tg-chat-feed">
+                <div class="wf-empty-hint">এখনও কোনো Telegram চ্যাট বা ওয়ার্কফ্লো রিপোর্ট নেই।</div>
               </div>
             </div>
 
@@ -3222,6 +3265,17 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                     <label style="font-size:0.8rem; cursor:pointer;">
                       <input type="checkbox" id="wf-tg-verify-chk" checked> 🛡️ কানেক্ট করার সময় Telegram API-এ লাইভ ভেরিফাই (getMe) করুন
                     </label>
+                    <label style="font-size:0.8rem; cursor:pointer;">
+                      <input type="checkbox" id="wf-tg-interactive-chk" checked> 🤖 Two-Way Telegram Chat Listener (Telegram মেসেজ থেকে Ping / Status / Run)
+                    </label>
+                    <label style="font-size:0.8rem; cursor:pointer;">
+                      <input type="checkbox" id="wf-tg-autoreport-chk" checked> 📢 প্রতিটি ওয়ার্কফ্লো রান শেষে Telegram-এ অটো রিপোর্ট পাঠান
+                    </label>
+                  </div>
+
+                  <div class="wf-field-group">
+                    <label>অতিরিক্ত অনুমোদিত Chat ID সমূহ (ঐচ্ছিক, কমা দিয়ে)</label>
+                    <input type="text" id="wf-tg-allowed-chats" class="text-input" placeholder="যেমন: 987654321, -10011223344">
                   </div>
 
                   <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">

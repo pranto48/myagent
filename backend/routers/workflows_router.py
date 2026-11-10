@@ -131,12 +131,20 @@ async def delete_workflow_variable(
 # ==============================================================================
 # Telegram Bot Connection, Status & Log Center for WORKFLOWS (Auto)
 # ==============================================================================
+def _with_tg_runtime(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    from workflows.telegram_service import telegram_chat_listener
+    out = dict(cfg)
+    out.pop("_bot_token", None)
+    out.update(telegram_chat_listener.get_runtime_state())
+    return out
+
+
 @router.get("/telegram/status")
 async def get_workflow_telegram_status(
     live_check: bool = Query(False),
     user=Depends(get_optional_current_user)
 ):
-    """Returns Telegram connection configuration, live connected status, and log statistics."""
+    """Returns Telegram connection configuration, live connected status, polling state, and log statistics."""
     import time as _t
     from workflows.telegram_service import telegram_verify_token
 
@@ -183,8 +191,7 @@ async def get_workflow_telegram_status(
                 latency_ms=verify.get("latency_ms", 0),
             )
 
-    cfg.pop("_bot_token", None)
-    return {"success": True, "telegram": cfg}
+    return {"success": True, "telegram": _with_tg_runtime(cfg)}
 
 
 @router.post("/telegram/connect")
@@ -192,7 +199,7 @@ async def connect_workflow_telegram(
     data: Dict[str, Any] = Body(...),
     user=Depends(get_optional_current_user)
 ):
-    """Connects/updates Telegram Bot credentials, verifies via getMe, and records status logs."""
+    """Connects/updates Telegram Bot credentials, verifies via getMe, and configures two-way chat & auto reports."""
     import time as _t
     from workflows.telegram_service import telegram_verify_token, telegram_detect_chats
 
@@ -201,6 +208,9 @@ async def connect_workflow_telegram(
     chat_id = data.get("chat_id")
     is_enabled = bool(data.get("is_enabled", True))
     verify_live = bool(data.get("verify_live", True))
+    inter_val = data.get("interactive_chat_enabled")
+    autorep_val = data.get("auto_send_reports")
+    allowed_cids = data.get("allowed_chat_ids")
 
     current = await WorkflowStore.get_telegram_config(include_plaintext_token=True)
     effective_tok = (raw_token.strip() if isinstance(raw_token, str) and raw_token.strip() else current.get("_bot_token", ""))
@@ -212,6 +222,14 @@ async def connect_workflow_telegram(
     now_s = _t.strftime("%Y-%m-%d %H:%M:%S")
     detected_chats: List[Dict[str, Any]] = []
 
+    extra_kwargs: Dict[str, Any] = {}
+    if inter_val is not None:
+        extra_kwargs["interactive_chat_enabled"] = bool(inter_val)
+    if autorep_val is not None:
+        extra_kwargs["auto_send_reports"] = bool(autorep_val)
+    if allowed_cids is not None:
+        extra_kwargs["allowed_chat_ids"] = str(allowed_cids)
+
     if not is_enabled:
         saved = await WorkflowStore.save_telegram_config(
             bot_token=effective_tok,
@@ -219,6 +237,7 @@ async def connect_workflow_telegram(
             is_enabled=False,
             status="Disconnected",
             last_error="",
+            **extra_kwargs,
         )
         await WorkflowStore.record_telegram_log(
             event_type="disconnect",
@@ -227,7 +246,7 @@ async def connect_workflow_telegram(
             chat_id=effective_cid,
             message_preview="Telegram connection disabled",
         )
-        return {"success": True, "verified": False, "telegram": saved, "detected_chats": []}
+        return {"success": True, "verified": False, "telegram": _with_tg_runtime(saved), "detected_chats": []}
 
     if verify_live:
         verify = await telegram_verify_token(effective_tok)
@@ -240,6 +259,7 @@ async def connect_workflow_telegram(
                 status="Error",
                 last_verified_at=now_s,
                 last_error=err,
+                **extra_kwargs,
             )
             await WorkflowStore.record_telegram_log(
                 event_type="connect",
@@ -254,7 +274,7 @@ async def connect_workflow_telegram(
                 "success": False,
                 "verified": False,
                 "error": err,
-                "telegram": saved,
+                "telegram": _with_tg_runtime(saved),
                 "detected_chats": [],
             }
 
@@ -275,6 +295,7 @@ async def connect_workflow_telegram(
             bot_first_name=verify.get("bot_first_name", ""),
             last_verified_at=now_s,
             last_error="",
+            **extra_kwargs,
         )
         await WorkflowStore.record_telegram_log(
             event_type="connect",
@@ -289,7 +310,7 @@ async def connect_workflow_telegram(
             "success": True,
             "verified": True,
             "message": f"Telegram connected as {saved.get('bot_username')}",
-            "telegram": saved,
+            "telegram": _with_tg_runtime(saved),
             "detected_chats": detected_chats,
         }
 
@@ -300,6 +321,7 @@ async def connect_workflow_telegram(
         is_enabled=True,
         status="Connected" if (effective_tok and effective_cid) else "Standby",
         last_error="",
+        **extra_kwargs,
     )
     await WorkflowStore.record_telegram_log(
         event_type="connect",
@@ -308,7 +330,7 @@ async def connect_workflow_telegram(
         chat_id=effective_cid,
         message_preview="Telegram credentials saved (without live ping)",
     )
-    return {"success": True, "verified": False, "telegram": saved, "detected_chats": []}
+    return {"success": True, "verified": False, "telegram": _with_tg_runtime(saved), "detected_chats": []}
 
 
 @router.post("/telegram/detect-chat")
@@ -355,7 +377,7 @@ async def test_workflow_telegram_message(
         workflow_name="Manual Telegram Connection Test",
         bot_username=cfg.get("bot_username") or "",
     )
-    updated_cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
+    updated_cfg = _with_tg_runtime(await WorkflowStore.get_telegram_config(include_plaintext_token=False))
     return {"success": res["ok"], "delivery": res, "telegram": updated_cfg}
 
 
@@ -382,7 +404,7 @@ async def disconnect_workflow_telegram(
         chat_id=before.get("chat_id", ""),
         message_preview="Telegram disconnected" + (" & token cleared" if clear_token else ""),
     )
-    return {"success": True, "telegram": saved}
+    return {"success": True, "telegram": _with_tg_runtime(saved)}
 
 
 @router.get("/telegram/logs")
@@ -395,7 +417,7 @@ async def get_workflow_telegram_logs(
     """Returns Telegram connection & delivery audit logs along with current connection status."""
     await WorkflowStore.init_tables_and_seed()
     logs = await WorkflowStore.list_telegram_logs(limit=limit, status_filter=status, event_filter=event_type)
-    cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
+    cfg = _with_tg_runtime(await WorkflowStore.get_telegram_config(include_plaintext_token=False))
     return {"success": True, "logs": logs, "telegram": cfg}
 
 
@@ -405,6 +427,158 @@ async def clear_workflow_telegram_logs(user=Depends(get_optional_current_user)):
     await WorkflowStore.init_tables_and_seed()
     deleted = await WorkflowStore.clear_telegram_logs()
     return {"success": True, "deleted": deleted}
+
+
+@router.get("/telegram/chats")
+async def get_workflow_telegram_chats(
+    limit: int = Query(40, le=120),
+    user=Depends(get_optional_current_user)
+):
+    """Returns two-way Telegram chat conversations, automated reports, and current WORKFLOWS (Auto) status."""
+    await WorkflowStore.init_tables_and_seed()
+    chats = await WorkflowStore.list_telegram_chats(limit=limit)
+    digest = await WorkflowStore.build_workflows_status_report(max_workflows=6, max_runs=4)
+    cfg = _with_tg_runtime(await WorkflowStore.get_telegram_config(include_plaintext_token=False))
+    return {"success": True, "chats": chats, "workflow_digest": digest, "telegram": cfg}
+
+
+@router.post("/telegram/chat/command")
+async def run_telegram_chat_command(
+    data: Dict[str, Any] = Body(...),
+    user=Depends(get_optional_current_user)
+):
+    """Executes an interactive Telegram chat command (e.g. 'ping 192.168.9.2 server and show status'), logs chat & optionally replies to Telegram."""
+    from workflows.telegram_service import handle_telegram_chat_message
+
+    await WorkflowStore.init_tables_and_seed()
+    msg = (data.get("message") or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="Command message cannot be empty.")
+
+    cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
+    chat_id = (data.get("chat_id") or "").strip() or cfg.get("chat_id") or "studio_console"
+    sender_name = (data.get("sender_name") or "").strip() or "Studio / Telegram User"
+    send_to_tg = bool(data.get("send_to_telegram", False))
+
+    res = await handle_telegram_chat_message(
+        chat_id=chat_id,
+        sender_name=sender_name,
+        text=msg,
+        dry_send=(not send_to_tg),
+        source="studio_or_api",
+    )
+    return {"success": True, **res}
+
+
+@router.post("/telegram/send-report")
+async def send_workflow_status_report_to_telegram(
+    data: Optional[Dict[str, Any]] = Body(default=None),
+    user=Depends(get_optional_current_user)
+):
+    """Sends a formatted WORKFLOWS (Auto) Status Report (or specific workflow's latest run) straight to Telegram chat."""
+    from workflows.telegram_service import telegram_send_message, format_workflow_execution_report
+
+    await WorkflowStore.init_tables_and_seed()
+    body = data if isinstance(data, dict) else {}
+    wf_id = (body.get("workflow_id") or "").strip()
+    cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=True)
+    tok = cfg.get("_bot_token") or ""
+    cid = (body.get("chat_id") or "").strip() or cfg.get("chat_id") or ""
+
+    if wf_id:
+        runs = await WorkflowStore.list_runs(workflow_id=wf_id, limit=1)
+        wf = await WorkflowStore.get_workflow(wf_id)
+        if runs:
+            report_text = format_workflow_execution_report(runs[0])
+            wf_name = runs[0].get("workflow_name") or (wf.get("name") if wf else wf_id)
+            st_label = runs[0].get("status", "INFO")
+        elif wf:
+            report_text = f"📊 WORKFLOWS (Auto) — {wf['name']}\n• Status: {wf.get('last_status', 'IDLE')}\n• Schedule: {wf.get('human_bn') or wf.get('daily_time')}\n• Next Run: {wf.get('next_run') or '-'}"
+            wf_name = wf["name"]
+            st_label = wf.get("last_status", "IDLE")
+        else:
+            raise HTTPException(status_code=404, detail="Workflow not found.")
+        summary_line = f"{wf_name} ({st_label})"
+    else:
+        digest = await WorkflowStore.build_workflows_status_report(max_workflows=8, max_runs=5)
+        report_text = digest["report_text"]
+        wf_name = "WORKFLOWS (Auto) Full Report"
+        st_label = "REPORT"
+        summary_line = digest["summary_line"]
+
+    chat_entry = await WorkflowStore.record_telegram_chat(
+        chat_id=cid or "studio_report",
+        sender_name=wf_name,
+        direction="report",
+        intent="workflow_report",
+        user_message=f"📤 WORKFLOWS (Auto) Report: {wf_name}",
+        reply_message=report_text,
+        workflow_status_summary=summary_line,
+        linked_workflow_id=wf_id,
+        status=st_label,
+    )
+
+    delivery = None
+    if tok and cid:
+        delivery = await telegram_send_message(
+            token=tok,
+            chat_id=cid,
+            text=report_text,
+            event_type="workflow_report",
+            workflow_id=wf_id,
+            workflow_name=wf_name,
+            bot_username=cfg.get("bot_username") or "",
+        )
+
+    return {
+        "success": True if (delivery is None or delivery.get("ok")) else False,
+        "report_text": report_text,
+        "chat": chat_entry,
+        "delivery": delivery,
+    }
+
+
+@router.delete("/telegram/chats")
+async def clear_workflow_telegram_chats(user=Depends(get_optional_current_user)):
+    """Clears recorded Telegram chat messages & report stream."""
+    await WorkflowStore.init_tables_and_seed()
+    deleted = await WorkflowStore.clear_telegram_chats()
+    return {"success": True, "deleted": deleted}
+
+
+@router.post("/telegram/webhook")
+async def receive_telegram_bot_webhook(data: Dict[str, Any] = Body(...)):
+    """Optional inbound Telegram Bot API Webhook endpoint for setups with a public HTTPS URL."""
+    from workflows.telegram_service import handle_telegram_chat_message
+
+    await WorkflowStore.init_tables_and_seed()
+    msg = data.get("message") or data.get("edited_message") or {}
+    text = (msg.get("text") or "").strip()
+    chat = msg.get("chat") or {}
+    incoming_cid = str(chat.get("id") or "").strip()
+    if not text or not incoming_cid:
+        return {"ok": True, "ignored": True}
+
+    cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
+    allowed_set = set()
+    if cfg.get("chat_id"):
+        allowed_set.add(cfg["chat_id"])
+    for extra in (cfg.get("allowed_chat_ids") or "").split(","):
+        if extra.strip():
+            allowed_set.add(extra.strip())
+
+    if allowed_set and incoming_cid not in allowed_set:
+        return {"ok": False, "error": "Unauthorized chat_id"}
+
+    sender = chat.get("username") or chat.get("first_name") or incoming_cid
+    res = await handle_telegram_chat_message(
+        chat_id=incoming_cid,
+        sender_name=str(sender),
+        text=text,
+        dry_send=False,
+        source="telegram_webhook",
+    )
+    return {"ok": True, "intent": res.get("intent")}
 
 
 @router.get("/runs/recent")

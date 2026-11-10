@@ -83,8 +83,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Cron scheduler startup error: {e}")
 
+    # Initialize Two-Way Telegram Chat Listener for WORKFLOWS (Auto)
+    try:
+        from workflows.telegram_service import telegram_chat_listener
+        await telegram_chat_listener.start()
+    except Exception as tg_lerr:
+        logger.error(f"Telegram chat listener startup error: {tg_lerr}")
+
     yield
     logger.info("Shutting down MyAgent services...")
+    try:
+        from workflows.telegram_service import telegram_chat_listener
+        await telegram_chat_listener.stop()
+    except Exception:
+        pass
     try:
         from cron import cron_scheduler
         await cron_scheduler.stop()
