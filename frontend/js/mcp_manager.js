@@ -8,12 +8,260 @@
 
 let allMcpServers = [];
 let allDiscoveredTools = [];
+let myAgentMcpStatus = null;
+let activeMcpConfigTab = 'claude';
 
 async function loadMcpDashboard() {
   await Promise.all([
+    loadMyAgentMcpServerStatus(),
     loadMcpServers(),
     loadAllToolsRegistry()
   ]);
+}
+
+// Load MyAgent Built-in MCP Server Status & Configs
+async function loadMyAgentMcpServerStatus() {
+  try {
+    const res = await fetch('/api/mcp/server/status', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    myAgentMcpStatus = await res.json();
+    renderMyAgentMcpServerStatus(myAgentMcpStatus);
+  } catch (err) {
+    console.error('Error loading MyAgent MCP Server status:', err);
+  }
+}
+
+function renderMyAgentMcpServerStatus(status) {
+  if (!status) return;
+
+  const badge = document.getElementById('mcp-server-status-badge');
+  const toggleBtn = document.getElementById('mcp-server-toggle-btn');
+  const kpiProto = document.getElementById('mcp-kpi-proto');
+  const kpiTools = document.getElementById('mcp-kpi-tools');
+  const kpiHost = document.getElementById('mcp-kpi-host');
+  const sseCode = document.getElementById('mcp-endpoint-sse');
+  const rpcCode = document.getElementById('mcp-endpoint-rpc');
+
+  const isEnabled = status.is_enabled;
+  if (badge) {
+    if (isEnabled) {
+      badge.style.background = 'rgba(16,185,129,0.2)';
+      badge.style.color = '#6ee7b7';
+      badge.style.borderColor = 'rgba(16,185,129,0.4)';
+      badge.innerText = '🟢 সক্রিয় (Online)';
+    } else {
+      badge.style.background = 'rgba(239,68,68,0.2)';
+      badge.style.color = '#fca5a5';
+      badge.style.borderColor = 'rgba(239,68,68,0.4)';
+      badge.innerText = '🔴 নিষ্ক্রিয় (Offline)';
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.innerText = isEnabled ? '⚡ সার্ভার বন্ধ করুন' : '⚡ সার্ভার চালু করুন';
+    toggleBtn.style.color = isEnabled ? 'var(--rose-red)' : 'var(--emerald-green)';
+    toggleBtn.style.borderColor = isEnabled ? 'rgba(244,63,94,0.4)' : 'rgba(16,185,129,0.4)';
+  }
+
+  if (kpiProto) kpiProto.innerText = status.protocol_version || 'MCP 2024-11-05';
+  if (kpiTools) kpiTools.innerText = `${status.tools_count || 18}+ টুলস রেডি`;
+  if (kpiHost) kpiHost.innerText = status.server_host || window.location.host;
+
+  if (sseCode && status.endpoints?.sse) {
+    sseCode.innerText = status.endpoints.sse;
+  }
+  if (rpcCode && status.endpoints?.rpc) {
+    rpcCode.innerText = status.endpoints.rpc;
+  }
+
+  // Update configuration code preview
+  updateMcpConfigCodePreview();
+}
+
+async function toggleMyAgentMcpServer() {
+  const current = myAgentMcpStatus?.is_enabled ?? true;
+  const target = !current;
+
+  try {
+    const res = await fetch('/api/mcp/server/toggle', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_enabled: target })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast(target ? 'MyAgent MCP সার্ভার সক্রিয় করা হয়েছে!' : 'MyAgent MCP সার্ভার নিষ্ক্রিয় করা হয়েছে!', 'info');
+    await loadMyAgentMcpServerStatus();
+  } catch (err) {
+    showToast(`টগল ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+function switchMcpConfigTab(tabName) {
+  activeMcpConfigTab = tabName;
+  ['claude', 'cursor', 'antigravity', 'stdio'].forEach(t => {
+    const btn = document.getElementById(`mcp-btn-tab-${t}`);
+    if (btn) {
+      if (t === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  updateMcpConfigCodePreview();
+}
+
+function updateMcpConfigCodePreview() {
+  const preview = document.getElementById('mcp-config-code-preview');
+  const hint = document.getElementById('mcp-config-path-hint');
+  if (!preview) return;
+
+  const currentHost = window.location.host || '192.168.9.9:3399';
+  const sseUrl = `http://${currentHost}/api/mcp/server/sse`;
+  const rpcUrl = `http://${currentHost}/api/mcp/server/rpc`;
+
+  if (activeMcpConfigTab === 'claude') {
+    const config = {
+      "mcpServers": {
+        "myagent_docker": {
+          "url": sseUrl
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> <code>%APPDATA%\\Claude\\claude_desktop_config.json</code> (Windows) অথবা <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS)`;
+    }
+  } else if (activeMcpConfigTab === 'cursor') {
+    const config = {
+      "mcpServers": {
+        "myagent-docker": {
+          "url": sseUrl
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> আপনার প্রজেক্ট রুটে <code>.cursor/mcp.json</code> অথবা Cursor Settings > Features > MCP > Add New MCP Server.`;
+    }
+  } else if (activeMcpConfigTab === 'antigravity') {
+    const config = {
+      "mcpServers": {
+        "myagent_docker": {
+          "url": sseUrl
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> Google Antigravity IDE Settings / <code>~/.gemini/antigravity/mcp_servers.json</code> (SSE Transport).`;
+    }
+  } else if (activeMcpConfigTab === 'stdio') {
+    const config = {
+      "mcpServers": {
+        "myagent_bridge": {
+          "command": "python",
+          "args": [
+            "-c",
+            `import sys, urllib.request, json; [print(urllib.request.urlopen(urllib.request.Request('${rpcUrl}', data=l.encode('utf-8'), headers={'Content-Type':'application/json'})).read().decode('utf-8'), flush=True) for l in sys.stdin if l.strip()]`
+          ]
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>Stdio ব্রিজ:</strong> যেসকল ক্লায়েন্ট শুধুমাত্র Stdio সাব-প্রসেস সাপোর্ট করে, তারা এই কমান্ড দিয়ে সরাসরি MyAgent ডকার অ্যাপের সাথে সংযুক্ত হতে পারবে।`;
+    }
+  }
+}
+
+function copyActiveMcpConfig() {
+  const preview = document.getElementById('mcp-config-code-preview');
+  if (!preview) return;
+  copyToClipboardText(preview.innerText, `${activeMcpConfigTab.toUpperCase()} কনফিগারেশন ক্লিপবোর্ডে কপি করা হয়েছে!`);
+}
+
+function copyToClipboardText(text, successMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(successMsg || 'কপি করা হয়েছে!', 'success');
+    }).catch(() => {
+      fallbackCopy(text, successMsg);
+    });
+  } else {
+    fallbackCopy(text, successMsg);
+  }
+}
+
+function fallbackCopy(text, successMsg) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  showToast(successMsg || 'কপি করা হয়েছে!', 'success');
+}
+
+async function runMyAgentMcpTest(testType) {
+  const out = document.getElementById('myagent-mcp-test-output');
+  if (!out) return;
+
+  out.innerText = `[${testType}] রিকোয়েস্ট পাঠানো হচ্ছে...`;
+
+  let payload = {};
+  if (testType === 'initialize') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "WebTester", version: "3.1.0" }
+      }
+    };
+  } else if (testType === 'tools/list') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/list",
+      params: {}
+    };
+  } else if (testType === 'ping_host') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "ping_network_diagnostics",
+        arguments: { target: "192.168.9.1", count: 2 }
+      }
+    };
+  } else if (testType === 'query_memory') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "query_company_memory",
+        arguments: { query: "Company guidelines and policies", top_k: 2 }
+      }
+    };
+  }
+
+  try {
+    const res = await fetch('/api/mcp/server/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    out.innerText = JSON.stringify(data, null, 2);
+    showToast('MCP টেস্ট সফল হয়েছে!', 'success');
+  } catch (err) {
+    out.innerText = `MCP টেস্ট ত্রুটি: ${err.message}`;
+    showToast(`টেস্ট ত্রুটি: ${err.message}`, 'error');
+  }
 }
 
 // Fetch all registered MCP servers

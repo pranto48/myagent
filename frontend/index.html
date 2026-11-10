@@ -1210,6 +1210,108 @@
             <p data-i18n="mcp_desc">ডকারাইজড এআই এজেন্টের জন্য বিল্ট-ইন ওপেন সোর্স টুলস স্যুট এবং ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা।</p>
           </div>
 
+          <!-- Section 0: MyAgent Built-in MCP Server (Expose Docker App as MCP Server) -->
+          <div class="card-panel mcp-server-hero-card" id="myagent-mcp-server-panel" style="margin-bottom: 24px;">
+            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div class="mcp-hero-icon">🚀</div>
+                <div>
+                  <h3 style="display:flex; align-items:center; gap:8px; margin:0;" data-i18n="mcp_server_option_title">
+                    MyAgent ডকার MCP সার্ভার (Expose as MCP Server)
+                    <span id="mcp-server-status-badge" class="badge-tag" style="background:rgba(16,185,129,0.2); color:#6ee7b7; border:1px solid rgba(16,185,129,0.4);">🟢 সক্রিয় (Online)</span>
+                  </h3>
+                  <p style="margin:4px 0 0 0; color:var(--text-muted); font-size:0.85rem;" data-i18n="mcp_server_option_desc">
+                    MyAgent ডকার অ্যাপকে একটি স্ট্যান্ডার্ড MCP সার্ভার হিসেবে এক্সপোজ করুন। Claude Desktop, Cursor IDE, Antigravity IDE থেকে সরাসরি এজেন্টের টুলস, কোম্পানি মেমোরি ও নেটওয়ার্ক পিং ব্যবহার করুন।
+                  </p>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <button id="mcp-server-toggle-btn" class="btn-sm-action" onclick="toggleMyAgentMcpServer()" style="font-size:0.82rem; padding:6px 12px; background:rgba(6,182,212,0.15); border-color:var(--cyan-glow); color:var(--cyan-glow);">
+                  ⚡ সার্ভার অন/অফ
+                </button>
+                <button class="btn-sm-action" onclick="loadMyAgentMcpServerStatus()" title="রিফ্রেশ" style="font-size:0.82rem; padding:6px 12px;">
+                  🔄 রিফ্রেশ
+                </button>
+              </div>
+            </div>
+
+            <!-- Server KPIs Strip -->
+            <div class="mcp-server-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:16px;">
+              <div class="mcp-kpi-box">
+                <span class="mcp-kpi-label">🔌 প্রোটোকল ভার্সন</span>
+                <span class="mcp-kpi-val" id="mcp-kpi-proto">MCP 2024-11-05</span>
+              </div>
+              <div class="mcp-kpi-box">
+                <span class="mcp-kpi-label">🛠️ এক্সপোজড টুলস</span>
+                <span class="mcp-kpi-val" id="mcp-kpi-tools">18+ টুলস রেডি</span>
+              </div>
+              <div class="mcp-kpi-box">
+                <span class="mcp-kpi-label">🌐 হোস্ট ও পোর্ট</span>
+                <span class="mcp-kpi-val" id="mcp-kpi-host">192.168.9.9:3399</span>
+              </div>
+              <div class="mcp-kpi-box">
+                <span class="mcp-kpi-label">⚡ ট্রান্সপোর্ট সাপোর্ট</span>
+                <span class="mcp-kpi-val">SSE + JSON-RPC + Stdio</span>
+              </div>
+            </div>
+
+            <!-- Server Endpoints Box -->
+            <div style="margin-top:16px; background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:8px; padding:12px 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                <strong style="color:var(--cyan-glow); font-size:0.85rem;">📡 সার্ভার এন্ডপয়েন্ট লিঙ্ক (Server Endpoints)</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted);">যেকোনো MCP ক্লায়েন্টে ব্যবহারযোগ্য</span>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px;">
+                <div style="display:flex; align-items:center; background:rgba(255,255,255,0.03); border-radius:6px; padding:6px 10px; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="color:var(--text-muted); font-size:0.75rem; width:70px; font-weight:600;">SSE URL:</span>
+                  <code id="mcp-endpoint-sse" style="flex:1; font-size:0.78rem; color:#6ee7b7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">http://192.168.9.9:3399/api/mcp/server/sse</code>
+                  <button class="btn-sm-action" style="padding:2px 8px; font-size:0.72rem; margin-left:6px;" onclick="copyToClipboardText(document.getElementById('mcp-endpoint-sse').innerText, 'SSE URL কপি করা হয়েছে!')">📋 কপি</button>
+                </div>
+                <div style="display:flex; align-items:center; background:rgba(255,255,255,0.03); border-radius:6px; padding:6px 10px; border:1px solid rgba(255,255,255,0.06);">
+                  <span style="color:var(--text-muted); font-size:0.75rem; width:70px; font-weight:600;">HTTP RPC:</span>
+                  <code id="mcp-endpoint-rpc" style="flex:1; font-size:0.78rem; color:#38bdf8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">http://192.168.9.9:3399/api/mcp/server/rpc</code>
+                  <button class="btn-sm-action" style="padding:2px 8px; font-size:0.72rem; margin-left:6px;" onclick="copyToClipboardText(document.getElementById('mcp-endpoint-rpc').innerText, 'RPC URL কপি করা হয়েছে!')">📋 কপি</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1-Click Client Configuration Tabs -->
+            <div style="margin-top:20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                <strong style="color:white; font-size:0.9rem;" data-i18n="mcp_ide_config_title">⚙️ ১-ক্লিক ক্লায়েন্ট কনফিগারেশন কোড (Client Setup)</strong>
+                <div class="mcp-config-tab-btns" style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button class="mcp-tab-btn active" id="mcp-btn-tab-claude" onclick="switchMcpConfigTab('claude')">Claude Desktop</button>
+                  <button class="mcp-tab-btn" id="mcp-btn-tab-cursor" onclick="switchMcpConfigTab('cursor')">Cursor IDE</button>
+                  <button class="mcp-tab-btn" id="mcp-btn-tab-antigravity" onclick="switchMcpConfigTab('antigravity')">Antigravity IDE</button>
+                  <button class="mcp-tab-btn" id="mcp-btn-tab-stdio" onclick="switchMcpConfigTab('stdio')">Python Stdio Bridge</button>
+                </div>
+              </div>
+
+              <div class="mcp-config-tab-content" style="position:relative; background:#0d1117; border:1px solid var(--border-subtle); border-radius:8px; padding:14px;">
+                <button class="btn-sm-action" onclick="copyActiveMcpConfig()" style="position:absolute; top:10px; right:12px; font-size:0.75rem; z-index:2; background:rgba(255,255,255,0.1);">
+                  📋 কনফিগ কপি করুন
+                </button>
+                <pre id="mcp-config-code-preview" style="margin:0; font-family:monospace; font-size:0.8rem; color:#a5f3fc; overflow-x:auto; max-height:220px; line-height:1.5;">// কনফিগ লোড হচ্ছে...</pre>
+                <div id="mcp-config-path-hint" style="margin-top:8px; font-size:0.74rem; color:var(--text-muted);"></div>
+              </div>
+            </div>
+
+            <!-- Live MCP Server Test Runner -->
+            <div style="margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <strong style="color:var(--purple-neon); font-size:0.88rem;" data-i18n="mcp_server_test_title">🧪 লাইভ MCP সার্ভার ইন্টারেক্টিভ টেস্টার</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted);">ব্রাউজার থেকে সরাসরি MyAgent MCP সার্ভার টেস্ট করুন</span>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('initialize')">🤝 1. Initialize Handshake</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('tools/list')">📋 2. List All Tools</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('ping_host')">🟢 3. Call ping_network_diagnostics (192.168.9.1)</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('query_memory')">🧠 4. Call query_company_memory</button>
+              </div>
+              <pre id="myagent-mcp-test-output" style="background:#090d16; border:1px solid var(--border-subtle); border-radius:6px; padding:12px; height:140px; overflow-y:auto; font-size:0.78rem; color:#38bdf8; margin:0; font-family:monospace;">পরীক্ষার জন্য উপরের যেকোনো টেস্ট বাটনে ক্লিক করুন...</pre>
+            </div>
+          </div>
+
           <!-- Section 1: 1-Click Open Source MCP Templates -->
           <div class="card-panel">
             <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">

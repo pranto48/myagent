@@ -1,13 +1,20 @@
-# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.0.0
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd) | Made By Arif (https://arifmahmud.com/) | Version: 3.1.0
 import json
-from fastapi import APIRouter, HTTPException, Depends
+import uuid
+import asyncio
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from mcp.store import MCPStore
 from mcp.manager import MCPManager
+from mcp.server import MyAgentMCPServer
 from agent.tools import AgentTools
 
 router = APIRouter(prefix="/api/mcp", tags=["Model Context Protocol (MCP)"])
+
+class ToggleServerRequest(BaseModel):
+    is_enabled: bool
 
 class AddMCPServerRequest(BaseModel):
     name: str
@@ -180,3 +187,102 @@ async def mock_sse_endpoint(payload: Dict[str, Any]):
             }
         }
     return {"jsonrpc": "2.0", "id": payload.get("id", 0), "result": "ok"}
+
+# ==============================================================================
+# MyAgent Built-in MCP Server Endpoints (Expose Docker App as MCP Server)
+# ==============================================================================
+
+@router.get("/server/status")
+async def get_myagent_mcp_server_status(request: Request):
+    """
+    Returns live status, exposed tools list, and ready-to-copy client
+    configurations (Claude Desktop, Cursor, Antigravity, Cline) for MyAgent MCP Server.
+    """
+    host = request.headers.get("host", "192.168.9.9:3399")
+    return await MyAgentMCPServer.get_status(host=host)
+
+@router.post("/server/toggle")
+async def toggle_myagent_mcp_server(req: ToggleServerRequest):
+    """Enables or disables the built-in MCP server feature."""
+    new_state = await MyAgentMCPServer.set_enabled(req.is_enabled)
+    return {
+        "success": True,
+        "is_enabled": new_state,
+        "message": f"MyAgent MCP Server is now {'enabled' if new_state else 'disabled'}."
+    }
+
+@router.post("/server/rpc")
+async def myagent_mcp_rpc(payload: Any, request: Request):
+    """
+    Stateless HTTP JSON-RPC 2.0 handler for MyAgent MCP Server.
+    Supports single JSON-RPC calls or batches for tools/list, tools/call, prompts, resources.
+    """
+    if not MyAgentMCPServer.is_enabled():
+        raise HTTPException(status_code=503, detail="MyAgent MCP Server is currently disabled.")
+    host = request.headers.get("host", "192.168.9.9:3399")
+    return await MyAgentMCPServer.handle_rpc(payload, host=host)
+
+@router.get("/server/sse")
+async def myagent_mcp_sse(request: Request):
+    """
+    Server-Sent Events (SSE) streaming endpoint for MCP clients
+    (Claude Desktop, Cursor IDE, Antigravity, Cline).
+    """
+    if not MyAgentMCPServer.is_enabled():
+        raise HTTPException(status_code=503, detail="MyAgent MCP Server is currently disabled.")
+
+    session_id = uuid.uuid4().hex
+    queue = MyAgentMCPServer.register_session(session_id)
+    host = request.headers.get("host", "192.168.9.9:3399")
+    messages_url = f"/api/mcp/server/messages?sessionId={session_id}"
+
+    async def event_generator():
+        try:
+            # Step 1: Advertise message endpoint according to standard MCP SSE specification
+            yield f"event: endpoint\ndata: {messages_url}\n\n"
+
+            # Step 2: Stream outgoing message queue with keepalive
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield f"event: message\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            MyAgentMCPServer.unregister_session(session_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+@router.post("/server/messages")
+async def myagent_mcp_messages(
+    payload: Any,
+    request: Request,
+    sessionId: Optional[str] = None,
+    session_id: Optional[str] = None
+):
+    """
+    Receives JSON-RPC 2.0 messages from active SSE client sessions.
+    Dispatches to MyAgent tool suite and streams responses back to the SSE session.
+    """
+    if not MyAgentMCPServer.is_enabled():
+        raise HTTPException(status_code=503, detail="MyAgent MCP Server is currently disabled.")
+
+    sid = sessionId or session_id
+    host = request.headers.get("host", "192.168.9.9:3399")
+    response = await MyAgentMCPServer.handle_rpc(payload, host=host)
+
+    if sid and MyAgentMCPServer.has_session(sid):
+        await MyAgentMCPServer.push_to_session(sid, response)
+
+    return response

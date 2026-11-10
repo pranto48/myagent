@@ -304,6 +304,10 @@ const I18N_TRANSLATIONS = {
     // MCP View
     mcp_title: "🔌 টুলস ও মডেল কনটেক্সট প্রোটোকল (MCP) হাব",
     mcp_desc: "ডকারাইজড এআই এজেন্টের জন্য বিল্ট-ইন ওপেন সোর্স টুলস স্যুট এবং ডায়নামিক এমসিপি সার্ভার ব্যবস্থাপনা।",
+    mcp_server_option_title: "🚀 MyAgent ডকার MCP সার্ভার (Expose as MCP Server)",
+    mcp_server_option_desc: "MyAgent ডকার অ্যাপকে একটি স্ট্যান্ডার্ড MCP সার্ভার হিসেবে এক্সপোজ করুন। Claude Desktop, Cursor IDE, Antigravity IDE থেকে সরাসরি এজেন্টের টুলস, কোম্পানি মেমোরি ও নেটওয়ার্ক পিং ব্যবহার করুন।",
+    mcp_ide_config_title: "⚙️ ১-ক্লিক ক্লায়েন্ট কনফিগারেশন কোড (Client Setup)",
+    mcp_server_test_title: "🧪 লাইভ MCP সার্ভার ইন্টারেক্টিভ টেস্টার",
     mcp_templates_title: "⚡ ১-ক্লিক ওপেন সোর্স MCP সার্ভার টেমপ্লেট",
     mcp_templates_desc: "একটি ক্লিকেই স্ট্যান্ডার্ড মডেল কনটেক্সট প্রোটোকল সার্ভার যুক্ত করুন",
     mcp_btn_add_custom: "+ কাস্টম MCP সার্ভার যোগ করুন",
@@ -1215,6 +1219,10 @@ const I18N_TRANSLATIONS = {
     // MCP View
     mcp_title: "🔌 Tools & Model Context Protocol (MCP) Hub",
     mcp_desc: "Dynamic open-source tools suite and model context protocol server management.",
+    mcp_server_option_title: "🚀 MyAgent Docker MCP Server (Expose as MCP Server)",
+    mcp_server_option_desc: "Expose MyAgent Docker app as a standard MCP server. Use MyAgent tools, company memory RAG, and network diagnostics directly from Claude Desktop, Cursor IDE, and Antigravity IDE.",
+    mcp_ide_config_title: "⚙️ 1-Click Client Configuration Code (Client Setup)",
+    mcp_server_test_title: "🧪 Live MCP Server Interactive Tester",
     mcp_templates_title: "⚡ 1-Click Open Source MCP Templates",
     mcp_templates_desc: "Connect standard model context protocol servers with one click",
     mcp_btn_add_custom: "+ Add Custom MCP Server",
