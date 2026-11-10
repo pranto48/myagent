@@ -16,6 +16,7 @@ let wfState = {
   templates: [],
   nodeCatalog: [],
   tools: [],
+  mcpServers: [],
   subagents: [],
   models: [],
   recentRuns: [],
@@ -108,6 +109,7 @@ function wfNodeMeta(type) {
     ai_agent: { icon: '🧠', label_bn: 'এআই এজেন্ট', label_en: 'AI Agent', color: '#a855f7', category: 'ai' },
     subagent: { icon: '🤖', label_bn: 'সাব-এজেন্ট', label_en: 'Sub-Agent', color: '#8b5cf6', category: 'ai' },
     tool_call: { icon: '🛠️', label_bn: 'টুল এক্সিকিউট', label_en: 'Agent Tool', color: '#3b82f6', category: 'action' },
+    mcp_tool: { icon: '🔌', label_bn: 'MCP টুল কল', label_en: 'MCP Tool Call', color: '#6366f1', category: 'action' },
     python_transform: { icon: '🐍', label_bn: 'পাইথন ট্রান্সফর্ম', label_en: 'Python Transform', color: '#eab308', category: 'action' },
     loop_foreach: { icon: '🔁', label_bn: 'ব্যাচ লুপ (ForEach)', label_en: 'ForEach Loop', color: '#6366f1', category: 'logic' },
     delay_wait: { icon: '⏳', label_bn: 'অপেক্ষা টাইমার', label_en: 'Delay Timer', color: '#64748b', category: 'logic' },
@@ -157,12 +159,14 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
         wfState.templates = tplData.templates || [];
         wfState.nodeCatalog = tplData.node_catalog || [];
         wfState.tools = tplData.tools || [];
+        wfState.mcpServers = tplData.mcp_servers || [];
         wfState.workflowsList = tplData.workflows_list || [];
         wfState.subagents = tplData.subagents || [];
         wfState.models = tplData.models || [];
         if (!hadPalette) populateQuickModelSelect();
         renderNodePalette();
         renderTemplatesLibrary();
+        renderWorkflowMcpStatusPill();
       }
     }
 
@@ -347,6 +351,7 @@ async function submitQuickDailyTask(event) {
   const save_memory = !!document.getElementById('wf-quick-save-memory')?.checked;
   const post_to_chat = !!document.getElementById('wf-quick-post-chat')?.checked;
   const notify_channels = !!document.getElementById('wf-quick-notify-channels')?.checked;
+  const use_mcp = document.getElementById('wf-quick-use-mcp')?.checked !== false;
   const run_immediately = !!document.getElementById('wf-quick-run-now')?.checked;
 
   const btn = document.getElementById('btn-wf-quick-create');
@@ -371,6 +376,7 @@ async function submitQuickDailyTask(event) {
         save_memory,
         post_to_chat,
         notify_channels,
+        use_mcp,
         run_immediately,
         language: typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn'
       })
@@ -1384,6 +1390,8 @@ function getNodeSummaryLine(node) {
       return `Agent: ${c.agent_id || 'swarm'}`;
     case 'tool_call':
       return `Tool: ${c.tool_name || 'system_info'}`;
+    case 'mcp_tool':
+      return `🔌 MCP: ${c.tool_name || 'select tool'}${c.server_id ? ' @ ' + c.server_id : ''}`;
     case 'python_transform':
       return `Python: ${(c.code || '').split('\n').slice(0, 2).join(' ')}`;
     case 'loop_foreach': {
@@ -2245,7 +2253,8 @@ function renderNodeInspector() {
         </div>
       </div>
       <div class="wf-check-row">
-        <label><input type="checkbox" ${c.enable_tools !== false ? 'checked' : ''} onchange="updateNodeCfg('enable_tools', this.checked)"> 🛠️ Tools</label>
+        <label><input type="checkbox" ${c.enable_tools !== false ? 'checked' : ''} onchange="updateNodeCfg('enable_tools', this.checked)"> 🛠️ Built-in Tools</label>
+        <label title="প্রয়োজন হলে MCP Hub-এ নিবন্ধিত এক্সটার্নাল MCP টুল ব্যবহার করবে"><input type="checkbox" ${c.use_mcp !== false ? 'checked' : ''} onchange="updateNodeCfg('use_mcp', this.checked)"> 🔌 Use MCP if Needed</label>
         <label><input type="checkbox" ${c.use_memory !== false ? 'checked' : ''} onchange="updateNodeCfg('use_memory', this.checked)"> 🧠 RAG Memory</label>
         <label title="যদি লোকাল LLM সার্ভার অফলাইন থাকে তবে আপস্ট্রিম টেলিমেট্রি দিয়ে ডাইজেস্ট তৈরি করবে"><input type="checkbox" ${c.fallback_on_error ? 'checked' : ''} onchange="updateNodeCfg('fallback_on_error', this.checked)"> 🛡️ Offline Digest Fallback</label>
       </div>
@@ -2268,12 +2277,13 @@ function renderNodeInspector() {
       </div>
     `;
   } else if (node.type === 'tool_call') {
-    const toolOpts = (wfState.tools || []).map(t =>
-      `<option value="${wfEsc(t.name)}" ${(c.tool_name || 'system_info') === t.name ? 'selected' : ''}>${wfEsc(t.name)}</option>`
-    ).join('');
+    const toolOpts = (wfState.tools || []).map(t => {
+      const tag = t.source === 'mcp' ? '[MCP] ' : '';
+      return `<option value="${wfEsc(t.name)}" ${(c.tool_name || 'system_info') === t.name ? 'selected' : ''}>${tag}${wfEsc(t.name)}</option>`;
+    }).join('');
     fieldsHtml = `
       <div class="wf-field-group">
-        <label>টুল নির্বাচন (Agent Tool)</label>
+        <label>টুল নির্বাচন (Built-in + MCP Tools)</label>
         <select class="text-input" onchange="updateNodeCfg('tool_name', this.value)">${toolOpts}</select>
       </div>
       <div class="wf-field-group">
@@ -2282,6 +2292,67 @@ function renderNodeInspector() {
                   onfocus="wfState.lastFocusedFieldId='wf-cfg-args'"
                   onchange="updateNodeCfg('args_json', this.value)">${wfEsc(typeof c.args_json === 'string' ? c.args_json : JSON.stringify(c.args_json || {}, null, 2))}</textarea>
       </div>
+    `;
+  } else if (node.type === 'mcp_tool') {
+    const servers = wfState.mcpServers || [];
+    const activeServers = servers.filter(s => s.is_enabled !== false);
+    const selectedSid = c.server_id || '';
+    const srvOpts = [
+      `<option value="" ${!selectedSid ? 'selected' : ''}>⚡ Auto (যেকোনো সক্রিয় MCP সার্ভার)</option>`,
+      ...servers.map(s => `<option value="${wfEsc(s.id)}" ${selectedSid === s.id ? 'selected' : ''}>🔌 ${wfEsc(s.name)} (${wfEsc(s.transport)} • ${(s.tools_cache || []).length} tools)</option>`)
+    ].join('');
+
+    const mcpToolsList = [];
+    activeServers.forEach(s => {
+      if (selectedSid && s.id !== selectedSid) return;
+      (s.tools_cache || []).forEach(t => {
+        mcpToolsList.push({ ...t, serverName: s.name, serverId: s.id });
+      });
+    });
+    const curTool = c.tool_name || (mcpToolsList[0] ? mcpToolsList[0].name : '');
+    const matchedSchema = mcpToolsList.find(t => t.name === curTool);
+    const toolSelectOpts = mcpToolsList.map(t =>
+      `<option value="${wfEsc(t.name)}" ${curTool === t.name ? 'selected' : ''}>[${wfEsc(t.serverName)}] ${wfEsc(t.name)}</option>`
+    );
+    if (curTool && !matchedSchema) {
+      toolSelectOpts.unshift(`<option value="${wfEsc(curTool)}" selected>${wfEsc(curTool)} (Custom / Cached)</option>`);
+    }
+    const schemaProps = matchedSchema?.inputSchema?.properties ? Object.keys(matchedSchema.inputSchema.properties) : [];
+
+    fieldsHtml = `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+        <span style="font-size:0.74rem; color:#a5b4fc; font-weight:700;">🔌 Active MCP Servers: ${activeServers.length}</span>
+        <div style="display:flex; gap:5px;">
+          <button type="button" class="wf-chip-btn" onclick="refreshWorkflowMcpServer('${wfEsc(selectedSid || (activeServers[0]?.id || ''))}')" title="MCP টুল লিস্ট রিফ্রেশ">🔄 Ping/Refresh</button>
+          <button type="button" class="wf-chip-btn" onclick="switchTab('mcp')">⚙️ MCP Hub</button>
+        </div>
+      </div>
+      <div class="wf-field-group">
+        <label>টার্গেট MCP সার্ভার</label>
+        <select class="text-input" onchange="updateNodeCfg('server_id', this.value); renderNodeInspector();">${srvOpts}</select>
+      </div>
+      <div class="wf-field-group">
+        <label>আবিষ্কৃত MCP টুল (Discovered Tool)</label>
+        <select class="text-input" onchange="updateNodeCfg('tool_name', this.value); renderNodeInspector();">${toolSelectOpts.join('') || '<option value="">কোনো MCP টুল নেই</option>'}</select>
+      </div>
+      <div class="wf-field-group">
+        <label>কাস্টম Tool Name (ঐচ্ছিক ওভাররাইড)</label>
+        <input type="text" class="text-input" value="${wfEsc(c.tool_name || '')}" placeholder="e.g. fetch_article_markdown" onchange="updateNodeCfg('tool_name', this.value)">
+      </div>
+      ${matchedSchema ? `
+        <div style="font-size:0.72rem; color:var(--text-muted); padding:6px 8px; border-radius:6px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.22);">
+          <div>${wfEsc(matchedSchema.description || '')}</div>
+          ${schemaProps.length ? `<div style="margin-top:3px;">Params: <code>${wfEsc(schemaProps.join(', '))}</code> <button type="button" class="wf-chip-btn" style="margin-left:6px;" onclick="applyMcpSampleArgs()">📋 Sample JSON</button></div>` : ''}
+        </div>
+      ` : ''}
+      <div class="wf-field-group">
+        <label>MCP টুল আর্গুমেন্ট (JSON)</label>
+        <textarea id="wf-cfg-mcpargs" class="text-input wf-code-textarea" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-mcpargs'"
+                  onchange="updateNodeCfg('args_json', this.value)">${wfEsc(typeof c.args_json === 'string' ? c.args_json : JSON.stringify(c.args_json || {}, null, 2))}</textarea>
+        ${varsHtml}
+      </div>
+      <label style="font-size:0.76rem; cursor:pointer;"><input type="checkbox" ${c.fallback_on_error ? 'checked' : ''} onchange="updateNodeCfg('fallback_on_error', this.checked)"> MCP ত্রুটি হলেও ওয়ার্কফ্লো চালু রাখুন</label>
     `;
   } else if (node.type === 'python_transform') {
     fieldsHtml = `
@@ -3510,6 +3581,62 @@ async function clearWorkflowTelegramChats() {
   }
 }
 
+function renderWorkflowMcpStatusPill() {
+  const pillText = document.getElementById('wf-mcp-pill-text');
+  if (!pillText) return;
+  const servers = wfState.mcpServers || [];
+  const active = servers.filter(s => s.is_enabled !== false);
+  const totalTools = active.reduce((acc, s) => acc + (s.tools_cache ? s.tools_cache.length : 0), 0);
+  pillText.textContent = `MCP: ${active.length} Server (${totalTools} Tools)`;
+}
+
+async function refreshWorkflowMcpServer(serverId = '') {
+  try {
+    if (serverId) {
+      const res = await wfFetch(`/api/workflows/mcp/ping/${encodeURIComponent(serverId)}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.mcp_servers) wfState.mcpServers = data.mcp_servers;
+      if (data.success) {
+        wfToast(`🔌 MCP '${serverId}' রিফ্রেশ হয়েছে (${data.ping?.latency_ms || 0}ms, ${(data.ping?.tools || []).length} tools)!`, 'success');
+      } else {
+        wfToast('⚠️ MCP Ping সতর্কতা: ' + (data.ping?.message || 'Offline'), 'warning');
+      }
+    } else {
+      const res = await wfFetch('/api/workflows/mcp/servers');
+      const data = await res.json();
+      if (data.mcp_servers) wfState.mcpServers = data.mcp_servers;
+      wfToast('🔄 MCP সার্ভার লিস্ট আপডেট হয়েছে।', 'info');
+    }
+    renderWorkflowMcpStatusPill();
+    if (wfState.selectedNodeId) renderNodeInspector();
+  } catch (err) {
+    wfToast('MCP রিফ্রেশ ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+function applyMcpSampleArgs() {
+  const wf = wfState.activeWorkflow;
+  const node = wf ? (wf.nodes || []).find(n => n.id === wfState.selectedNodeId) : null;
+  if (!node) return;
+  const c = node.config || {};
+  const servers = (wfState.mcpServers || []).filter(s => s.is_enabled !== false);
+  let foundTool = null;
+  for (const s of servers) {
+    if (c.server_id && s.id !== c.server_id) continue;
+    const hit = (s.tools_cache || []).find(t => t.name === c.tool_name);
+    if (hit) { foundTool = hit; break; }
+  }
+  const props = foundTool?.inputSchema?.properties || {};
+  const sample = {};
+  Object.keys(props).forEach(k => {
+    const t = props[k]?.type || 'string';
+    sample[k] = t === 'integer' || t === 'number' ? 0 : (t === 'boolean' ? true : (k === 'url' ? 'https://example.com' : '{{prev.output}}'));
+  });
+  updateNodeCfg('args_json', JSON.stringify(sample, null, 2));
+  renderNodeInspector();
+  wfToast('📋 MCP টুল স্কিমা অনুযায়ী Sample JSON বসানো হয়েছে।', 'info');
+}
+
 // Global exports
 window.loadWorkflowsStudio = loadWorkflowsStudio;
 window.switchWorkflowsSubTab = switchWorkflowsSubTab;
@@ -3597,3 +3724,5 @@ window.closeQuickPicker = closeQuickPicker;
 window.runNodeQuickTestFromCard = runNodeQuickTestFromCard;
 window.onViewportMouseDown = onViewportMouseDown;
 window.onCanvasWheel = onCanvasWheel;
+window.refreshWorkflowMcpServer = refreshWorkflowMcpServer;
+window.applyMcpSampleArgs = applyMcpSampleArgs;

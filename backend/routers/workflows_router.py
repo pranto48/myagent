@@ -52,13 +52,26 @@ async def get_workflow_catalog_and_templates(user=Depends(get_optional_current_u
     from agent.tools import AgentTools
     from agent.openrouter_client import OPENROUTER_ALL_FREE_MODELS, FEATURED_OPENROUTER_MODELS, OpenRouterService
     from agent.subagents.work_engine import SubAgentWorkEngine
+    from mcp.store import MCPStore
+    from mcp.server import MyAgentMCPServer
     from config import settings
 
-    tools_schema = AgentTools.get_openai_tools_schema()
-    tool_names = [
-        {"name": t["function"]["name"], "description": t["function"].get("description", "")}
-        for t in tools_schema if t.get("function", {}).get("name")
-    ]
+    tools_schema = await AgentTools.get_all_tools_schema()
+    mcp_servers = await MCPStore.list_servers()
+    tool_names = []
+    for t in tools_schema:
+        fn = t.get("function", {})
+        t_name = fn.get("name")
+        if not t_name:
+            continue
+        desc = fn.get("description", "")
+        is_mcp = str(desc).startswith("[MCP:")
+        tool_names.append({
+            "name": t_name,
+            "description": desc,
+            "source": "mcp" if is_mcp else "builtin",
+            "parameters": fn.get("parameters", {"type": "object", "properties": {}})
+        })
     subagents = await SubAgentWorkEngine.get_all_subagents()
 
     models = [
@@ -76,6 +89,8 @@ async def get_workflow_catalog_and_templates(user=Depends(get_optional_current_u
         "templates": WORKFLOW_TEMPLATES,
         "node_catalog": NODE_CATALOG,
         "tools": tool_names,
+        "mcp_servers": mcp_servers,
+        "mcp_server_enabled": MyAgentMCPServer.is_enabled(),
         "workflows_list": [{"id": w["id"], "name": w["name"], "icon": w.get("icon", "⚡")} for w in all_wfs],
         "subagents": [
             {"id": "swarm", "name": "🐝 Full Multi-Agent Swarm Orchestrator", "icon": "🐝"},
@@ -126,6 +141,39 @@ async def delete_workflow_variable(
     if not ok:
         raise HTTPException(status_code=404, detail="Variable not found.")
     return {"success": True, "message": f"Deleted variable '{key}'."}
+
+
+# ==============================================================================
+# MCP Hub Integration Endpoints for WORKFLOWS (Auto)
+# ==============================================================================
+@router.get("/mcp/servers")
+async def get_workflow_mcp_servers(user=Depends(get_optional_current_user)):
+    """Lists all registered external/local MCP servers and discovered tools for WORKFLOWS (Auto)."""
+    from mcp.store import MCPStore
+    from mcp.server import MyAgentMCPServer
+    servers = await MCPStore.list_servers()
+    return {
+        "success": True,
+        "mcp_servers": servers,
+        "mcp_server_enabled": MyAgentMCPServer.is_enabled(),
+    }
+
+
+@router.post("/mcp/ping/{server_id}")
+async def ping_workflow_mcp_server(
+    server_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Pings an MCP server and refreshes its discovered tools cache inside WORKFLOWS (Auto)."""
+    from mcp.manager import MCPManager
+    from mcp.store import MCPStore
+    ping_res = await MCPManager.ping_server(server_id)
+    servers = await MCPStore.list_servers()
+    return {
+        "success": bool(ping_res.get("success")),
+        "ping": ping_res,
+        "mcp_servers": servers,
+    }
 
 
 # ==============================================================================
@@ -615,6 +663,7 @@ async def create_quick_daily_workflow(
     notify_channels = bool(data.get("notify_channels", False))
     custom_webhook_url = (data.get("custom_webhook_url") or "").strip()
     language = (data.get("language") or "bn").strip()
+    use_mcp = bool(data.get("use_mcp", True))
 
     wf = await WorkflowStore.build_quick_daily_workflow(
         name=name,
@@ -629,7 +678,8 @@ async def create_quick_daily_workflow(
         post_to_chat=post_to_chat,
         notify_channels=notify_channels,
         custom_webhook_url=custom_webhook_url,
-        language=language
+        language=language,
+        use_mcp=use_mcp
     )
 
     run_immediately = bool(data.get("run_immediately", False))

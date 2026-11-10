@@ -1334,6 +1334,17 @@ class AgentTools:
         except Exception as e:
             return f"Workflow architect error: {str(e)}"
 
+    @staticmethod
+    async def get_workflows_status_report() -> str:
+        """Returns comprehensive WORKFLOWS (Auto) live status, schedules, and latest execution traces."""
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.init_tables_and_seed()
+            digest = await WorkflowStore.build_workflows_status_report(max_workflows=12, max_runs=8)
+            return digest.get("report_text", "") or json.dumps(digest, ensure_ascii=False)
+        except Exception as e:
+            return f"Failed to inspect workflows status: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -1548,11 +1559,13 @@ class AgentTools:
                     frequency=args.get("frequency", "daily"),
                     project_name=args.get("project_name")
                 )
+            elif tool_name == "get_workflows_status_report":
+                return await cls.get_workflows_status_report()
 
             else:
                 # Check dynamic MCP manager
                 from mcp.manager import MCPManager
-                return await MCPManager.call_tool(tool_name, args)
+                return await MCPManager.call_tool(tool_name, args, server_id=args.get("_mcp_server_id"))
         except Exception as e:
             logger.error(f"Error dispatching tool {tool_name}: {e}")
             return f"Error executing tool '{tool_name}': {str(e)}"
@@ -2150,6 +2163,17 @@ class AgentTools:
                 "function": {
                     "name": "system_info",
                     "description": "Returns Docker container runtime health: CPU load, RAM usage, and available disk space.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_workflows_status_report",
+                    "description": "Returns comprehensive WORKFLOWS (Auto) live status, schedules, and latest autonomous run reports.",
                     "parameters": {
                         "type": "object",
                         "properties": {}

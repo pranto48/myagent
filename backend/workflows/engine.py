@@ -737,6 +737,7 @@ class WorkflowEngine:
                 proj_name = (cfg.get("project_name") or "").strip() or None
                 use_mem = bool(cfg.get("use_memory", True))
                 enable_tools = bool(cfg.get("enable_tools", True))
+                use_mcp = bool(cfg.get("use_mcp", True))
                 lang = cfg.get("language", "bn")
                 max_turns = int(cfg.get("max_turns", 5))
 
@@ -748,6 +749,7 @@ class WorkflowEngine:
                         project_name=proj_name,
                         use_memory=use_mem,
                         enable_tools=enable_tools,
+                        include_mcp=use_mcp,
                         language=lang,
                         max_turns=max_turns
                     ),
@@ -836,6 +838,46 @@ class WorkflowEngine:
                 output = str(t_out)
                 data = {"tool_name": tool_name, "args": tool_args}
                 summary = f"Tool '{tool_name}' executed"
+
+            # 4A-2. Explicit MCP Hub Tool Call Node
+            elif ntype == "mcp_tool":
+                from mcp.manager import MCPManager
+                server_id = (cfg.get("server_id") or "").strip()
+                tool_name = (cfg.get("tool_name") or "").strip()
+                if not tool_name:
+                    raise ValueError("MCP tool_name cannot be empty.")
+
+                raw_args = cfg.get("args_json", "{}")
+                if isinstance(raw_args, dict):
+                    tool_args = raw_args
+                else:
+                    try:
+                        tool_args = json.loads(str(raw_args).strip() or "{}")
+                    except Exception:
+                        tool_args = {"input": str(raw_args or ctx.get("prev", {}).get("output", ""))}
+
+                if is_dry_run:
+                    output = f"[🧪 DRY-RUN PREVIEW] Would call MCP tool '{tool_name}' (server='{server_id or 'auto'}') with args={json.dumps(tool_args, ensure_ascii=False)}"
+                    data = {"dry_run": True, "server_id": server_id, "tool_name": tool_name, "args": tool_args, "source": "mcp"}
+                    summary = f"[DRY-RUN] MCP: {tool_name}"
+                else:
+                    mcp_out = await asyncio.wait_for(
+                        MCPManager.call_tool(tool_name, tool_args, server_id=server_id or None),
+                        timeout=60.0
+                    )
+                    output = str(mcp_out)
+                    is_err_out = output.startswith("MCP Error:") or output.startswith("Error executing MCP tool")
+                    data = {
+                        "server_id": server_id or "auto",
+                        "tool_name": tool_name,
+                        "args": tool_args,
+                        "source": "mcp",
+                    }
+                    if is_err_out and not bool(cfg.get("fallback_on_error", False)):
+                        status = "FAILED"
+                        summary = f"MCP '{tool_name}' error"
+                    else:
+                        summary = f"🔌 MCP '{tool_name}' ({len(output)} chars)"
 
             # 4B. Python Data Transform Node
             elif ntype == "python_transform":

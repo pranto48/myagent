@@ -177,6 +177,7 @@ NODE_CATALOG: List[Dict[str, Any]] = [
             "project_name": "",
             "use_memory": True,
             "enable_tools": True,
+            "use_mcp": True,
             "language": "bn",
             "max_turns": 5
         }
@@ -204,6 +205,20 @@ NODE_CATALOG: List[Dict[str, Any]] = [
         "default_config": {
             "tool_name": "system_info",
             "args_json": "{}"
+        }
+    },
+    {
+        "type": "mcp_tool",
+        "category": "action",
+        "icon": "🔌",
+        "label_en": "MCP Tool Call",
+        "label_bn": "MCP টুল কল (External/Hub)",
+        "color": "#6366f1",
+        "default_config": {
+            "server_id": "",
+            "tool_name": "fetch_article_markdown",
+            "args_json": "{\"url\": \"https://example.com\"}",
+            "fallback_on_error": False
         }
     },
     {
@@ -2050,7 +2065,8 @@ class WorkflowStore:
         post_to_chat: bool = True,
         notify_channels: bool = False,
         custom_webhook_url: str = "",
-        language: str = "bn"
+        language: str = "bn",
+        use_mcp: bool = True
     ) -> Dict[str, Any]:
         """
         Synthesizes a complete n8n-style multi-node DAG workflow from natural-language daily instructions.
@@ -2091,6 +2107,7 @@ class WorkflowStore:
                     "project_name": project_name or "",
                     "use_memory": True,
                     "enable_tools": True,
+                    "use_mcp": bool(use_mcp),
                     "language": language or "bn",
                     "max_turns": 6,
                     "fallback_on_error": True
@@ -2301,6 +2318,7 @@ class WorkflowStore:
         wants_ping = any(k in lower for k in ["ping", "network", "lan", "latency", "পিং", "নেটওয়ার্ক", "সার্ভার"])
         wants_ports = any(k in lower for k in ["port", "scan", "পোর্ট", "স্ক্যান", "security", "সিকিউরিটি", "vulnerability", "audit", "dlp"])
         wants_http = any(k in lower for k in ["http", "api", "url", "webhook", "fetch", "endpoint", "এপিআই"])
+        wants_mcp = any(k in lower for k in ["mcp", "model context", "fetch_article", "fs_read", "sqlite_schema", "external tool", "এমসিপি"])
         wants_db = any(k in lower for k in ["db", "sql", "sqlite", "database", "query", "ডাটাবেস", "মেমোরি", "নলেজ"])
         wants_python = any(k in lower for k in ["python", "csv", "excel", "metric", "score", "parse", "calculate", "পাইথন", "হিসাব", "স্কোর"])
         wants_memory = any(k in lower for k in ["memory", "remember", "note", "project", "মেমোরি", "নোট", "প্রজেক্ট"])
@@ -2387,6 +2405,20 @@ class WorkflowStore:
                     "url": found_urls[0] if found_urls else "https://httpbin.org/get",
                     "headers_json": "{\"Accept\": \"application/json\"}",
                     "body_json": ""
+                }
+            })
+
+        if wants_mcp:
+            mcp_tool_name = "fetch_article_markdown" if found_urls else "fs_read_dir"
+            mcp_args = {"url": found_urls[0]} if found_urls else {"path": ""}
+            collect_nodes.append({
+                "type": "mcp_tool",
+                "title": "🔌 MCP টুল এক্সিকিউশন",
+                "config": {
+                    "server_id": "",
+                    "tool_name": mcp_tool_name,
+                    "args_json": json.dumps(mcp_args),
+                    "fallback_on_error": False
                 }
             })
 

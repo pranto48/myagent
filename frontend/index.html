@@ -2981,6 +2981,10 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 <span class="wf-tg-dot"></span>
                 <span id="wf-tg-pill-text">✈️ Telegram: Disconnected</span>
               </button>
+              <button type="button" id="wf-mcp-status-pill" class="wf-tg-status-pill" style="border-color:rgba(99,102,241,0.5); color:#a5b4fc;" onclick="switchTab('mcp')" title="MCP Hub-এ নিবন্ধিত এক্সটার্নাল MCP সার্ভার ও টুল ম্যানেজ করুন">
+                <span>🔌</span>
+                <span id="wf-mcp-pill-text">MCP: Loading...</span>
+              </button>
               <button type="button" class="btn-secondary" onclick="switchTab('workflow-docs')" title="দৈনিক অটো টাস্ক তৈরির গাইড ও ডকুমেন্টেশন">📖 ডকুমেন্টেশন</button>
               <button type="button" class="btn-secondary" onclick="openWorkflowVarsModal()" title="AES-256 এনক্রিপ্টেড গ্লোবাল ভেরিয়েবল ও সিক্রেটস ভল্ট">🔐 Vars Vault</button>
               <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক বিল্ডার</button>
@@ -3085,6 +3089,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                   <label><input type="checkbox" id="wf-quick-save-memory"> 💾 Project Memory-তে সেভ</label>
                   <label><input type="checkbox" id="wf-quick-post-chat" checked> 💬 Chat Session-এ রিপোর্ট</label>
                   <label><input type="checkbox" id="wf-quick-notify-channels"> 📡 Telegram/Discord</label>
+                  <label><input type="checkbox" id="wf-quick-use-mcp" checked> 🔌 Use MCP Tools</label>
                   <label><input type="checkbox" id="wf-quick-run-now"> ⚡ তৈরি করেই এখনই রান করুন</label>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">

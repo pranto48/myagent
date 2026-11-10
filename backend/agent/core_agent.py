@@ -1012,6 +1012,7 @@ class CompanyAIAgent:
         project_name: Optional[str] = None,
         use_memory: bool = True,
         enable_tools: bool = True,
+        include_mcp: bool = True,
         language: str = "bn",
         temperature: float = 0.25,
         max_turns: int = 6
@@ -1113,7 +1114,18 @@ class CompanyAIAgent:
         ]
 
         active_client, target_model = self.get_client_for_model(model)
-        tools_schema = await AgentTools.get_all_tools_schema() if enable_tools else []
+        if enable_tools:
+            tools_schema = await AgentTools.get_all_tools_schema() if include_mcp else list(AgentTools.get_openai_tools_schema())
+            if include_mcp and tools_schema:
+                mcp_names = [
+                    t["function"]["name"]
+                    for t in tools_schema
+                    if str(t.get("function", {}).get("description", "")).startswith("[MCP:")
+                ]
+                if mcp_names and messages and messages[0]["role"] == "system":
+                    messages[0]["content"] += f"\n\nEXTERNAL MCP TOOLS AVAILABLE (call if needed): {', '.join(mcp_names[:20])}"
+        else:
+            tools_schema = []
         tool_trace: List[Dict[str, Any]] = []
         reasoning_steps: List[str] = []
         final_reply = ""
