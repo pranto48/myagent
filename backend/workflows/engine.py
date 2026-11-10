@@ -380,14 +380,16 @@ class WorkflowEngine:
                         }
 
                     # 1. Pinned output short-circuit for instant downstream debugging
-                    if bool(node_cfg.get("use_pinned")) and node_cfg.get("pinned_output"):
+                    is_pinned = bool(node_cfg.get("use_pinned") or node.get("use_pinned"))
+                    pinned_val = node_cfg.get("pinned_output") if node_cfg.get("pinned_output") is not None else node.get("pinned_output")
+                    if is_pinned and pinned_val is not None and str(pinned_val) != "":
                         return {
                             "node_id": nid,
                             "type": ntype,
                             "title": node.get("title", ntype),
                             "status": "SUCCESS",
                             "duration_ms": 0,
-                            "output": str(node_cfg.get("pinned_output")),
+                            "output": str(pinned_val),
                             "summary": "📌 Pinned Output Used",
                             "data": {"pinned": True}
                         }
@@ -830,7 +832,10 @@ class WorkflowEngine:
                     "prev_output": prev_raw,
                     "prev_json": prev_json,
                     "prev_data": ctx.get("prev", {}).get("data", {}),
+                    "prev_all": ctx.get("prev_all", []),
                     "nodes_data": nodes_data_view,
+                    "vars": ctx.get("vars", {}),
+                    "secrets": ctx.get("secrets", {}),
                     "trigger": ctx.get("trigger", {}),
                     "workflow": ctx.get("workflow", {}),
                     "json": json,

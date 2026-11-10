@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body, Query, Header
 
 from routers.auth import get_current_user, get_optional_current_user
 from workflows.store import WorkflowStore, WORKFLOW_TEMPLATES, NODE_CATALOG
-from workflows.engine import workflow_engine
+from workflows.engine import workflow_engine, _redact_secrets_in_obj
 
 logger = logging.getLogger("myagent.routers.workflows")
 
@@ -254,7 +254,7 @@ async def test_single_workflow_node(
     from datetime import datetime
     from workflows.store import _get_tzinfo
     now_tz = datetime.now(_get_tzinfo("Asia/Dhaka"))
-    vars_map, _ = await WorkflowStore.get_secrets_for_runtime()
+    vars_map, secret_values = await WorkflowStore.get_secrets_for_runtime()
     ctx = {
         "workflow": {"id": "test", "name": "Studio Node Test"},
         "trigger": {
@@ -277,7 +277,7 @@ async def test_single_workflow_node(
         "_depth": 0,
         "_wf_id": ""
     }
-    res = await workflow_engine.execute_single_node(node, ctx)
+    res = _redact_secrets_in_obj(await workflow_engine.execute_single_node(node, ctx), secret_values)
     return {"success": res["status"] != "FAILED", "result": res}
 
 
