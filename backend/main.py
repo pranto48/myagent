@@ -29,6 +29,7 @@ from routers import (
     security_router,
     backup_router,
     ops_router,
+    workflows_router,
     init_ops_db
 ) 
 from routers.reports import router as reports_router
@@ -65,6 +66,11 @@ async def lifespan(app: FastAPI):
         await pm_db.close()
         await SecurityAuditStore().init_db()
         await init_ops_db()
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.init_tables_and_seed()
+        except Exception as wf_err:
+            logger.error(f"WorkflowStore initialization error: {wf_err}")
         logger.info(f"Persistent databases, Autonomous Agent engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
     except Exception as e:
         logger.error(f"SQLite DB initialization error: {e}")
@@ -117,6 +123,7 @@ app.include_router(documents_router)
 app.include_router(memory_router)
 app.include_router(settings_router)
 app.include_router(ops_router)
+app.include_router(workflows_router)
 
 @app.get("/api/version")
 async def get_version():

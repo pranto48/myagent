@@ -1214,6 +1214,93 @@ class AgentTools:
         except Exception as e:
             return f"Skill invocation error: {str(e)}"
 
+    @staticmethod
+    async def create_daily_agent_task(
+        task_name: str,
+        daily_instruction: str,
+        daily_time: str = "09:00",
+        frequency: str = "daily",
+        model: Optional[str] = None,
+        project_name: Optional[str] = None,
+        save_report: bool = True,
+        save_memory: bool = False,
+        post_to_chat: bool = True
+    ) -> str:
+        """Creates and activates an n8n-style daily autonomous agent workflow."""
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.init_tables_and_seed()
+            wf = await WorkflowStore.build_quick_daily_workflow(
+                name=task_name.strip() or "Daily AI Agent Task",
+                instruction=daily_instruction.strip(),
+                daily_time=daily_time,
+                frequency=frequency,
+                timezone_str="Asia/Dhaka",
+                model=model or "",
+                project_name=project_name or "",
+                save_report=save_report,
+                save_memory=save_memory,
+                post_to_chat=post_to_chat
+            )
+            return json.dumps({
+                "success": True,
+                "workflow_id": wf["id"],
+                "name": wf["name"],
+                "schedule_expr": wf["schedule_expr"],
+                "next_run": wf["next_run"],
+                "timezone": wf["timezone"],
+                "nodes_count": len(wf.get("nodes", [])),
+                "message": f"Daily autonomous workflow '{wf['name']}' scheduled successfully."
+            }, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"Failed to create daily workflow: {str(e)}"
+
+    @staticmethod
+    async def list_workflows() -> str:
+        """Lists all configured n8n-style autonomous workflows with schedule and stats."""
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.init_tables_and_seed()
+            wfs = await WorkflowStore.list_workflows()
+            summary = [
+                {
+                    "id": w["id"],
+                    "name": w["name"],
+                    "trigger_type": w["trigger_type"],
+                    "schedule": w["schedule_expr"],
+                    "is_enabled": w["is_enabled"],
+                    "next_run": w.get("next_run"),
+                    "last_run": w.get("last_run"),
+                    "last_status": w.get("last_status"),
+                    "run_count": w.get("run_count", 0),
+                    "nodes_count": len(w.get("nodes", []))
+                }
+                for w in wfs
+            ]
+            return json.dumps({"total_workflows": len(summary), "workflows": summary}, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"Failed to list workflows: {str(e)}"
+
+    @staticmethod
+    async def run_workflow_now(workflow_id: str) -> str:
+        """Executes a workflow DAG immediately via WorkflowEngine."""
+        try:
+            from workflows.engine import workflow_engine
+            res = await workflow_engine.execute_workflow(workflow_id=workflow_id.strip(), trigger_source="mcp")
+            return json.dumps({
+                "success": res.get("success"),
+                "run_id": res.get("run_id"),
+                "status": res.get("status"),
+                "duration_ms": res.get("duration_ms"),
+                "final_output": res.get("final_output", "")[:2500],
+                "steps": [
+                    {"node_id": nr["node_id"], "title": nr["title"], "status": nr["status"], "ms": nr["duration_ms"]}
+                    for nr in res.get("node_results", [])
+                ]
+            }, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"Workflow execution error: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -1404,6 +1491,22 @@ class AgentTools:
                     skill_name=args.get("skill_name", ""),
                     task_context=args.get("task_context", "")
                 )
+            elif tool_name == "create_daily_agent_task":
+                return await cls.create_daily_agent_task(
+                    task_name=args.get("task_name", "Daily Auto Task"),
+                    daily_instruction=args.get("daily_instruction", ""),
+                    daily_time=args.get("daily_time", "09:00"),
+                    frequency=args.get("frequency", "daily"),
+                    model=args.get("model"),
+                    project_name=args.get("project_name"),
+                    save_report=bool(args.get("save_report", True)),
+                    save_memory=bool(args.get("save_memory", False)),
+                    post_to_chat=bool(args.get("post_to_chat", True))
+                )
+            elif tool_name == "list_workflows":
+                return await cls.list_workflows()
+            elif tool_name == "run_workflow_now":
+                return await cls.run_workflow_now(workflow_id=args.get("workflow_id", ""))
 
             else:
                 # Check dynamic MCP manager
@@ -1653,6 +1756,53 @@ class AgentTools:
                             "task_context": {"type": "string", "description": "Specific task details to apply the skill onto"}
                         },
                         "required": ["skill_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_daily_agent_task",
+                    "description": "Creates and schedules a daily n8n-style multi-node autonomous workflow so the AI agent executes the given task automatically every day (or hourly/weekly), archives reports, and posts digests.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "task_name": {"type": "string", "description": "Short descriptive title of the daily automated task"},
+                            "daily_instruction": {"type": "string", "description": "Detailed task instructions the AI agent should execute automatically"},
+                            "daily_time": {"type": "string", "description": "24-hour time HH:MM in Asia/Dhaka e.g. '09:00', '21:30' (default '09:00')"},
+                            "frequency": {"type": "string", "enum": ["daily", "hourly", "every_6h", "weekly", "every_15m"], "description": "Execution frequency (default: daily)"},
+                            "model": {"type": "string", "description": "Optional specific OpenRouter or local model ID"},
+                            "project_name": {"type": "string", "description": "Optional project scope for memory context/saving"},
+                            "save_report": {"type": "boolean", "description": "Archive output to AI Reports (default true)"},
+                            "save_memory": {"type": "boolean", "description": "Persist daily summary into Project Memory (default false)"},
+                            "post_to_chat": {"type": "boolean", "description": "Post daily output into chat automation digest (default true)"}
+                        },
+                        "required": ["task_name", "daily_instruction"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_workflows",
+                    "description": "Lists all configured n8n-style automated daily workflows, their schedules, next run timestamps, and status.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "run_workflow_now",
+                    "description": "Immediately triggers an n8n-style workflow by ID and returns per-node execution trace and output.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "workflow_id": {"type": "string", "description": "Target workflow ID from list_workflows"}
+                        },
+                        "required": ["workflow_id"]
                     }
                 }
             },

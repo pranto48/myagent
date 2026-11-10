@@ -1,0 +1,1694 @@
+/* ==============================================================================
+ * Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
+ * Made By Arif (https://arifmahmud.com/)
+ * Project: MyAgent | Version: 3.3.0
+ * Visual n8n-Style Autonomous Workflow Studio & Daily Task Manager
+ * ============================================================================== */
+
+// Global Workflow Studio State
+let wfState = {
+  workflows: [],
+  templates: [],
+  nodeCatalog: [],
+  tools: [],
+  subagents: [],
+  models: [],
+  recentRuns: [],
+  activeWorkflow: null,       // Deep-cloned mutable object for canvas editing
+  activeRun: null,            // Latest or inspected run trace object
+  selectedNodeId: null,
+  connectingFrom: null,       // { nodeId: string, condition: '' | 'true' | 'false' }
+  draggingNodeId: null,
+  dragOffsetX: 0,
+  dragOffsetY: 0,
+  lastFocusedFieldId: null,
+  subTab: 'studio',           // 'studio' | 'history' | 'templates'
+  inspectorTab: 'node',       // 'node' | 'run'
+  dirty: false,
+  mouseCanvasX: 0,
+  mouseCanvasY: 0,
+};
+
+// ------------------------------------------------------------------------------
+// Helpers: Auth Fetch, Escaping, Toast, Cloning
+// ------------------------------------------------------------------------------
+function wfGetToken() {
+  return (
+    localStorage.getItem('myagent_access_token') ||
+    localStorage.getItem('myagent_token') ||
+    (typeof getAuthToken === 'function' ? getAuthToken() : '') ||
+    ''
+  );
+}
+
+async function wfFetch(url, options = {}) {
+  const token = wfGetToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return fetch(url, { ...options, headers });
+}
+
+function wfEsc(str) {
+  if (typeof escapeHtml === 'function') return escapeHtml(str == null ? '' : String(str));
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function wfToast(msg, type = 'info') {
+  if (typeof showToast === 'function') {
+    showToast(msg, type);
+  } else {
+    console.log(`[WorkflowStudio][${type}] ${msg}`);
+  }
+}
+
+function wfClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function wfNodeMeta(type) {
+  const found = (wfState.nodeCatalog || []).find(c => c.type === type);
+  if (found) return found;
+  const fallback = {
+    trigger_daily: { icon: '⏰', label_bn: 'দৈনিক শিডিউল', label_en: 'Daily Trigger', color: '#06b6d4', category: 'trigger' },
+    trigger_webhook: { icon: '🌐', label_bn: 'ওয়েবহুক ট্রিগার', label_en: 'Webhook Trigger', color: '#0ea5e9', category: 'trigger' },
+    ai_agent: { icon: '🧠', label_bn: 'এআই এজেন্ট', label_en: 'AI Agent', color: '#a855f7', category: 'ai' },
+    subagent: { icon: '🤖', label_bn: 'সাব-এজেন্ট', label_en: 'Sub-Agent', color: '#8b5cf6', category: 'ai' },
+    tool_call: { icon: '🛠️', label_bn: 'টুল এক্সিকিউট', label_en: 'Agent Tool', color: '#3b82f6', category: 'action' },
+    condition: { icon: '🔀', label_bn: 'শর্ত (IF/Else)', label_en: 'IF/Else', color: '#f59e0b', category: 'logic' },
+    http_request: { icon: '📡', label_bn: 'HTTP রিকোয়েস্ট', label_en: 'HTTP Request', color: '#0284c7', category: 'action' },
+    save_report: { icon: '📄', label_bn: 'AI রিপোর্ট সেভ', label_en: 'Save Report', color: '#10b981', category: 'output' },
+    memory_save: { icon: '💾', label_bn: 'মেমোরি সেভ', label_en: 'Save Memory', color: '#14b8a6', category: 'output' },
+    notify_channel: { icon: '📣', label_bn: 'চ্যাট/চ্যানেল নোটিফাই', label_en: 'Notify Digest', color: '#ec4899', category: 'output' },
+  };
+  return fallback[type] || { icon: '⚙️', label_bn: type, label_en: type, color: '#64748b', category: 'action' };
+}
+
+// ------------------------------------------------------------------------------
+// Initialization & Loaders
+// ------------------------------------------------------------------------------
+async function loadWorkflowsStudio(preserveActiveId = null) {
+  const listEl = document.getElementById('wf-list-container');
+  if (listEl && !wfState.workflows.length) {
+    listEl.innerHTML = '<div class="wf-empty-hint">লোড হচ্ছে...</div>';
+  }
+
+  try {
+    const [wfRes, tplRes] = await Promise.all([
+      wfFetch('/api/workflows'),
+      wfState.nodeCatalog.length ? Promise.resolve(null) : wfFetch('/api/workflows/templates')
+    ]);
+
+    const wfData = await wfRes.json();
+    if (!wfRes.ok || !wfData.success) {
+      throw new Error(wfData.detail || 'Failed to fetch workflows');
+    }
+
+    wfState.workflows = wfData.workflows || [];
+    wfState.recentRuns = wfData.recent_runs || [];
+
+    if (tplRes) {
+      const tplData = await tplRes.json();
+      if (tplData && tplData.success) {
+        wfState.templates = tplData.templates || [];
+        wfState.nodeCatalog = tplData.node_catalog || [];
+        wfState.tools = tplData.tools || [];
+        wfState.subagents = tplData.subagents || [];
+        wfState.models = tplData.models || [];
+        populateQuickModelSelect();
+        renderNodePalette();
+        renderTemplatesLibrary();
+      }
+    }
+
+    updateWorkflowKpis(wfData.stats || {});
+    renderWorkflowsSidebar();
+    renderExecutionHistoryTable();
+
+    // Select active workflow
+    const targetId = preserveActiveId || (wfState.activeWorkflow ? wfState.activeWorkflow.id : null);
+    let nextSelected = targetId ? wfState.workflows.find(w => w.id === targetId) : null;
+    if (!nextSelected && wfState.workflows.length > 0) {
+      nextSelected = wfState.workflows[0];
+    }
+
+    if (nextSelected) {
+      await selectWorkflow(nextSelected.id, true);
+    } else {
+      wfState.activeWorkflow = null;
+      renderWorkflowToolbar();
+      renderWorkflowCanvas();
+      renderNodeInspector();
+    }
+  } catch (err) {
+    console.error('loadWorkflowsStudio error:', err);
+    if (listEl) {
+      listEl.innerHTML = `<div class="wf-empty-hint" style="color:#f43f5e;">লোড ত্রুটি: ${wfEsc(err.message)}</div>`;
+    }
+    wfToast('ওয়ার্কফ্লো স্টুডিও লোড করতে সমস্যা হয়েছে: ' + err.message, 'error');
+  }
+}
+
+function updateWorkflowKpis(stats) {
+  const setText = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = v;
+  };
+  setText('wf-kpi-total', stats.total_workflows ?? wfState.workflows.length ?? 0);
+  setText('wf-kpi-active', stats.active_workflows ?? wfState.workflows.filter(w => w.is_enabled).length);
+  setText('wf-kpi-runs', stats.total_runs ?? 0);
+  setText('wf-kpi-success', `${stats.success_rate ?? 100}%`);
+}
+
+function populateQuickModelSelect() {
+  const sel = document.getElementById('wf-quick-model');
+  if (!sel) return;
+  const models = wfState.models || [];
+  sel.innerHTML = models.map(m =>
+    `<option value="${wfEsc(m.id)}">${wfEsc(m.label || m.id)}</option>`
+  ).join('');
+}
+
+// ------------------------------------------------------------------------------
+// Sub-tabs & Quick Builder Collapse/Presets
+// ------------------------------------------------------------------------------
+function switchWorkflowsSubTab(tabName) {
+  wfState.subTab = tabName;
+  ['studio', 'history', 'templates'].forEach(t => {
+    const pane = document.getElementById(`wf-subtab-${t}`);
+    const btn = document.getElementById(`wf-tabbtn-${t}`);
+    if (pane) pane.style.display = t === tabName ? '' : 'none';
+    if (btn) btn.classList.toggle('active', t === tabName);
+  });
+
+  if (tabName === 'studio') {
+    setTimeout(drawWorkflowEdges, 40);
+  } else if (tabName === 'history') {
+    refreshRecentWorkflowRuns();
+  }
+}
+
+function switchWfInspectorTab(tabName) {
+  wfState.inspectorTab = tabName;
+  ['node', 'run'].forEach(t => {
+    const pane = document.getElementById(`wf-inspector-${t}`);
+    const btn = document.getElementById(`wf-insp-btn-${t}`);
+    if (pane) pane.style.display = t === tabName ? 'flex' : 'none';
+    if (btn) btn.classList.toggle('active', t === tabName);
+  });
+}
+
+function toggleQuickDailyBuilder() {
+  const body = document.getElementById('wf-quick-builder-body');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+}
+
+function applyQuickDailyPreset(presetKey) {
+  const nameEl = document.getElementById('wf-quick-name');
+  const instEl = document.getElementById('wf-quick-instruction');
+  const timeEl = document.getElementById('wf-quick-time');
+  const freqEl = document.getElementById('wf-quick-frequency');
+  const repEl = document.getElementById('wf-quick-save-report');
+  const memEl = document.getElementById('wf-quick-save-memory');
+
+  if (presetKey === 'health') {
+    if (nameEl) nameEl.value = 'দৈনিক সার্ভার ও নেটওয়ার্ক হেলথ অডিট';
+    if (instEl) instEl.value = 'সিস্টেম ইনফো (CPU/RAM/Disk), ডকার কন্টেইনার অবস্থা এবং 192.168.9.5 / 192.168.9.9 / DNS পিং চেক করে একটি স্পষ্ট দৈনিক হেলথ রিপোর্ট তৈরি করো। কোনো সমস্যা থাকলে WARNING দাও।';
+    if (timeEl) timeEl.value = '09:00';
+    if (freqEl) freqEl.value = 'daily';
+    if (repEl) repEl.checked = true;
+    if (memEl) memEl.checked = false;
+  } else if (presetKey === 'project') {
+    if (nameEl) nameEl.value = 'দৈনিক প্রজেক্ট মেমোরি ও কাজ রিভিউ';
+    if (instEl) instEl.value = 'সংরক্ষিত প্রজেক্ট মেমোরি ও SQLite ডাটাবেস চেক করে আজকের অগ্রাধিকারভিত্তিক কাজের তালিকা (Action Plan) এবং প্রজেক্ট স্ট্যাটাস সারাংশ তৈরি করো।';
+    if (timeEl) timeEl.value = '10:00';
+    if (freqEl) freqEl.value = 'daily';
+    if (repEl) repEl.checked = true;
+    if (memEl) memEl.checked = true;
+  } else if (presetKey === 'research') {
+    if (nameEl) nameEl.value = 'দৈনিক এআই টেক ও কোম্পানি নলেজ ডাইজেস্ট';
+    if (instEl) instEl.value = 'কোম্পানি নলেজ বেজ ও প্রজেক্ট নোট পর্যালোচনা করে গুরুত্বপূর্ণ ইনসাইট, রিস্ক এবং আজকের টিমের জন্য করণীয় টিপস তৈরি করো।';
+    if (timeEl) timeEl.value = '11:00';
+    if (freqEl) freqEl.value = 'daily';
+    if (repEl) repEl.checked = true;
+    if (memEl) memEl.checked = true;
+  } else if (presetKey === 'security') {
+    if (nameEl) nameEl.value = 'রাতের সিকিউরিটি কমপ্লায়েন্স ও পোর্ট অডিট';
+    if (instEl) instEl.value = 'সিকিউরিটি পোর্ট স্ক্যানার এবং সিস্টেম লগ বিশ্লেষণ করে অস্বাভাবিক অ্যাক্টিভিটি বা ঝুঁকি আছে কিনা যাচাই করো এবং সিকিউরিটি সামারি দাও।';
+    if (timeEl) timeEl.value = '22:00';
+    if (freqEl) freqEl.value = 'daily';
+    if (repEl) repEl.checked = true;
+    if (memEl) memEl.checked = false;
+  }
+
+  // Ensure builder is open
+  const body = document.getElementById('wf-quick-builder-body');
+  if (body && body.style.display === 'none') body.style.display = 'block';
+}
+
+async function submitQuickDailyTask(event) {
+  if (event) event.preventDefault();
+  const instructionEl = document.getElementById('wf-quick-instruction');
+  const instruction = instructionEl ? instructionEl.value.trim() : '';
+  if (!instruction) {
+    wfToast('অনুগ্রহ করে এজেন্ট প্রতিদিন কী কাজ করবে তা লিখুন।', 'error');
+    if (instructionEl) instructionEl.focus();
+    return;
+  }
+
+  const name = (document.getElementById('wf-quick-name')?.value || '').trim() || instruction.slice(0, 44);
+  const daily_time = document.getElementById('wf-quick-time')?.value || '09:00';
+  const frequency = document.getElementById('wf-quick-frequency')?.value || 'daily';
+  const model = document.getElementById('wf-quick-model')?.value || '';
+  const project_name = (document.getElementById('wf-quick-project')?.value || '').trim();
+  const save_report = !!document.getElementById('wf-quick-save-report')?.checked;
+  const save_memory = !!document.getElementById('wf-quick-save-memory')?.checked;
+  const post_to_chat = !!document.getElementById('wf-quick-post-chat')?.checked;
+  const notify_channels = !!document.getElementById('wf-quick-notify-channels')?.checked;
+  const run_immediately = !!document.getElementById('wf-quick-run-now')?.checked;
+
+  const btn = document.getElementById('btn-wf-quick-create');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = run_immediately
+      ? '⏳ তৈরি ও লাইভ রান হচ্ছে...'
+      : '⏳ ওয়ার্কফ্লো তৈরি হচ্ছে...';
+  }
+
+  try {
+    const res = await wfFetch('/api/workflows/quick-daily', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        instruction,
+        daily_time,
+        frequency,
+        timezone: 'Asia/Dhaka',
+        model,
+        project_name,
+        save_report,
+        save_memory,
+        post_to_chat,
+        notify_channels,
+        run_immediately,
+        language: typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn'
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || 'Workflow creation failed');
+    }
+
+    wfToast(`✅ "${data.workflow.name}" অ্যাক্টিভেট হয়েছে! (${daily_time} Asia/Dhaka)`, 'success');
+    if (instructionEl) instructionEl.value = '';
+    const nameEl = document.getElementById('wf-quick-name');
+    if (nameEl) nameEl.value = '';
+
+    await loadWorkflowsStudio(data.workflow.id);
+    switchWorkflowsSubTab('studio');
+
+    if (data.run_result) {
+      wfState.activeRun = data.run_result;
+      applyRunOverlayToCanvas();
+      renderRunOutputPanel();
+      switchWfInspectorTab('run');
+    }
+  } catch (err) {
+    wfToast('কুইক ডেইলি টাস্ক তৈরি ব্যর্থ: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Workflows Sidebar & Selection
+// ------------------------------------------------------------------------------
+function renderWorkflowsSidebar() {
+  const container = document.getElementById('wf-list-container');
+  if (!container) return;
+
+  const list = wfState.workflows || [];
+  if (!list.length) {
+    container.innerHTML = '<div class="wf-empty-hint">এখনও কোনো ওয়ার্কফ্লো তৈরি হয়নি। উপরের Quick Builder ব্যবহার করুন।</div>';
+    return;
+  }
+
+  const activeId = wfState.activeWorkflow ? wfState.activeWorkflow.id : '';
+  container.innerHTML = list.map(wf => {
+    const isSel = wf.id === activeId;
+    const statusCls = (wf.last_status || 'IDLE').toLowerCase();
+    const sched = wf.trigger_type === 'webhook'
+      ? '🌐 Webhook'
+      : wf.trigger_type === 'manual'
+        ? '👆 Manual'
+        : `⏰ ${wf.daily_time || wf.schedule_expr || 'Scheduled'}`;
+    const nodeCount = (wf.nodes || []).length;
+
+    return `
+      <div class="wf-list-item ${isSel ? 'selected' : ''}" onclick="selectWorkflow('${wfEsc(wf.id)}')">
+        <div class="wf-list-top">
+          <div class="wf-list-title-wrap">
+            <span class="wf-list-icon">${wfEsc(wf.icon || '⚡')}</span>
+            <div>
+              <div class="wf-list-name">${wfEsc(wf.name)}</div>
+              <div class="wf-list-meta">${wfEsc(sched)} • ${nodeCount} nodes • ${wf.run_count || 0} runs</div>
+            </div>
+          </div>
+          <label class="cyber-switch" onclick="event.stopPropagation()">
+            <input type="checkbox" ${wf.is_enabled ? 'checked' : ''} onchange="toggleWorkflowById('${wfEsc(wf.id)}')">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="wf-list-bottom">
+          <span class="wf-status-pill ${statusCls}">${wfEsc(wf.last_status || 'IDLE')}</span>
+          <span class="wf-next-hint">${wf.next_run ? 'Next: ' + wfEsc(wf.next_run.slice(5, 16)) : ''}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function selectWorkflow(workflowId, skipPrompt = false) {
+  if (!skipPrompt && wfState.dirty && wfState.activeWorkflow && wfState.activeWorkflow.id !== workflowId) {
+    // Auto-save prompt could interrupt workflow switching; save silently or notify user
+    wfToast('সতর্কতা: পূর্বের ওয়ার্কফ্লোর অসংরক্ষিত পরিবর্তন বাতিল হয়েছে (Save বাটনে ক্লিক করুন)।', 'warning');
+  }
+
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Workflow not found');
+
+    wfState.activeWorkflow = wfClone(data.workflow);
+    wfState.recentRuns = data.runs && data.runs.length
+      ? mergeRuns(wfState.recentRuns, data.runs)
+      : wfState.recentRuns;
+    wfState.activeRun = data.runs && data.runs.length ? data.runs[0] : null;
+    wfState.selectedNodeId = (wfState.activeWorkflow.nodes && wfState.activeWorkflow.nodes[0])
+      ? wfState.activeWorkflow.nodes[0].id
+      : null;
+    wfState.connectingFrom = null;
+    wfState.dirty = false;
+
+    renderWorkflowsSidebar();
+    renderWorkflowToolbar();
+    renderWorkflowCanvas();
+    renderNodeInspector();
+    renderRunOutputPanel();
+  } catch (err) {
+    wfToast('ওয়ার্কফ্লো লোড ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+function mergeRuns(existing, incoming) {
+  const map = new Map();
+  [...incoming, ...existing].forEach(r => { if (r && r.id) map.set(r.id, r); });
+  return Array.from(map.values()).slice(0, 40);
+}
+
+async function toggleWorkflowById(workflowId) {
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(workflowId)}/toggle`, { method: 'PUT' });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Toggle failed');
+
+    if (wfState.activeWorkflow && wfState.activeWorkflow.id === workflowId) {
+      wfState.activeWorkflow.is_enabled = data.is_enabled;
+      wfState.activeWorkflow.next_run = data.workflow.next_run;
+      renderWorkflowToolbar();
+    }
+    wfToast(data.is_enabled ? '⚡ অটো শিডিউল সক্রিয় হয়েছে!' : '⏸️ ওয়ার্কফ্লো পজ করা হয়েছে।', 'info');
+    await loadWorkflowsStudio(wfState.activeWorkflow ? wfState.activeWorkflow.id : null);
+  } catch (err) {
+    wfToast('টগল ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+async function createBlankWorkflow() {
+  const defaultWf = {
+    name: `নতুন কাস্টম ওয়ার্কফ্লো #${wfState.workflows.length + 1}`,
+    description: 'Visual multi-node daily AI agent workflow',
+    icon: '⚡',
+    trigger_type: 'daily',
+    daily_time: '09:00',
+    timezone: 'Asia/Dhaka',
+    is_enabled: false
+  };
+  try {
+    const res = await wfFetch('/api/workflows', {
+      method: 'POST',
+      body: JSON.stringify(defaultWf)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Failed to create workflow');
+    wfToast('নতুন ওয়ার্কফ্লো ক্যানভাসে তৈরি হয়েছে!', 'success');
+    await loadWorkflowsStudio(data.workflow.id);
+    switchWorkflowsSubTab('studio');
+  } catch (err) {
+    wfToast('নতুন ওয়ার্কফ্লো তৈরি ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Node Palette & Canvas Manipulation (n8n Visual Graph Editor)
+// ------------------------------------------------------------------------------
+function renderNodePalette() {
+  const el = document.getElementById('wf-node-palette');
+  if (!el) return;
+  const catalog = wfState.nodeCatalog || [];
+  el.innerHTML = catalog.map(item => `
+    <button type="button" class="wf-palette-chip" style="--node-color:${item.color};" onclick="addNodeToCanvas('${wfEsc(item.type)}')" title="ক্যানভাসে ${wfEsc(item.label_en)} যোগ করুন">
+      <span class="wf-palette-dot" style="background:${item.color};"></span>
+      <span>${wfEsc(item.icon)} ${wfEsc(item.label_bn || item.label_en)}</span>
+      <span class="wf-palette-plus">+</span>
+    </button>
+  `).join('');
+}
+
+function addNodeToCanvas(nodeType) {
+  if (!wfState.activeWorkflow) {
+    wfToast('প্রথমে একটি ওয়ার্কফ্লো নির্বাচন করুন বা তৈরি করুন।', 'warning');
+    return;
+  }
+
+  const meta = wfNodeMeta(nodeType);
+  const nodes = wfState.activeWorkflow.nodes || [];
+  const edges = wfState.activeWorkflow.edges || [];
+
+  // Unique ID
+  let maxIdx = nodes.length;
+  nodes.forEach(n => {
+    const m = /^node_(\d+)$/.exec(n.id || '');
+    if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
+  });
+  const newId = `node_${maxIdx + 1}`;
+
+  // Place cleanly beside selected node or rightmost node
+  const anchor = nodes.find(n => n.id === wfState.selectedNodeId) || nodes[nodes.length - 1];
+  const baseX = anchor ? (Number(anchor.x || 60) + 290) : 60;
+  const baseY = anchor ? Number(anchor.y || 140) : 140;
+
+  // Check collision and offset Y if needed
+  let targetY = baseY;
+  while (nodes.some(n => Math.abs((n.x || 0) - baseX) < 160 && Math.abs((n.y || 0) - targetY) < 95)) {
+    targetY += 130;
+  }
+
+  const newNode = {
+    id: newId,
+    type: nodeType,
+    title: meta.label_bn || meta.label_en || nodeType,
+    x: baseX,
+    y: targetY,
+    config: wfClone(meta.default_config || {})
+  };
+
+  nodes.push(newNode);
+
+  // Auto-link from selected anchor if anchor is not condition (or if it doesn't already branch)
+  if (anchor && !nodeType.startsWith('trigger_')) {
+    let cond = '';
+    if (anchor.type === 'condition') {
+      const hasTrue = edges.some(e => e.source === anchor.id && e.condition === 'true');
+      cond = hasTrue ? 'false' : 'true';
+    }
+    edges.push({
+      id: `e_${Date.now().toString(36)}`,
+      source: anchor.id,
+      target: newId,
+      condition: cond
+    });
+  }
+
+  wfState.activeWorkflow.nodes = nodes;
+  wfState.activeWorkflow.edges = edges;
+  wfState.selectedNodeId = newId;
+  markWfDirty();
+
+  renderWorkflowCanvas();
+  renderNodeInspector();
+  switchWfInspectorTab('node');
+}
+
+function autoLayoutWorkflow() {
+  const wf = wfState.activeWorkflow;
+  if (!wf || !wf.nodes || !wf.nodes.length) return;
+
+  const nodes = wf.nodes;
+  const edges = wf.edges || [];
+  const inDeg = {};
+  const adj = {};
+  nodes.forEach(n => { inDeg[n.id] = 0; adj[n.id] = []; });
+  edges.forEach(e => {
+    if (inDeg[e.target] !== undefined && adj[e.source]) {
+      inDeg[e.target]++;
+      adj[e.source].push(e);
+    }
+  });
+
+  // Layered BFS placement
+  const levelMap = {};
+  const queue = nodes.filter(n => inDeg[n.id] === 0).map(n => n.id);
+  if (!queue.length) queue.push(nodes[0].id);
+  queue.forEach(id => { levelMap[id] = 0; });
+
+  let head = 0;
+  while (head < queue.length) {
+    const u = queue[head++];
+    const lv = levelMap[u] || 0;
+    (adj[u] || []).forEach(e => {
+      const v = e.target;
+      if (levelMap[v] === undefined || levelMap[v] < lv + 1) {
+        levelMap[v] = lv + 1;
+        queue.push(v);
+      }
+    });
+  }
+
+  nodes.forEach(n => {
+    if (levelMap[n.id] === undefined) levelMap[n.id] = 0;
+  });
+
+  // Group by level
+  const byLevel = {};
+  nodes.forEach(n => {
+    const lv = levelMap[n.id];
+    if (!byLevel[lv]) byLevel[lv] = [];
+    byLevel[lv].push(n);
+  });
+
+  Object.keys(byLevel).forEach(lvStr => {
+    const lv = Number(lvStr);
+    const grp = byLevel[lv];
+    const startY = grp.length === 1 ? 160 : 60;
+    grp.forEach((n, idx) => {
+      n.x = 50 + lv * 290;
+      n.y = startY + idx * 165;
+    });
+  });
+
+  markWfDirty();
+  renderWorkflowCanvas();
+  wfToast('ক্যানভাস অটো-অ্যালাইন সম্পন্ন হয়েছে।', 'info');
+}
+
+function markWfDirty() {
+  wfState.dirty = true;
+  const saveBtn = document.getElementById('btn-wf-save');
+  if (saveBtn) saveBtn.classList.add('wf-save-dirty');
+}
+
+function renderWorkflowToolbar() {
+  const bar = document.getElementById('wf-canvas-toolbar');
+  if (!bar) return;
+  const wf = wfState.activeWorkflow;
+  if (!wf) {
+    bar.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">বাম পাশ থেকে একটি ওয়ার্কফ্লো সিলেক্ট করুন।</div>';
+    return;
+  }
+
+  const schedBadge = wf.trigger_type === 'webhook'
+    ? '🌐 Webhook Trigger'
+    : `⏰ ${wf.daily_time || 'Scheduled'} (${wf.timezone || 'Asia/Dhaka'})`;
+
+  bar.innerHTML = `
+    <div class="wf-tb-left">
+      <span class="wf-tb-icon">${wfEsc(wf.icon || '⚡')}</span>
+      <input type="text" id="wf-active-name-input" class="wf-tb-name-input" value="${wfEsc(wf.name)}"
+             onchange="updateActiveWorkflowMeta('name', this.value)" title="ওয়ার্কফ্লোর নাম এডিট করুন">
+      <span class="wf-tb-sched-pill" title="${wfEsc(wf.human_bn || wf.schedule_expr || '')}">${wfEsc(schedBadge)}</span>
+    </div>
+    <div class="wf-tb-right">
+      <label class="wf-tb-toggle" title="অটো শিডিউল চালু/বন্ধ">
+        <input type="checkbox" ${wf.is_enabled ? 'checked' : ''} onchange="updateActiveWorkflowMeta('is_enabled', this.checked)">
+        <span>${wf.is_enabled ? 'ON' : 'OFF'}</span>
+      </label>
+      <button type="button" class="wf-tb-btn" onclick="autoLayoutWorkflow()" title="অটো-লেআউট">📐</button>
+      <button type="button" class="wf-tb-btn" onclick="copyWorkflowWebhookUrl()" title="Webhook URL কপি">🔗 Webhook</button>
+      <button type="button" id="btn-wf-save" class="wf-tb-btn wf-btn-save ${wfState.dirty ? 'wf-save-dirty' : ''}" onclick="saveActiveWorkflow()">💾 Save</button>
+      <button type="button" id="btn-wf-run-now" class="wf-tb-btn wf-btn-run" onclick="runActiveWorkflowNow()">▶ Run Now</button>
+      <button type="button" class="wf-tb-btn wf-btn-del" onclick="deleteActiveWorkflow()" title="ডিলিট">🗑️</button>
+    </div>
+  `;
+}
+
+function updateActiveWorkflowMeta(key, value) {
+  if (!wfState.activeWorkflow) return;
+  wfState.activeWorkflow[key] = value;
+  markWfDirty();
+  if (key === 'is_enabled') renderWorkflowToolbar();
+}
+
+async function saveActiveWorkflow() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+
+  // Keep trigger node time/frequency synced with workflow root
+  const trig = (wf.nodes || []).find(n => (n.type || '').startsWith('trigger_'));
+  if (trig) {
+    if (trig.type === 'trigger_daily') {
+      const cfg = trig.config || {};
+      const dt = cfg.daily_time || wf.daily_time || '09:00';
+      const freq = cfg.frequency || 'daily';
+      const tz = cfg.timezone || wf.timezone || 'Asia/Dhaka';
+      wf.trigger_type = freq === 'daily' ? 'daily' : 'cron';
+      wf.daily_time = dt;
+      wf.timezone = tz;
+      const parts = dt.split(':');
+      const hh = Math.max(0, Math.min(23, parseInt(parts[0] || '9', 10)));
+      const mm = Math.max(0, Math.min(59, parseInt(parts[1] || '0', 10)));
+      if (freq === 'every_15m') wf.schedule_expr = '*/15 * * * *';
+      else if (freq === 'hourly') wf.schedule_expr = `${mm} * * * *`;
+      else if (freq === 'every_6h') wf.schedule_expr = `${mm} */6 * * *`;
+      else if (freq === 'weekly') wf.schedule_expr = `${mm} ${hh} * * 0`;
+      else wf.schedule_expr = `${mm} ${hh} * * *`;
+    } else if (trig.type === 'trigger_webhook') {
+      wf.trigger_type = 'webhook';
+      wf.schedule_expr = '';
+    }
+  }
+
+  const btn = document.getElementById('btn-wf-save');
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ Saving...'; }
+
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: wf.name,
+        description: wf.description,
+        icon: wf.icon,
+        trigger_type: wf.trigger_type,
+        schedule_expr: wf.schedule_expr,
+        daily_time: wf.daily_time,
+        timezone: wf.timezone,
+        nodes: wf.nodes,
+        edges: wf.edges,
+        is_enabled: wf.is_enabled
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Save failed');
+
+    wfState.activeWorkflow = wfClone(data.workflow);
+    wfState.dirty = false;
+    wfToast('✅ ওয়ার্কফ্লো গ্রাফ ও শিডিউল সংরক্ষিত হয়েছে!', 'success');
+    await loadWorkflowsStudio(wf.id);
+  } catch (err) {
+    wfToast('সংরক্ষণ ব্যর্থ: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = '💾 Save'; }
+  }
+}
+
+async function runActiveWorkflowNow() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+
+  if (wfState.dirty) {
+    await saveActiveWorkflow();
+  }
+
+  const btn = document.getElementById('btn-wf-run-now');
+  if (btn) { btn.disabled = true; btn.innerText = '⚡ Running...'; }
+
+  // Mark visual nodes running
+  document.querySelectorAll('.wf-node-card').forEach(card => {
+    card.classList.remove('wf-status-success', 'wf-status-failed', 'wf-status-skipped');
+    card.classList.add('wf-status-running');
+  });
+
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ payload: { triggered_by: 'studio_ui' } })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Execution error');
+
+    wfState.activeRun = data;
+    applyRunOverlayToCanvas();
+    renderRunOutputPanel();
+    switchWfInspectorTab('run');
+
+    if (data.status === 'SUCCESS') {
+      wfToast(`✅ ওয়ার্কফ্লো সফল (${data.duration_ms} ms)!`, 'success');
+    } else if (data.status === 'PARTIAL') {
+      wfToast(`⚠️ আংশিক সফল (${data.duration_ms} ms) — Run Trace দেখুন।`, 'warning');
+    } else {
+      wfToast(`❌ রান ব্যর্থ: ${data.error || data.status}`, 'error');
+    }
+
+    await loadWorkflowsStudio(wf.id);
+    // Keep newly finished trace visible after sidebar refresh
+    wfState.activeRun = data;
+    applyRunOverlayToCanvas();
+    renderRunOutputPanel();
+  } catch (err) {
+    wfToast('রান ব্যর্থ: ' + err.message, 'error');
+    document.querySelectorAll('.wf-node-card').forEach(c => c.classList.remove('wf-status-running'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = '▶ Run Now'; }
+  }
+}
+
+async function deleteActiveWorkflow() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  if (!confirm(`আপনি কি "${wf.name}" ওয়ার্কফ্লোটি স্থায়ীভাবে মুছে ফেলতে চান?`)) return;
+
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Delete failed');
+    wfState.activeWorkflow = null;
+    wfState.activeRun = null;
+    wfState.selectedNodeId = null;
+    wfToast('ওয়ার্কফ্লো মুছে ফেলা হয়েছে।', 'info');
+    await loadWorkflowsStudio();
+  } catch (err) {
+    wfToast('ডিলিট ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+function copyWorkflowWebhookUrl() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  const origin = window.location.origin;
+  const url = `${origin}/api/workflows/webhook/${wf.id}${wf.webhook_secret ? `?secret=${wf.webhook_secret}` : ''}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url);
+  }
+  wfToast(`🔗 Webhook URL কপি হয়েছে! POST অনুরোধ পাঠালেই ওয়ার্কফ্লো রান হবে।\n${url}`, 'success');
+}
+
+// ------------------------------------------------------------------------------
+// Visual Canvas Rendering, Dragging & SVG Edges
+// ------------------------------------------------------------------------------
+function getNodeSummaryLine(node) {
+  const c = node.config || {};
+  switch (node.type) {
+    case 'trigger_daily':
+      return `${c.frequency || 'daily'} @ ${c.daily_time || '09:00'} (${c.timezone || 'Asia/Dhaka'})`;
+    case 'trigger_webhook':
+      return `${c.method || 'POST'} /webhook/${wfState.activeWorkflow ? wfState.activeWorkflow.id : '...'}`;
+    case 'ai_agent':
+      return `${c.model || 'Default AI'} • ${(c.prompt || '').slice(0, 42)}...`;
+    case 'subagent':
+      return `Agent: ${c.agent_id || 'swarm'}`;
+    case 'tool_call':
+      return `Tool: ${c.tool_name || 'system_info'}`;
+    case 'condition':
+      return `IF ${c.target || 'prev'} ${c.operator || 'contains'} "${c.value || ''}"`;
+    case 'http_request':
+      return `${c.method || 'POST'} ${c.url || ''}`;
+    case 'save_report':
+      return `Report: ${c.title || 'Summary'}`;
+    case 'memory_save':
+      return `Project: ${c.project_name || 'myagent'} / ${c.key || 'note'}`;
+    case 'notify_channel':
+      return `To: ${c.target || 'chat_and_channels'}`;
+    default:
+      return node.type;
+  }
+}
+
+function renderWorkflowCanvas() {
+  const nodesLayer = document.getElementById('wf-nodes-layer');
+  const svgLayer = document.getElementById('wf-edges-svg');
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!nodesLayer || !svgLayer) return;
+
+  const wf = wfState.activeWorkflow;
+  if (!wf) {
+    nodesLayer.innerHTML = '<div class="wf-canvas-empty">কোনো ওয়ার্কফ্লো সিলেক্ট করা হয়নি।</div>';
+    svgLayer.innerHTML = '';
+    return;
+  }
+
+  const nodes = wf.nodes || [];
+  let maxX = 1200, maxY = 560;
+  nodes.forEach(n => {
+    maxX = Math.max(maxX, (Number(n.x) || 0) + 320);
+    maxY = Math.max(maxY, (Number(n.y) || 0) + 220);
+  });
+  if (stage) {
+    stage.style.width = `${maxX}px`;
+    stage.style.height = `${maxY}px`;
+  }
+
+  // Build map of latest run node statuses
+  const runMap = {};
+  if (wfState.activeRun && Array.isArray(wfState.activeRun.node_results)) {
+    wfState.activeRun.node_results.forEach(r => {
+      if (r && r.node_id) runMap[r.node_id] = r;
+    });
+  }
+
+  nodesLayer.innerHTML = nodes.map(node => {
+    const meta = wfNodeMeta(node.type);
+    const isSelected = wfState.selectedNodeId === node.id;
+    const isCond = node.type === 'condition';
+    const isTrig = (node.type || '').startsWith('trigger_');
+    const nr = runMap[node.id];
+    const runStatusCls = nr ? `wf-status-${(nr.status || '').toLowerCase()}` : '';
+    const statusBadge = nr
+      ? `<span class="wf-node-run-badge ${(nr.status || '').toLowerCase()}">${wfEsc(nr.status)} ${nr.duration_ms || 0}ms</span>`
+      : `<span class="wf-node-id-badge">${wfEsc(node.id)}</span>`;
+
+    const portsOutHtml = isCond
+      ? `
+        <div class="wf-port-out wf-port-true" data-node="${wfEsc(node.id)}" data-cond="true"
+             onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'true')" title="TRUE শাখা কানেক্ট করুন">T</div>
+        <div class="wf-port-out wf-port-false" data-node="${wfEsc(node.id)}" data-cond="false"
+             onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'false')" title="FALSE শাখা কানেক্ট করুন">F</div>
+      `
+      : `
+        <div class="wf-port-out" data-node="${wfEsc(node.id)}" data-cond=""
+             onclick="onOutputPortClick(event, '${wfEsc(node.id)}', '')" title="পরবর্তী নোডের ইনপুট পোর্টে সংযুক্ত করুন"></div>
+      `;
+
+    const portInHtml = isTrig
+      ? ''
+      : `<div class="wf-port-in ${wfState.connectingFrom ? 'wf-port-target-hint' : ''}"
+              data-node="${wfEsc(node.id)}"
+              onclick="onInputPortClick(event, '${wfEsc(node.id)}')"
+              title="এখানে সংযুক্ত করুন"></div>`;
+
+    return `
+      <div class="wf-node-card ${isSelected ? 'selected' : ''} ${runStatusCls}"
+           id="wf-card-${wfEsc(node.id)}"
+           style="left:${Number(node.x || 50)}px; top:${Number(node.y || 120)}px; --node-accent:${meta.color};"
+           onmousedown="onNodeMouseDown(event, '${wfEsc(node.id)}')"
+           onclick="onNodeCardClick(event, '${wfEsc(node.id)}')">
+        ${portInHtml}
+        <div class="wf-node-header">
+          <div class="wf-node-head-left">
+            <span class="wf-node-icon">${wfEsc(meta.icon)}</span>
+            <span class="wf-node-title">${wfEsc(node.title || meta.label_bn)}</span>
+          </div>
+          <button type="button" class="wf-node-del-btn" onclick="deleteNodeById(event, '${wfEsc(node.id)}')" title="নোড মুছুন">&times;</button>
+        </div>
+        <div class="wf-node-body">
+          <div class="wf-node-summary">${wfEsc(getNodeSummaryLine(node))}</div>
+          <div class="wf-node-footer">
+            <span class="wf-node-type-pill">${wfEsc(meta.label_en || node.type)}</span>
+            ${statusBadge}
+          </div>
+        </div>
+        ${portsOutHtml}
+      </div>
+    `;
+  }).join('');
+
+  drawWorkflowEdges();
+}
+
+function applyRunOverlayToCanvas() {
+  renderWorkflowCanvas();
+}
+
+function drawWorkflowEdges() {
+  const svg = document.getElementById('wf-edges-svg');
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!svg || !stage || !wfState.activeWorkflow) return;
+
+  const nodes = wfState.activeWorkflow.nodes || [];
+  const edges = wfState.activeWorkflow.edges || [];
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  const defs = `
+    <defs>
+      <marker id="wf-arrow-cyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,1 L7,4 L0,7 Z" fill="#38bdf8"></path>
+      </marker>
+      <marker id="wf-arrow-true" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,1 L7,4 L0,7 Z" fill="#10b981"></path>
+      </marker>
+      <marker id="wf-arrow-false" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,1 L7,4 L0,7 Z" fill="#f59e0b"></path>
+      </marker>
+    </defs>
+  `;
+
+  const paths = edges.map(edge => {
+    const srcEl = document.getElementById(`wf-card-${edge.source}`);
+    const tgtEl = document.getElementById(`wf-card-${edge.target}`);
+    const srcNode = nodeMap[edge.source];
+    const tgtNode = nodeMap[edge.target];
+    if (!srcNode || !tgtNode) return '';
+
+    const w = srcEl ? srcEl.offsetWidth : 230;
+    const h = srcEl ? srcEl.offsetHeight : 96;
+    const th = tgtEl ? tgtEl.offsetHeight : 96;
+
+    const cond = (edge.condition || '').toLowerCase();
+    let sy = Number(srcNode.y || 0) + h / 2;
+    if (srcNode.type === 'condition') {
+      sy = Number(srcNode.y || 0) + (cond === 'false' ? h * 0.72 : h * 0.32);
+    }
+    const sx = Number(srcNode.x || 0) + w;
+    const tx = Number(tgtNode.x || 0);
+    const ty = Number(tgtNode.y || 0) + th / 2;
+
+    const dx = Math.max(55, Math.abs(tx - sx) * 0.48);
+    const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
+
+    const color = cond === 'true' ? '#10b981' : cond === 'false' ? '#f59e0b' : '#38bdf8';
+    const marker = cond === 'true' ? 'url(#wf-arrow-true)' : cond === 'false' ? 'url(#wf-arrow-false)' : 'url(#wf-arrow-cyan)';
+
+    const mx = (sx + tx) / 2;
+    const my = (sy + ty) / 2;
+    const badgeLabel = cond ? cond.toUpperCase() : '✕';
+
+    return `
+      <g class="wf-edge-group" onclick="removeEdgeById('${wfEsc(edge.id)}')" title="সংযোগ মুছে ফেলতে ক্লিক করুন">
+        <path class="wf-edge-hit" d="${d}" fill="none" stroke="transparent" stroke-width="16"></path>
+        <path class="wf-edge-path" d="${d}" fill="none" stroke="${color}" stroke-width="2.4" marker-end="${marker}"></path>
+        <g class="wf-edge-label" transform="translate(${mx}, ${my})">
+          <rect x="-18" y="-10" width="36" height="20" rx="10" fill="#0f172a" stroke="${color}" stroke-width="1.4"></rect>
+          <text x="0" y="4" text-anchor="middle" fill="${color}" font-size="9.5" font-weight="700" font-family="Fira Code, monospace">${wfEsc(badgeLabel)}</text>
+        </g>
+      </g>
+    `;
+  }).join('');
+
+  // Temporary rubber band when connecting ports
+  let tempWire = '';
+  if (wfState.connectingFrom && nodeMap[wfState.connectingFrom.nodeId]) {
+    const srcNode = nodeMap[wfState.connectingFrom.nodeId];
+    const srcEl = document.getElementById(`wf-card-${srcNode.id}`);
+    const w = srcEl ? srcEl.offsetWidth : 230;
+    const h = srcEl ? srcEl.offsetHeight : 96;
+    const sx = Number(srcNode.x || 0) + w;
+    let sy = Number(srcNode.y || 0) + h / 2;
+    if (srcNode.type === 'condition') {
+      sy = Number(srcNode.y || 0) + (wfState.connectingFrom.condition === 'false' ? h * 0.72 : h * 0.32);
+    }
+    const tx = wfState.mouseCanvasX || (sx + 80);
+    const ty = wfState.mouseCanvasY || sy;
+    tempWire = `<path d="M ${sx} ${sy} L ${tx} ${ty}" stroke="#38bdf8" stroke-width="2" stroke-dasharray="5,5" fill="none"></path>`;
+  }
+
+  svg.setAttribute('width', stage ? stage.offsetWidth : 1400);
+  svg.setAttribute('height', stage ? stage.offsetHeight : 600);
+  svg.innerHTML = defs + paths + tempWire;
+}
+
+// Dragging & Port Wiring Handlers
+function onNodeMouseDown(event, nodeId) {
+  if (event.target.closest('.wf-port-out') || event.target.closest('.wf-port-in') || event.target.closest('.wf-node-del-btn')) {
+    return;
+  }
+  event.stopPropagation();
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  const node = (wf.nodes || []).find(n => n.id === nodeId);
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!node || !stage) return;
+
+  const stageRect = stage.getBoundingClientRect();
+  wfState.draggingNodeId = nodeId;
+  wfState.dragOffsetX = event.clientX - stageRect.left - Number(node.x || 0);
+  wfState.dragOffsetY = event.clientY - stageRect.top - Number(node.y || 0);
+}
+
+document.addEventListener('mousemove', (event) => {
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!stage) return;
+
+  if (wfState.draggingNodeId && wfState.activeWorkflow) {
+    const node = (wfState.activeWorkflow.nodes || []).find(n => n.id === wfState.draggingNodeId);
+    if (!node) return;
+    const stageRect = stage.getBoundingClientRect();
+    const nx = Math.max(12, Math.round(event.clientX - stageRect.left - wfState.dragOffsetX));
+    const ny = Math.max(12, Math.round(event.clientY - stageRect.top - wfState.dragOffsetY));
+    node.x = nx;
+    node.y = ny;
+
+    const card = document.getElementById(`wf-card-${node.id}`);
+    if (card) {
+      card.style.left = `${nx}px`;
+      card.style.top = `${ny}px`;
+    }
+    markWfDirty();
+    drawWorkflowEdges();
+  } else if (wfState.connectingFrom) {
+    const stageRect = stage.getBoundingClientRect();
+    wfState.mouseCanvasX = event.clientX - stageRect.left;
+    wfState.mouseCanvasY = event.clientY - stageRect.top;
+    drawWorkflowEdges();
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (wfState.draggingNodeId) {
+    wfState.draggingNodeId = null;
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && wfState.connectingFrom) {
+    wfState.connectingFrom = null;
+    renderWorkflowCanvas();
+  }
+});
+
+function onNodeCardClick(event, nodeId) {
+  event.stopPropagation();
+  if (wfState.connectingFrom) {
+    if (wfState.connectingFrom.nodeId !== nodeId) {
+      connectNodes(wfState.connectingFrom.nodeId, nodeId, wfState.connectingFrom.condition);
+    }
+    wfState.connectingFrom = null;
+    drawWorkflowEdges();
+    return;
+  }
+
+  wfState.selectedNodeId = nodeId;
+  document.querySelectorAll('.wf-node-card').forEach(el => el.classList.remove('selected'));
+  const card = document.getElementById(`wf-card-${nodeId}`);
+  if (card) card.classList.add('selected');
+  renderNodeInspector();
+  switchWfInspectorTab('node');
+}
+
+function onOutputPortClick(event, nodeId, condition = '') {
+  event.stopPropagation();
+  wfState.connectingFrom = { nodeId, condition };
+  wfToast('এখন লক্ষ্য নোডের বাম ইনপুট পোর্টে (●) ক্লিক করুন।', 'info');
+  renderWorkflowCanvas();
+}
+
+function onInputPortClick(event, targetNodeId) {
+  event.stopPropagation();
+  if (!wfState.connectingFrom) return;
+  const { nodeId, condition } = wfState.connectingFrom;
+  if (nodeId === targetNodeId) {
+    wfState.connectingFrom = null;
+    drawWorkflowEdges();
+    return;
+  }
+  connectNodes(nodeId, targetNodeId, condition);
+  wfState.connectingFrom = null;
+  renderWorkflowCanvas();
+  renderNodeInspector();
+}
+
+function onCanvasBackgroundClick(event) {
+  if (wfState.connectingFrom) {
+    wfState.connectingFrom = null;
+    renderWorkflowCanvas();
+  }
+}
+
+function connectNodes(sourceId, targetId, condition = '') {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  wf.edges = wf.edges || [];
+  const exists = wf.edges.some(e => e.source === sourceId && e.target === targetId && (e.condition || '') === (condition || ''));
+  if (!exists) {
+    wf.edges.push({
+      id: `e_${Date.now().toString(36)}_${Math.floor(Math.random() * 100)}`,
+      source: sourceId,
+      target: targetId,
+      condition: condition || ''
+    });
+    markWfDirty();
+    wfToast(`🔗 সংযোগ তৈরি হয়েছে (${sourceId} → ${targetId})`, 'success');
+  }
+  renderWorkflowCanvas();
+  renderNodeInspector();
+}
+
+function removeEdgeById(edgeId) {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  wf.edges = (wf.edges || []).filter(e => e.id !== edgeId);
+  markWfDirty();
+  renderWorkflowCanvas();
+  renderNodeInspector();
+}
+
+function deleteNodeById(event, nodeId) {
+  if (event) event.stopPropagation();
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  wf.nodes = (wf.nodes || []).filter(n => n.id !== nodeId);
+  wf.edges = (wf.edges || []).filter(e => e.source !== nodeId && e.target !== nodeId);
+  if (wfState.selectedNodeId === nodeId) {
+    wfState.selectedNodeId = wf.nodes[0] ? wf.nodes[0].id : null;
+  }
+  markWfDirty();
+  renderWorkflowCanvas();
+  renderNodeInspector();
+}
+
+// ------------------------------------------------------------------------------
+// Node Inspector & Single-Node Tester
+// ------------------------------------------------------------------------------
+function renderNodeInspector() {
+  const el = document.getElementById('wf-inspector-node');
+  if (!el) return;
+
+  const wf = wfState.activeWorkflow;
+  const node = wf ? (wf.nodes || []).find(n => n.id === wfState.selectedNodeId) : null;
+  if (!wf || !node) {
+    el.innerHTML = '<div class="wf-empty-hint">ক্যানভাস থেকে যেকোনো একটি নোডে ক্লিক করে সেটিংস দেখুন।</div>';
+    return;
+  }
+
+  const meta = wfNodeMeta(node.type);
+  const c = node.config || {};
+  const varsHtml = `
+    <div class="wf-var-chips">
+      <span style="font-size:0.7rem; color:var(--text-muted);">ভেরিয়েবল ইনসার্ট:</span>
+      ${['{{prev.output}}', '{{trigger.date}}', '{{trigger.time}}', '{{trigger.payload}}', '{{workflow.name}}']
+        .map(v => `<button type="button" class="wf-var-chip" onclick="insertTemplateVar('${wfEsc(v)}')">${wfEsc(v)}</button>`).join('')}
+    </div>
+  `;
+
+  let fieldsHtml = '';
+  if (node.type === 'trigger_daily') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>ফ্রিকোয়েন্সি (Frequency)</label>
+        <select class="text-input" onchange="updateNodeCfg('frequency', this.value)">
+          <option value="daily" ${c.frequency === 'daily' ? 'selected' : ''}>প্রতিদিন (Daily)</option>
+          <option value="hourly" ${c.frequency === 'hourly' ? 'selected' : ''}>প্রতি ঘণ্টায় (Hourly)</option>
+          <option value="every_6h" ${c.frequency === 'every_6h' ? 'selected' : ''}>প্রতি ৬ ঘণ্টায় (Every 6h)</option>
+          <option value="weekly" ${c.frequency === 'weekly' ? 'selected' : ''}>সাপ্তাহিক (Weekly)</option>
+          <option value="every_15m" ${c.frequency === 'every_15m' ? 'selected' : ''}>প্রতি ১৫ মিনিটে (Every 15m)</option>
+        </select>
+      </div>
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>সময় (HH:MM)</label>
+          <input type="time" class="text-input" value="${wfEsc(c.daily_time || '09:00')}" onchange="updateNodeCfg('daily_time', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>টাইমজোন</label>
+          <input type="text" class="text-input" value="${wfEsc(c.timezone || 'Asia/Dhaka')}" onchange="updateNodeCfg('timezone', this.value)">
+        </div>
+      </div>
+    `;
+  } else if (node.type === 'trigger_webhook') {
+    const whUrl = `${window.location.origin}/api/workflows/webhook/${wf.id}?secret=${wf.webhook_secret || ''}`;
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>Webhook POST Endpoint</label>
+        <input type="text" class="text-input" readonly value="${wfEsc(whUrl)}" style="font-family:'Fira Code', monospace; font-size:0.75rem;">
+      </div>
+    `;
+  } else if (node.type === 'ai_agent') {
+    const modelOpts = (wfState.models || []).map(m =>
+      `<option value="${wfEsc(m.id)}" ${(c.model || '') === m.id ? 'selected' : ''}>${wfEsc(m.label || m.id)}</option>`
+    ).join('');
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>AI মডেল নির্বাচন</label>
+        <select class="text-input" onchange="updateNodeCfg('model', this.value)">${modelOpts}</select>
+      </div>
+      <div class="wf-field-group">
+        <label>টাস্ক প্রম্পট (Task Prompt)</label>
+        <textarea id="wf-cfg-prompt" class="text-input wf-code-textarea" rows="4"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-prompt'"
+                  onchange="updateNodeCfg('prompt', this.value)">${wfEsc(c.prompt || '')}</textarea>
+        ${varsHtml}
+      </div>
+      <div class="wf-field-group">
+        <label>সিস্টেম নির্দেশনা (System Instruction)</label>
+        <textarea id="wf-cfg-sys" class="text-input" rows="2"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-sys'"
+                  onchange="updateNodeCfg('system_instruction', this.value)">${wfEsc(c.system_instruction || '')}</textarea>
+      </div>
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>প্রজেক্ট মেমোরি স্কোপ</label>
+          <input type="text" class="text-input" value="${wfEsc(c.project_name || '')}" placeholder="e.g. myagent" onchange="updateNodeCfg('project_name', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>Max Tool Turns</label>
+          <input type="number" min="1" max="10" class="text-input" value="${Number(c.max_turns || 5)}" onchange="updateNodeCfg('max_turns', parseInt(this.value || 5, 10))">
+        </div>
+      </div>
+      <div class="wf-check-row">
+        <label><input type="checkbox" ${c.enable_tools !== false ? 'checked' : ''} onchange="updateNodeCfg('enable_tools', this.checked)"> 🛠️ Autonomous Tools</label>
+        <label><input type="checkbox" ${c.use_memory !== false ? 'checked' : ''} onchange="updateNodeCfg('use_memory', this.checked)"> 🧠 RAG Memory</label>
+      </div>
+    `;
+  } else if (node.type === 'subagent') {
+    const subOpts = (wfState.subagents || []).map(s =>
+      `<option value="${wfEsc(s.id)}" ${(c.agent_id || 'net_ping_subagent') === s.id ? 'selected' : ''}>${wfEsc(s.name)}</option>`
+    ).join('');
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>টার্গেট সাব-এজেন্ট / সোয়ার্ম</label>
+        <select class="text-input" onchange="updateNodeCfg('agent_id', this.value)">${subOpts}</select>
+      </div>
+      <div class="wf-field-group">
+        <label>টাস্ক নির্দেশনা</label>
+        <textarea id="wf-cfg-subtask" class="text-input" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-subtask'"
+                  onchange="updateNodeCfg('task', this.value)">${wfEsc(c.task || '')}</textarea>
+        ${varsHtml}
+      </div>
+    `;
+  } else if (node.type === 'tool_call') {
+    const toolOpts = (wfState.tools || []).map(t =>
+      `<option value="${wfEsc(t.name)}" ${(c.tool_name || 'system_info') === t.name ? 'selected' : ''}>${wfEsc(t.name)}</option>`
+    ).join('');
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>টুল নির্বাচন (Agent Tool)</label>
+        <select class="text-input" onchange="updateNodeCfg('tool_name', this.value)">${toolOpts}</select>
+      </div>
+      <div class="wf-field-group">
+        <label>আর্গুমেন্ট JSON</label>
+        <textarea id="wf-cfg-args" class="text-input wf-code-textarea" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-args'"
+                  onchange="updateNodeCfg('args_json', this.value)">${wfEsc(typeof c.args_json === 'string' ? c.args_json : JSON.stringify(c.args_json || {}, null, 2))}</textarea>
+      </div>
+    `;
+  } else if (node.type === 'condition') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>টার্গেট ডেটা (Target Variable)</label>
+        <input id="wf-cfg-target" type="text" class="text-input" value="${wfEsc(c.target || '{{prev.output}}')}"
+               onfocus="wfState.lastFocusedFieldId='wf-cfg-target'"
+               onchange="updateNodeCfg('target', this.value)">
+      </div>
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>অপারেটর</label>
+          <select class="text-input" onchange="updateNodeCfg('operator', this.value)">
+            <option value="contains" ${c.operator === 'contains' ? 'selected' : ''}>Contains</option>
+            <option value="not_contains" ${c.operator === 'not_contains' ? 'selected' : ''}>Not Contains</option>
+            <option value="equals" ${c.operator === 'equals' ? 'selected' : ''}>Equals</option>
+            <option value="not_empty" ${c.operator === 'not_empty' ? 'selected' : ''}>Not Empty</option>
+            <option value="regex" ${c.operator === 'regex' ? 'selected' : ''}>Regex Match</option>
+            <option value="greater_than" ${c.operator === 'greater_than' ? 'selected' : ''}>Number &gt;</option>
+            <option value="less_than" ${c.operator === 'less_than' ? 'selected' : ''}>Number &lt;</option>
+          </select>
+        </div>
+        <div class="wf-field-group">
+          <label>তুলনীয় মান (Value)</label>
+          <input type="text" class="text-input" value="${wfEsc(c.value || '')}" onchange="updateNodeCfg('value', this.value)">
+        </div>
+      </div>
+    `;
+  } else if (node.type === 'http_request') {
+    fieldsHtml = `
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>HTTP Method</label>
+          <select class="text-input" onchange="updateNodeCfg('method', this.value)">
+            ${['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option value="${m}" ${(c.method || 'POST') === m ? 'selected' : ''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="wf-field-group">
+          <label>Target URL</label>
+          <input type="text" class="text-input" value="${wfEsc(c.url || '')}" onchange="updateNodeCfg('url', this.value)">
+        </div>
+      </div>
+      <div class="wf-field-group">
+        <label>Body JSON</label>
+        <textarea id="wf-cfg-httpbody" class="text-input wf-code-textarea" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-httpbody'"
+                  onchange="updateNodeCfg('body_json', this.value)">${wfEsc(c.body_json || '{}')}</textarea>
+        ${varsHtml}
+      </div>
+    `;
+  } else if (node.type === 'save_report') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>রিপোর্টের শিরোনাম (Title)</label>
+        <input type="text" class="text-input" value="${wfEsc(c.title || '')}" onchange="updateNodeCfg('title', this.value)">
+      </div>
+      <div class="wf-field-group">
+        <label>রিপোর্ট কনটেন্ট টেমপ্লেট</label>
+        <textarea id="wf-cfg-rpt" class="text-input" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-rpt'"
+                  onchange="updateNodeCfg('content', this.value)">${wfEsc(c.content || '{{prev.output}}')}</textarea>
+        ${varsHtml}
+      </div>
+    `;
+  } else if (node.type === 'memory_save') {
+    fieldsHtml = `
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>Project Name</label>
+          <input type="text" class="text-input" value="${wfEsc(c.project_name || 'myagent')}" onchange="updateNodeCfg('project_name', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>Memory Key</label>
+          <input type="text" class="text-input" value="${wfEsc(c.key || '')}" onchange="updateNodeCfg('key', this.value)">
+        </div>
+      </div>
+      <div class="wf-field-group">
+        <label>কনটেন্ট</label>
+        <textarea id="wf-cfg-mem" class="text-input" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-mem'"
+                  onchange="updateNodeCfg('content', this.value)">${wfEsc(c.content || '{{prev.output}}')}</textarea>
+        ${varsHtml}
+      </div>
+    `;
+  } else if (node.type === 'notify_channel') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>ডেলিভারি টার্গেট</label>
+        <select class="text-input" onchange="updateNodeCfg('target', this.value)">
+          <option value="chat_and_channels" ${c.target === 'chat_and_channels' ? 'selected' : ''}>💬 Chat Session + 📡 Telegram/Discord/Slack</option>
+          <option value="chat_session" ${c.target === 'chat_session' ? 'selected' : ''}>💬 শুধুমাত্র Chat Session-এ</option>
+          <option value="channels" ${c.target === 'channels' ? 'selected' : ''}>📡 শুধুমাত্র External Channels-এ</option>
+        </select>
+      </div>
+      <div class="wf-field-group">
+        <label>মেসেজ শিরোনাম</label>
+        <input type="text" class="text-input" value="${wfEsc(c.title || '')}" onchange="updateNodeCfg('title', this.value)">
+      </div>
+      <div class="wf-field-group">
+        <label>মেসেজ বডি</label>
+        <textarea id="wf-cfg-msg" class="text-input" rows="3"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-msg'"
+                  onchange="updateNodeCfg('message', this.value)">${wfEsc(c.message || '{{prev.output}}')}</textarea>
+        ${varsHtml}
+      </div>
+      <div class="wf-field-group">
+        <label>কাস্টম Webhook URL (ঐচ্ছিক)</label>
+        <input type="text" class="text-input" value="${wfEsc(c.custom_webhook_url || '')}" placeholder="https://..." onchange="updateNodeCfg('custom_webhook_url', this.value)">
+      </div>
+    `;
+  }
+
+  // Outgoing edges manager
+  const otherNodes = (wf.nodes || []).filter(n => n.id !== node.id);
+  const outgoingEdges = (wf.edges || []).filter(e => e.source === node.id);
+
+  el.innerHTML = `
+    <div class="wf-insp-head">
+      <span style="font-size:1.25rem;">${wfEsc(meta.icon)}</span>
+      <div style="flex:1;">
+        <input type="text" class="text-input" style="font-weight:700; padding:6px 8px;" value="${wfEsc(node.title || meta.label_bn)}"
+               onchange="updateSelectedNodeTitle(this.value)">
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">ID: ${wfEsc(node.id)} • Type: ${wfEsc(node.type)}</div>
+      </div>
+    </div>
+
+    ${fieldsHtml}
+
+    <div class="wf-insp-box">
+      <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--text-secondary);">🔗 পরবর্তী নোডের সংযোগ (Connections)</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+        <select id="wf-quick-connect-tgt" class="text-input" style="flex:1; min-width:120px; padding:5px 8px;">
+          ${otherNodes.map(n => `<option value="${wfEsc(n.id)}">${wfEsc(n.title || n.id)} (${wfEsc(n.id)})</option>`).join('')}
+        </select>
+        ${node.type === 'condition' ? `
+          <select id="wf-quick-connect-cond" class="text-input" style="width:92px; padding:5px 6px;">
+            <option value="true">TRUE ✓</option>
+            <option value="false">FALSE ✕</option>
+          </select>` : ''}
+        <button type="button" class="btn-sm-action-cyber" onclick="connectFromInspector()">+ যুক্ত করুন</button>
+      </div>
+      <div class="wf-edge-chips">
+        ${outgoingEdges.length
+          ? outgoingEdges.map(e => {
+              const tNode = (wf.nodes || []).find(n => n.id === e.target);
+              return `<span class="wf-edge-chip">${e.condition ? `[${e.condition.toUpperCase()}] ` : ''}→ ${wfEsc(tNode ? tNode.title : e.target)} <b onclick="removeEdgeById('${wfEsc(e.id)}')">×</b></span>`;
+            }).join('')
+          : '<span style="font-size:0.73rem; color:var(--text-muted);">কোনো আউটগোয়িং সংযোগ নেই।</span>'
+        }
+      </div>
+    </div>
+
+    <div class="wf-insp-box">
+      <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:#38bdf8;">🧪 সিঙ্গেল-নোড লাইভ টেস্ট (Node Test)</div>
+      <input type="text" id="wf-node-test-input" class="text-input" placeholder="ঐচ্ছিক টেস্ট ইনপুট ({{prev.output}})" style="margin-bottom:6px;">
+      <button type="button" id="btn-wf-test-node" class="btn-sm-action-cyber" style="width:100%;" onclick="testSelectedNode()">⚡ এই নোডটি টেস্ট করুন</button>
+      <pre id="wf-node-test-output" class="wf-node-test-pre" style="display:none;"></pre>
+    </div>
+  `;
+}
+
+function updateSelectedNodeTitle(val) {
+  const wf = wfState.activeWorkflow;
+  const node = wf ? (wf.nodes || []).find(n => n.id === wfState.selectedNodeId) : null;
+  if (!node) return;
+  node.title = val;
+  markWfDirty();
+  renderWorkflowCanvas();
+}
+
+function updateNodeCfg(key, val) {
+  const wf = wfState.activeWorkflow;
+  const node = wf ? (wf.nodes || []).find(n => n.id === wfState.selectedNodeId) : null;
+  if (!node) return;
+  node.config = node.config || {};
+  node.config[key] = val;
+  if (node.type === 'trigger_daily') {
+    if (key === 'daily_time') wf.daily_time = val;
+    if (key === 'timezone') wf.timezone = val;
+  }
+  markWfDirty();
+  renderWorkflowCanvas();
+  if (node.type === 'trigger_daily') renderWorkflowToolbar();
+}
+
+function insertTemplateVar(varToken) {
+  const fid = wfState.lastFocusedFieldId;
+  const field = fid ? document.getElementById(fid) : null;
+  if (!field) {
+    if (navigator.clipboard) navigator.clipboard.writeText(varToken);
+    wfToast(`📋 ${varToken} ক্লিপবোর্ডে কপি হয়েছে!`, 'info');
+    return;
+  }
+  const start = field.selectionStart || field.value.length;
+  const end = field.selectionEnd || start;
+  field.value = field.value.slice(0, start) + varToken + field.value.slice(end);
+  field.focus();
+  field.dispatchEvent(new Event('change'));
+}
+
+function connectFromInspector() {
+  const tgt = document.getElementById('wf-quick-connect-tgt')?.value;
+  const condEl = document.getElementById('wf-quick-connect-cond');
+  const cond = condEl ? condEl.value : '';
+  if (!tgt || !wfState.selectedNodeId) return;
+  connectNodes(wfState.selectedNodeId, tgt, cond);
+}
+
+async function testSelectedNode() {
+  const wf = wfState.activeWorkflow;
+  const node = wf ? (wf.nodes || []).find(n => n.id === wfState.selectedNodeId) : null;
+  if (!node) return;
+
+  const btn = document.getElementById('btn-wf-test-node');
+  const outEl = document.getElementById('wf-node-test-output');
+  const sampleInput = document.getElementById('wf-node-test-input')?.value || '';
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ Testing Node...'; }
+
+  try {
+    const res = await wfFetch('/api/workflows/node/test', {
+      method: 'POST',
+      body: JSON.stringify({ node, sample_input: sampleInput })
+    });
+    const data = await res.json();
+    const r = data.result || {};
+    if (outEl) {
+      outEl.style.display = 'block';
+      outEl.textContent = `[${r.status || 'DONE'} • ${r.duration_ms || 0} ms]\n${r.output || JSON.stringify(data, null, 2)}`;
+    }
+  } catch (err) {
+    if (outEl) {
+      outEl.style.display = 'block';
+      outEl.textContent = 'Test Error: ' + err.message;
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = '⚡ এই নোডটি টেস্ট করুন'; }
+  }
+}
+
+// ------------------------------------------------------------------------------
+// Execution Trace Panel & Run History Table
+// ------------------------------------------------------------------------------
+function renderRunOutputPanel() {
+  const el = document.getElementById('wf-inspector-run');
+  if (!el) return;
+  const run = wfState.activeRun;
+  if (!run) {
+    el.innerHTML = '<div class="wf-empty-hint">এই ওয়ার্কফ্লোটি এখনও রান হয়নি। উপরের "▶ Run Now" বাটনে ক্লিক করে লাইভ এক্সিকিউশন দেখুন।</div>';
+    return;
+  }
+
+  const steps = run.node_results || [];
+  const statusCls = (run.status || 'IDLE').toLowerCase();
+
+  el.innerHTML = `
+    <div class="wf-run-summary-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="wf-status-pill ${statusCls}">${wfEsc(run.status)}</span>
+        <span style="font-size:0.75rem; color:var(--text-muted); font-family:'Fira Code', monospace;">${run.duration_ms || 0} ms • ${wfEsc(run.trigger_source || 'manual')}</span>
+      </div>
+      <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:6px;">
+        Run ID: <code>${wfEsc(run.id || run.run_id || '-')}</code>
+      </div>
+      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+        <button type="button" class="mini-btn-copy" onclick="switchTab('reports')">📄 AI Reports দেখুন</button>
+        <button type="button" class="mini-btn-copy" onclick="switchTab('chat')">💬 Chat Digest দেখুন</button>
+      </div>
+    </div>
+
+    <div class="wf-trace-list">
+      ${steps.map((st, idx) => `
+        <div class="wf-trace-step ${(st.status || '').toLowerCase()}">
+          <div class="wf-trace-top">
+            <span class="wf-trace-title">${idx + 1}. ${wfEsc(wfNodeMeta(st.type).icon)} ${wfEsc(st.title || st.node_id)}</span>
+            <span class="wf-status-pill ${(st.status || '').toLowerCase()}">${wfEsc(st.status)} (${st.duration_ms || 0}ms)</span>
+          </div>
+          ${st.summary ? `<div class="wf-trace-sub">${wfEsc(st.summary)}</div>` : ''}
+          <pre class="wf-trace-pre">${wfEsc((st.output || '').slice(0, 1800))}</pre>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function refreshRecentWorkflowRuns() {
+  try {
+    const res = await wfFetch('/api/workflows/runs/recent?limit=35');
+    const data = await res.json();
+    if (data && data.success) {
+      wfState.recentRuns = data.runs || [];
+      renderExecutionHistoryTable();
+    }
+  } catch (err) {
+    console.warn('refreshRecentWorkflowRuns error:', err);
+  }
+}
+
+function renderExecutionHistoryTable() {
+  const tbody = document.getElementById('wf-runs-history-tbody');
+  if (!tbody) return;
+  const runs = wfState.recentRuns || [];
+  tbody.innerHTML = !runs.length
+    ? '<tr><td colspan="7" style="padding:18px; text-align:center; color:var(--text-muted);">এখনও কোনো রান ইতিহাস নেই।</td></tr>'
+    : runs.map(r => `
+    <tr style="border-bottom:1px solid var(--border-subtle);">
+      <td style="padding:10px 14px; font-family:'Fira Code', monospace; font-size:0.75rem;">${wfEsc(r.id)}</td>
+      <td style="padding:10px 14px; font-weight:600;">${wfEsc(r.workflow_name || r.workflow_id)}</td>
+      <td style="padding:10px 14px;"><span class="wf-source-badge">${wfEsc(r.trigger_source || 'manual')}</span></td>
+      <td style="padding:10px 14px;"><span class="wf-status-pill ${(r.status || '').toLowerCase()}">${wfEsc(r.status)}</span></td>
+      <td style="padding:10px 14px; font-family:'Fira Code', monospace; font-size:0.78rem;">${r.duration_ms || 0} ms</td>
+      <td style="padding:10px 14px; font-size:0.78rem; color:var(--text-muted);">${wfEsc(r.started_at || '')}</td>
+      <td style="padding:10px 14px; text-align:right;">
+        <button type="button" class="btn-sm-action-cyber" onclick="inspectHistoricalRun('${wfEsc(r.id)}')">🔍 Trace দেখুন</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function inspectHistoricalRun(runId) {
+  const found = (wfState.recentRuns || []).find(r => r.id === runId);
+  if (!found) return;
+  await selectWorkflow(found.workflow_id, true);
+  wfState.activeRun = found;
+  applyRunOverlayToCanvas();
+  renderRunOutputPanel();
+  switchWorkflowsSubTab('studio');
+  switchWfInspectorTab('run');
+}
+
+// ------------------------------------------------------------------------------
+// Pre-Built Templates Library
+// ------------------------------------------------------------------------------
+function renderTemplatesLibrary() {
+  const grid = document.getElementById('wf-templates-grid');
+  if (!grid) return;
+  const templates = wfState.templates || [];
+  if (!templates.length) {
+    grid.innerHTML = '<div class="wf-empty-hint">কোনো টেমপ্লেট পাওয়া যায়নি।</div>';
+    return;
+  }
+
+  grid.innerHTML = templates.map(tpl => {
+    const chain = (tpl.nodes || []).map(n => wfNodeMeta(n.type).icon).join(' → ');
+    return `
+      <div class="wf-template-card">
+        <div class="wf-tpl-top">
+          <span class="wf-tpl-icon">${wfEsc(tpl.icon || '⚡')}</span>
+          <div>
+            <h4>${wfEsc(tpl.name)}</h4>
+            <span class="wf-tpl-sched">${tpl.trigger_type === 'webhook' ? '🌐 Webhook' : `⏰ Daily ${tpl.daily_time || '09:00'}`}</span>
+          </div>
+        </div>
+        <p class="wf-tpl-desc">${wfEsc(tpl.description || '')}</p>
+        <div class="wf-tpl-chain">${wfEsc(chain)} (${(tpl.nodes || []).length} Nodes)</div>
+        <button type="button" class="btn-primary" style="width:100%; justify-content:center;" onclick="installWorkflowTemplate('${wfEsc(tpl.id)}')">
+          ➕ ইনস্টল ও কাস্টমাইজ করুন
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function installWorkflowTemplate(templateId) {
+  try {
+    const res = await wfFetch(`/api/workflows/templates/${encodeURIComponent(templateId)}/install`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Install failed');
+    wfToast(`✅ "${data.workflow.name}" ইনস্টল হয়েছে!`, 'success');
+    await loadWorkflowsStudio(data.workflow.id);
+    switchWorkflowsSubTab('studio');
+  } catch (err) {
+    wfToast('টেমপ্লেট ইনস্টল ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+// Global exports
+window.loadWorkflowsStudio = loadWorkflowsStudio;
+window.switchWorkflowsSubTab = switchWorkflowsSubTab;
+window.switchWfInspectorTab = switchWfInspectorTab;
+window.toggleQuickDailyBuilder = toggleQuickDailyBuilder;
+window.applyQuickDailyPreset = applyQuickDailyPreset;
+window.submitQuickDailyTask = submitQuickDailyTask;
+window.selectWorkflow = selectWorkflow;
+window.toggleWorkflowById = toggleWorkflowById;
+window.createBlankWorkflow = createBlankWorkflow;
+window.addNodeToCanvas = addNodeToCanvas;
+window.autoLayoutWorkflow = autoLayoutWorkflow;
+window.updateActiveWorkflowMeta = updateActiveWorkflowMeta;
+window.saveActiveWorkflow = saveActiveWorkflow;
+window.runActiveWorkflowNow = runActiveWorkflowNow;
+window.deleteActiveWorkflow = deleteActiveWorkflow;
+window.copyWorkflowWebhookUrl = copyWorkflowWebhookUrl;
+window.onNodeMouseDown = onNodeMouseDown;
+window.onNodeCardClick = onNodeCardClick;
+window.onOutputPortClick = onOutputPortClick;
+window.onInputPortClick = onInputPortClick;
+window.onCanvasBackgroundClick = onCanvasBackgroundClick;
+window.removeEdgeById = removeEdgeById;
+window.deleteNodeById = deleteNodeById;
+window.updateSelectedNodeTitle = updateSelectedNodeTitle;
+window.updateNodeCfg = updateNodeCfg;
+window.insertTemplateVar = insertTemplateVar;
+window.connectFromInspector = connectFromInspector;
+window.testSelectedNode = testSelectedNode;
+window.refreshRecentWorkflowRuns = refreshRecentWorkflowRuns;
+window.inspectHistoricalRun = inspectHistoricalRun;
+window.installWorkflowTemplate = installWorkflowTemplate;

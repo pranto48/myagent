@@ -115,17 +115,68 @@ class CronScheduler:
         except Exception as e:
             logger.error(f"Error syncing next runs: {e}")
 
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.sync_missing_next_runs()
+        except Exception as w_err:
+            logger.debug(f"Workflow next_run sync skipped: {w_err}")
+
     async def _scheduler_loop(self):
-        """Continuously polls for due jobs."""
+        """Continuously polls for due cron jobs and autonomous workflows."""
         while self._running:
             try:
                 await self._check_and_dispatch_due_jobs()
+                await self._check_and_dispatch_due_workflows()
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Error in scheduler tick: {e}")
             
             await asyncio.sleep(self.tick_seconds)
+
+    async def _check_and_dispatch_due_workflows(self):
+        """Checks ops_workflows for enabled daily/cron workflows whose next_run_ts <= now and runs them."""
+        try:
+            from workflows.store import WorkflowStore, compute_next_run
+            from workflows.engine import workflow_engine
+
+            now_ts = time.time()
+            db = await self._get_db()
+            try:
+                async with db.execute("""
+                    SELECT id, name, trigger_type, schedule_expr, timezone
+                    FROM ops_workflows
+                    WHERE is_enabled = 1
+                      AND trigger_type NOT IN ('manual', 'webhook')
+                      AND next_run_ts IS NOT NULL
+                      AND next_run_ts <= ?
+                """, (now_ts,)) as cur:
+                    due_wfs = [dict(r) for r in await cur.fetchall()]
+
+                for wf in due_wfs:
+                    wf_id = wf["id"]
+                    if workflow_engine.is_running(wf_id):
+                        continue
+
+                    # Advance next_run immediately to prevent duplicate trigger on overlapping 20s ticks
+                    next_str, next_ts, _, _ = compute_next_run(
+                        wf.get("schedule_expr"),
+                        wf.get("timezone") or "Asia/Dhaka",
+                        wf.get("trigger_type") or "daily"
+                    )
+                    if next_ts:
+                        await db.execute(
+                            "UPDATE ops_workflows SET next_run = ?, next_run_ts = ? WHERE id = ?",
+                            (next_str, next_ts, wf_id)
+                        )
+                    await db.commit()
+
+                    logger.info(f"Dispatching scheduled workflow '{wf['name']}' ({wf_id})...")
+                    asyncio.create_task(workflow_engine.execute_workflow(wf_id, trigger_source="schedule"))
+            finally:
+                await db.close()
+        except Exception as e:
+            logger.debug(f"Scheduled workflow tick check skipped: {e}")
 
     async def _check_and_dispatch_due_jobs(self):
         """Identifies jobs whose next_run is past or now, and executes them."""

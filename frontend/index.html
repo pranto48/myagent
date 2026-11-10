@@ -136,6 +136,14 @@
           <span data-i18n="ops_suite_header">AUTONOMOUS SUITE</span>
         </div>
 
+        <!-- 0. WORKFLOWS (n8n Visual Auto Tasks) -->
+        <button class="nav-btn ops-btn" id="nav-workflows-btn" onclick="switchTab('workflows')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span data-i18n="nav_workflows">WORKFLOWS (অটো)</span>
+        </button>
+
         <!-- SESSIONS -->
         <button class="nav-btn ops-btn" id="nav-sessions-btn" onclick="switchTab('sessions')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
@@ -2951,6 +2959,186 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
         </div>
       </section>
 
+      <!-- Ops View: WORKFLOWS (n8n-Style Autonomous Workflow & Daily Task Studio) -->
+      <section class="tab-view" id="view-workflows">
+        <div class="ops-view-layout wf-studio-container">
+          <!-- Header Banner -->
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>⚡</span> <span data-i18n="wf_studio_title">n8n-স্টাইল অটোনোমাস ওয়ার্কফ্লো ও দৈনিক টাস্ক স্টুডিও</span></h3>
+              <p data-i18n="wf_studio_desc">প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক ডেইলি বিল্ডার</button>
+              <button type="button" class="btn-secondary" onclick="loadWorkflowsStudio()">🔄 রিফ্রেশ</button>
+              <button type="button" class="btn-primary" onclick="createBlankWorkflow()">➕ নতুন ওয়ার্কফ্লো</button>
+            </div>
+          </div>
+
+          <!-- KPI Cards Strip -->
+          <div class="wf-kpi-strip">
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">মোট ওয়ার্কফ্লো</span>
+              <span class="wf-kpi-val" id="wf-kpi-total">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">সক্রিয় দৈনিক শিডিউল</span>
+              <span class="wf-kpi-val" style="color:#10b981;" id="wf-kpi-active">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">সর্বমোট অটোমেটেড রান</span>
+              <span class="wf-kpi-val" style="color:#38bdf8;" id="wf-kpi-runs">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">সাফল্যের হার</span>
+              <span class="wf-kpi-val" style="color:#a855f7;" id="wf-kpi-success">100%</span>
+            </div>
+          </div>
+
+          <!-- Hero Quick Daily Auto-Task Builder -->
+          <div class="wf-quick-card" id="wf-quick-daily-card">
+            <div class="wf-quick-header" onclick="toggleQuickDailyBuilder()">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="wf-quick-badge">1-CLICK DAILY AGENT</span>
+                <h4 style="margin:0; font-size:0.98rem;">🤖 প্রতিদিন স্বয়ংক্রিয়ভাবে করানোর জন্য এআই এজেন্টকে একটি দৈনিক কাজ দিন</h4>
+              </div>
+              <span style="font-size:0.8rem; color:var(--text-muted);">Expand / Collapse ▾</span>
+            </div>
+            <form id="wf-quick-builder-body" onsubmit="submitQuickDailyTask(event)" style="margin-top:12px;">
+              <div class="wf-quick-presets">
+                <span style="font-size:0.75rem; color:var(--text-muted);">১-ক্লিক উদাহরণ:</span>
+                <button type="button" class="wf-preset-pill" onclick="applyQuickDailyPreset('health')">🏥 সার্ভার ও নেটওয়ার্ক অডিট</button>
+                <button type="button" class="wf-preset-pill" onclick="applyQuickDailyPreset('project')">📊 প্রজেক্ট মেমোরি ও কাজ রিভিউ</button>
+                <button type="button" class="wf-preset-pill" onclick="applyQuickDailyPreset('research')">🔍 নলেজ ও ইনসাইট ডাইজেস্ট</button>
+                <button type="button" class="wf-preset-pill" onclick="applyQuickDailyPreset('security')">🛡️ রাতের সিকিউরিটি চেক</button>
+              </div>
+
+              <div class="wf-quick-grid">
+                <div class="wf-field-group">
+                  <label>দৈনিক কাজের নাম</label>
+                  <input type="text" id="wf-quick-name" class="text-input" placeholder="যেমন: দৈনিক সকালের সার্ভার ও প্রজেক্ট ব্রিফিং">
+                </div>
+                <div class="wf-field-group">
+                  <label>সময় (Asia/Dhaka)</label>
+                  <input type="time" id="wf-quick-time" class="text-input" value="09:00">
+                </div>
+                <div class="wf-field-group">
+                  <label>ফ্রিকোয়েন্সি</label>
+                  <select id="wf-quick-frequency" class="text-input">
+                    <option value="daily" selected>প্রতিদিন (Daily)</option>
+                    <option value="hourly">প্রতি ঘণ্টায় (Hourly)</option>
+                    <option value="every_6h">প্রতি ৬ ঘণ্টায় (Every 6h)</option>
+                    <option value="weekly">সাপ্তাহিক (Weekly)</option>
+                    <option value="every_15m">প্রতি ১৫ মিনিটে (Every 15m)</option>
+                  </select>
+                </div>
+                <div class="wf-field-group">
+                  <label>AI মডেল</label>
+                  <select id="wf-quick-model" class="text-input">
+                    <option value="">Default Agent Model</option>
+                  </select>
+                </div>
+                <div class="wf-field-group">
+                  <label>প্রজেক্ট মেমোরি (ঐচ্ছিক)</label>
+                  <input type="text" id="wf-quick-project" class="text-input" placeholder="e.g. myagent">
+                </div>
+              </div>
+
+              <div class="wf-field-group" style="margin-top:10px;">
+                <label>প্রতিদিন নির্দিষ্ট সময়ে এজেন্ট কী কাজ করবে? (Natural Language Instructions)</label>
+                <textarea id="wf-quick-instruction" class="text-input" rows="2" placeholder="বিস্তারিত লিখুন — যেমন: প্রতিদিন সার্ভার হেলথ ও পিং চেক করে সমস্যা থাকলে সতর্ক করো, অথবা প্রজেক্ট ডেটাবেস রিভিউ করে আজকের কাজের তালিকা বানাও..."></textarea>
+              </div>
+
+              <div class="wf-quick-footer">
+                <div class="wf-check-row">
+                  <label><input type="checkbox" id="wf-quick-save-report" checked> 📄 AI Reports-এ সেভ</label>
+                  <label><input type="checkbox" id="wf-quick-save-memory"> 💾 Project Memory-তে সেভ</label>
+                  <label><input type="checkbox" id="wf-quick-post-chat" checked> 💬 Chat Session-এ রিপোর্ট</label>
+                  <label><input type="checkbox" id="wf-quick-notify-channels"> 📡 Telegram/Discord</label>
+                  <label><input type="checkbox" id="wf-quick-run-now"> ⚡ তৈরি করেই এখনই রান করুন</label>
+                </div>
+                <button type="submit" id="btn-wf-quick-create" class="btn-primary">
+                  ⚡ অটো ওয়ার্কফ্লো তৈরি ও অ্যাক্টিভেট করুন
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Sub-Tabs -->
+          <div class="wf-subtabs-bar">
+            <button type="button" id="wf-tabbtn-studio" class="wf-subtab-btn active" onclick="switchWorkflowsSubTab('studio')">🎨 ভিজ্যুয়াল n8n স্টুডিও (Canvas)</button>
+            <button type="button" id="wf-tabbtn-history" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('history')">📜 এক্সিকিউশন হিস্ট্রি ও ট্রেস</button>
+            <button type="button" id="wf-tabbtn-templates" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('templates')">📚 টেমপ্লেট লাইব্রেরি</button>
+          </div>
+
+          <!-- SUBTAB 1: Visual Studio -->
+          <div id="wf-subtab-studio" class="wf-workspace-grid">
+            <!-- Left Pane: Saved Workflows & Node Palette -->
+            <div class="wf-left-pane">
+              <div class="wf-pane-header">📋 ওয়ার্কফ্লো তালিকা</div>
+              <div id="wf-list-container" class="wf-list-scroll"></div>
+              <div class="wf-pane-header" style="margin-top:8px;">🧩 নোড প্যালেট (ক্লিক করে যোগ করুন)</div>
+              <div id="wf-node-palette" class="wf-palette-list"></div>
+            </div>
+
+            <!-- Center Pane: Interactive Dotted Canvas -->
+            <div class="wf-center-pane">
+              <div id="wf-canvas-toolbar" class="wf-canvas-toolbar"></div>
+              <div id="wf-canvas-viewport" class="wf-canvas-viewport" onclick="onCanvasBackgroundClick(event)">
+                <div id="wf-canvas-stage" class="wf-canvas-stage">
+                  <svg id="wf-edges-svg" class="wf-edges-svg"></svg>
+                  <div id="wf-nodes-layer" class="wf-nodes-layer"></div>
+                </div>
+              </div>
+              <div class="wf-canvas-hint">
+                💡 টিপস: নোড ড্র্যাগ করে সাজান • আউটপুট পোর্ট (ডান পাশের ডট / T / F) থেকে অন্য নোডের বাম ডটে ক্লিক করে কানেক্ট করুন • সংযোগের লেবেলে ক্লিক করলে লিংক মুছবে।
+              </div>
+            </div>
+
+            <!-- Right Pane: Dynamic Node Inspector & Run Trace -->
+            <div class="wf-right-pane">
+              <div class="wf-inspector-tabs">
+                <button type="button" id="wf-insp-btn-node" class="wf-insp-tab active" onclick="switchWfInspectorTab('node')">⚙️ নোড সেটিংস</button>
+                <button type="button" id="wf-insp-btn-run" class="wf-insp-tab" onclick="switchWfInspectorTab('run')">📊 লাইভ আউটপুট</button>
+              </div>
+              <div id="wf-inspector-node" class="wf-inspector-body" style="display:flex;"></div>
+              <div id="wf-inspector-run" class="wf-inspector-body" style="display:none;"></div>
+            </div>
+          </div>
+
+          <!-- SUBTAB 2: Execution History -->
+          <div id="wf-subtab-history" style="display:none;">
+            <div class="ops-card" style="padding:0; overflow:hidden;">
+              <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; font-size:0.95rem;">📜 সাম্প্রতিক অটোনোমাস ওয়ার্কফ্লো রান ইতিহাস</span>
+                <button type="button" class="btn-sm-action-cyber" onclick="refreshRecentWorkflowRuns()">🔄 রিফ্রেশ</button>
+              </div>
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.84rem; text-align:left;">
+                  <thead>
+                    <tr style="background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+                      <th style="padding:10px 14px;">Run ID</th>
+                      <th style="padding:10px 14px;">Workflow Name</th>
+                      <th style="padding:10px 14px;">Trigger</th>
+                      <th style="padding:10px 14px;">Status</th>
+                      <th style="padding:10px 14px;">Duration</th>
+                      <th style="padding:10px 14px;">Started At</th>
+                      <th style="padding:10px 14px; text-align:right;">Trace</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wf-runs-history-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB 3: Templates Library -->
+          <div id="wf-subtab-templates" style="display:none;">
+            <div id="wf-templates-grid" class="wf-templates-grid"></div>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <!-- Document Chunk Inspector Modal -->
@@ -3987,6 +4175,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
   <script src="js/settings.js"></script>
   <script src="js/reports_manager.js"></script>
   <script src="js/ops_manager.js"></script>
+  <script src="js/workflows_manager.js"></script>
   <script src="js/app.js"></script>
     <!-- Subagent Interactive Task Runner Modal -->
     <div class="modal-overlay" id="modal-subagent-task" style="display:none;">

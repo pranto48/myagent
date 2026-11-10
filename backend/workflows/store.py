@@ -1,0 +1,1140 @@
+# ==============================================================================
+# Copyright (c) 2026 IT support BD (https://itsupport.com.bd)
+# Made By Arif (https://arifmahmud.com/)
+# Project: MyAgent | Version: 3.3.0
+# Workflow Graph Store & Pre-Built Daily Automation Templates
+# ==============================================================================
+
+import os
+import json
+import uuid
+import time
+import logging
+from datetime import datetime, timedelta, timezone, tzinfo
+from typing import Dict, Any, List, Optional, Tuple
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
+try:
+    import aiosqlite
+except ImportError:
+    aiosqlite = None
+
+try:
+    from config import settings
+except ImportError:
+    class _FallbackSettings:
+        DATA_DIR = os.environ.get("DATA_DIR", "./data")
+        LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-3.7-flash")
+    settings = _FallbackSettings()
+
+from cron.cron_parser import CronExpression
+
+logger = logging.getLogger("myagent.workflows.store")
+
+STATIC_TZ_OFFSETS = {
+    "Asia/Dhaka": timedelta(hours=6),
+    "Asia/Kolkata": timedelta(hours=5, minutes=30),
+    "Asia/Dubai": timedelta(hours=4),
+    "Asia/Singapore": timedelta(hours=8),
+    "Asia/Tokyo": timedelta(hours=9),
+    "UTC": timedelta(hours=0),
+    "Europe/London": timedelta(hours=0),
+    "America/New_York": timedelta(hours=-5),
+}
+
+
+def _get_tzinfo(tz_name: str = "Asia/Dhaka") -> tzinfo:
+    tz_clean = (tz_name or "Asia/Dhaka").strip()
+    if ZoneInfo is not None:
+        try:
+            return ZoneInfo(tz_clean)
+        except Exception:
+            pass
+    offset = STATIC_TZ_OFFSETS.get(tz_clean, timedelta(hours=6))
+    return timezone(offset)
+
+
+def _get_ops_db_path() -> str:
+    if os.name == "nt" or not os.path.exists(settings.DATA_DIR):
+        os.makedirs("./data", exist_ok=True)
+        return os.path.join("./data", "ops.db")
+    return os.path.join(settings.DATA_DIR, "ops.db")
+
+
+def daily_time_to_cron(daily_time: str = "09:00", frequency: str = "daily", weekday: int = 0) -> str:
+    """Converts HH:MM & frequency ('daily', 'hourly', 'every_6h', 'weekly', 'every_15m') to 5-field cron."""
+    hh, mm = 9, 0
+    try:
+        parts = (daily_time or "09:00").strip().split(":")
+        hh = max(0, min(23, int(parts[0])))
+        mm = max(0, min(59, int(parts[1]))) if len(parts) > 1 else 0
+    except Exception:
+        hh, mm = 9, 0
+
+    freq = (frequency or "daily").lower().strip()
+    if freq == "every_15m":
+        return "*/15 * * * *"
+    if freq == "hourly":
+        return f"{mm} * * * *"
+    if freq == "every_6h":
+        return f"{mm} */6 * * *"
+    if freq == "weekly":
+        wd = max(0, min(6, int(weekday)))
+        return f"{mm} {hh} * * {wd}"
+    return f"{mm} {hh} * * *"
+
+
+def compute_next_run(
+    schedule_expr: Optional[str],
+    tz_name: str = "Asia/Dhaka",
+    trigger_type: str = "daily"
+) -> Tuple[Optional[str], Optional[float], str, str]:
+    """
+    Computes next run timestamp in target timezone AND UTC epoch timestamp for scheduler accuracy.
+    Returns (next_run_local_str, next_run_utc_ts, human_en, human_bn).
+    """
+    ttype = (trigger_type or "daily").lower().strip()
+    if ttype in ("manual", "webhook"):
+        label_en = "Webhook HTTP Trigger" if ttype == "webhook" else "Manual / MCP Trigger"
+        label_bn = "ওয়েবহুক HTTP ট্রিগার" if ttype == "webhook" else "ম্যানুয়াল / MCP ট্রিগার"
+        return None, None, label_en, label_bn
+
+    expr = (schedule_expr or "0 9 * * *").strip()
+    try:
+        cron = CronExpression(expr)
+        tz = _get_tzinfo(tz_name)
+        now_in_tz = datetime.now(tz).replace(tzinfo=None)
+        next_local_naive = cron.get_next_run(now_in_tz)
+        next_aware = next_local_naive.replace(tzinfo=tz)
+        next_utc_ts = next_aware.timestamp()
+        return (
+            next_local_naive.strftime("%Y-%m-%d %H:%M:%S"),
+            next_utc_ts,
+            cron.to_human_en(),
+            cron.to_human_bn()
+        )
+    except Exception as e:
+        logger.warning(f"Cron calculation failed for '{expr}': {e}")
+        return None, None, expr, expr
+
+
+# ==============================================================================
+# Node Types Metadata Catalog for Visual Studio Palette
+# ==============================================================================
+NODE_CATALOG: List[Dict[str, Any]] = [
+    {
+        "type": "trigger_daily",
+        "category": "trigger",
+        "icon": "⏰",
+        "label_en": "Daily Schedule Trigger",
+        "label_bn": "দৈনিক শিডিউল ট্রিগার",
+        "color": "#06b6d4",
+        "default_config": {"daily_time": "09:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+    },
+    {
+        "type": "trigger_webhook",
+        "category": "trigger",
+        "icon": "🌐",
+        "label_en": "Webhook Trigger",
+        "label_bn": "ওয়েবহুক ট্রিগার",
+        "color": "#0ea5e9",
+        "default_config": {"method": "POST"}
+    },
+    {
+        "type": "ai_agent",
+        "category": "ai",
+        "icon": "🧠",
+        "label_en": "AI Autonomous Agent",
+        "label_bn": "অটোনোমাস এআই এজেন্ট",
+        "color": "#a855f7",
+        "default_config": {
+            "prompt": "Analyze the incoming data and generate an actionable summary:\n{{prev.output}}",
+            "system_instruction": "You are an autonomous corporate AI workflow agent. Use tools if live inspection is needed.",
+            "model": "",
+            "project_name": "",
+            "use_memory": True,
+            "enable_tools": True,
+            "language": "bn",
+            "max_turns": 5
+        }
+    },
+    {
+        "type": "subagent",
+        "category": "ai",
+        "icon": "🤖",
+        "label_en": "Sub-Agent / Swarm",
+        "label_bn": "সাব-এজেন্ট / সোয়ার্ম",
+        "color": "#8b5cf6",
+        "default_config": {
+            "agent_id": "net_ping_subagent",
+            "task": "Run diagnostics and summarize findings. Context: {{prev.output}}",
+            "model": ""
+        }
+    },
+    {
+        "type": "tool_call",
+        "category": "action",
+        "icon": "🛠️",
+        "label_en": "Execute Agent Tool",
+        "label_bn": "টুল এক্সিকিউট করুন",
+        "color": "#3b82f6",
+        "default_config": {
+            "tool_name": "system_info",
+            "args_json": "{}"
+        }
+    },
+    {
+        "type": "condition",
+        "category": "logic",
+        "icon": "🔀",
+        "label_en": "IF / Else Condition",
+        "label_bn": "শর্ত (IF / Else)",
+        "color": "#f59e0b",
+        "default_config": {
+            "target": "{{prev.output}}",
+            "operator": "contains",
+            "value": "ERROR"
+        }
+    },
+    {
+        "type": "http_request",
+        "category": "action",
+        "icon": "📡",
+        "label_en": "HTTP Request",
+        "label_bn": "HTTP রিকোয়েস্ট",
+        "color": "#0284c7",
+        "default_config": {
+            "method": "POST",
+            "url": "https://httpbin.org/post",
+            "headers_json": "{\"Content-Type\": \"application/json\"}",
+            "body_json": "{\"workflow\": \"{{workflow.name}}\", \"output\": \"{{prev.output}}\"}"
+        }
+    },
+    {
+        "type": "save_report",
+        "category": "output",
+        "icon": "📄",
+        "label_en": "Save Executive Report",
+        "label_bn": "AI রিপোর্ট সেভ করুন",
+        "color": "#10b981",
+        "default_config": {
+            "title": "{{workflow.name}} - {{trigger.date}}",
+            "report_type": "executive_summary",
+            "content": "{{prev.output}}",
+            "index_in_memory": True
+        }
+    },
+    {
+        "type": "memory_save",
+        "category": "output",
+        "icon": "💾",
+        "label_en": "Save Project Memory",
+        "label_bn": "প্রজেক্ট মেমোরিতে সেভ",
+        "color": "#14b8a6",
+        "default_config": {
+            "project_name": "myagent",
+            "key": "daily_log_{{trigger.date}}",
+            "category": "notes",
+            "context": "production",
+            "content": "{{prev.output}}",
+            "save_to_vector": True
+        }
+    },
+    {
+        "type": "notify_channel",
+        "category": "output",
+        "icon": "📣",
+        "label_en": "Notify / Post Digest",
+        "label_bn": "চ্যাট ও চ্যানেল নোটিফাই",
+        "color": "#ec4899",
+        "default_config": {
+            "target": "chat_and_channels",
+            "session_title": "📅 Daily Automated Agent Reports",
+            "title": "⚡ {{workflow.name}} ({{trigger.date}})",
+            "message": "{{prev.output}}",
+            "custom_webhook_url": ""
+        }
+    }
+]
+
+
+# ==============================================================================
+# Pre-built Production n8n Workflow Templates
+# ==============================================================================
+WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
+    {
+        "id": "tpl_daily_morning_brief",
+        "name": "🌅 দৈনিক সকালের এআই এক্সিকিউটিভ ব্রিফিং ও হেলথ অডিট",
+        "description": "প্রতিদিন সকাল ৯:০০টায় স্বয়ংক্রিয়ভাবে সার্ভার পিং, সিস্টেম রিসোর্স চেক, এআই বিশ্লেষণ, কন্ডিশনাল অ্যালার্ট এবং রিপোর্ট ও চ্যাট ডাইজেস্ট তৈরি করে।",
+        "icon": "🌅",
+        "trigger_type": "daily",
+        "schedule_expr": "0 9 * * *",
+        "daily_time": "09:00",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 1,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "দৈনিক সকাল ৯:০০ ট্রিগার",
+                "x": 50,
+                "y": 150,
+                "config": {"daily_time": "09:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "tool_call",
+                "title": "সার্ভার রিসোর্স ও হেলথ চেক",
+                "x": 320,
+                "y": 150,
+                "config": {"tool_name": "system_info", "args_json": "{}"}
+            },
+            {
+                "id": "node_3",
+                "type": "subagent",
+                "title": "নেটওয়ার্ক পিং সাব-এজেন্ট",
+                "x": 590,
+                "y": 150,
+                "config": {
+                    "agent_id": "net_ping_subagent",
+                    "task": "Run network latency check across all active LAN and DNS targets and report status.",
+                    "model": ""
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "ai_agent",
+                "title": "এআই অটোনোমাস ব্রিফিং এনালিস্ট",
+                "x": 860,
+                "y": 150,
+                "config": {
+                    "prompt": (
+                        "আজকের তারিখ: {{trigger.date}}। নিচের সার্ভার ও নেটওয়ার্ক টেলিমেট্রি এবং কোম্পানি মেমোরি পর্যালোচনা করে একটি সংক্ষিপ্ত দৈনিক এক্সিকিউটিভ ব্রিফিং তৈরি করুন:\n\n"
+                        "1. সিস্টেম ইনফো:\n{{nodes.node_2.output}}\n\n"
+                        "2. নেটওয়ার্ক পিং রিপোর্ট:\n{{nodes.node_3.output}}\n\n"
+                        "সমস্যা থাকলে WARNING বা CRITICAL চিহ্নিত করুন, নাহলে ALL SYSTEMS HEALTHY লিখুন।"
+                    ),
+                    "system_instruction": "You are the Daily Morning Operations Briefing Agent. Analyze telemetry cleanly and check project memory if helpful.",
+                    "model": "",
+                    "project_name": "myagent",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": "bn",
+                    "max_turns": 4
+                }
+            },
+            {
+                "id": "node_5",
+                "type": "condition",
+                "title": "সমস্যা আছে কি না? (IF Alert)",
+                "x": 1130,
+                "y": 150,
+                "config": {
+                    "target": "{{prev.output}}",
+                    "operator": "regex",
+                    "value": "(OFFLINE|CRITICAL|FAILED|ERROR|WARNING)"
+                }
+            },
+            {
+                "id": "node_6",
+                "type": "notify_channel",
+                "title": "অ্যালার্ট চ্যানেল নোটিফিকেশন",
+                "x": 1410,
+                "y": 60,
+                "config": {
+                    "target": "chat_and_channels",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "🚨 ALERT: {{workflow.name}} ({{trigger.date}})",
+                    "message": "{{nodes.node_4.output}}",
+                    "custom_webhook_url": ""
+                }
+            },
+            {
+                "id": "node_7",
+                "type": "save_report",
+                "title": "দৈনিক রিপোর্ট আর্কাইভ",
+                "x": 1410,
+                "y": 250,
+                "config": {
+                    "title": "দৈনিক হেলথ ও ব্রিফিং রিপোর্ট - {{trigger.date}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_4.output}}",
+                    "index_in_memory": True
+                }
+            },
+            {
+                "id": "node_8",
+                "type": "notify_channel",
+                "title": "চ্যাট ডাইজেস্ট পাঠান",
+                "x": 1680,
+                "y": 250,
+                "config": {
+                    "target": "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "✅ {{workflow.name}} ({{trigger.date}})",
+                    "message": "{{nodes.node_4.output}}",
+                    "custom_webhook_url": ""
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""},
+            {"id": "e5", "source": "node_5", "target": "node_6", "condition": "true"},
+            {"id": "e6", "source": "node_5", "target": "node_7", "condition": "false"},
+            {"id": "e7", "source": "node_7", "target": "node_8", "condition": ""}
+        ]
+    },
+    {
+        "id": "tpl_daily_security_audit",
+        "name": "🛡️ দৈনিক সিকিউরিটি, পোর্ট স্ক্যান ও DLP অডিট",
+        "description": "প্রতিদিন রাত ৩:০০টায় সার্ভার পোর্ট স্ক্যান করে, সিকিউরিটি অডিটর সাব-এজেন্ট চালায় এবং কমপ্লায়েন্স রিপোর্ট সংরক্ষণ করে।",
+        "icon": "🛡️",
+        "trigger_type": "daily",
+        "schedule_expr": "0 3 * * *",
+        "daily_time": "03:00",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 1,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "রাত ৩:০০ দৈনিক অডিট",
+                "x": 60,
+                "y": 140,
+                "config": {"daily_time": "03:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "tool_call",
+                "title": "TCP পোর্ট স্ক্যানার (192.168.9.9)",
+                "x": 350,
+                "y": 140,
+                "config": {
+                    "tool_name": "network_port_scan",
+                    "args_json": "{\"target\": \"127.0.0.1\", \"ports\": [80, 443, 8000, 3399, 22]}"
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "subagent",
+                "title": "সিকিউরিটি ও DLP সাব-এজেন্ট",
+                "x": 640,
+                "y": 140,
+                "config": {
+                    "agent_id": "security_auditor_agent",
+                    "task": "Review DLP compliance and inspect port scan findings: {{nodes.node_2.output}}",
+                    "model": ""
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "ai_agent",
+                "title": "সিকিউরিটি কমপ্লায়েন্স বিশ্লেষক",
+                "x": 930,
+                "y": 140,
+                "config": {
+                    "prompt": "নিচের পোর্ট স্ক্যান ও DLP অডিট ফলাফল থেকে দৈনিক সিকিউরিটি রিপোর্ট তৈরি করুন:\n\nপোর্ট স্ক্যান:\n{{nodes.node_2.output}}\n\nDLP অডিট:\n{{nodes.node_3.output}}",
+                    "system_instruction": "Analyze security posture concisely with risk rating and recommendations.",
+                    "model": "",
+                    "project_name": "myagent",
+                    "use_memory": False,
+                    "enable_tools": False,
+                    "language": "bn",
+                    "max_turns": 3
+                }
+            },
+            {
+                "id": "node_5",
+                "type": "save_report",
+                "title": "সিকিউরিটি রিপোর্ট সেভ",
+                "x": 1220,
+                "y": 140,
+                "config": {
+                    "title": "দৈনিক সিকিউরিটি অডিট - {{trigger.date}}",
+                    "report_type": "incident_report",
+                    "content": "{{prev.output}}",
+                    "index_in_memory": True
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""}
+        ]
+    },
+    {
+        "id": "tpl_daily_custom_ai_task",
+        "name": "🤖 দৈনিক কাস্টম এআই রিসার্চ ও প্রজেক্ট নোট এজেন্ট",
+        "description": "প্রতিদিন নির্দিষ্ট সময়ে আপনার নির্ধারিত নির্দেশনা অনুযায়ী এআই এজেন্ট কাজ করবে, টুল ব্যবহার করবে ও ফলাফল মেমোরি ও চ্যাটে সেভ করবে।",
+        "icon": "🤖",
+        "trigger_type": "daily",
+        "schedule_expr": "0 10 * * *",
+        "daily_time": "10:00",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 0,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "সকাল ১০:০০ দৈনিক ট্রিগার",
+                "x": 60,
+                "y": 140,
+                "config": {"daily_time": "10:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "ai_agent",
+                "title": "অটোনোমাস এআই ওয়ার্কার",
+                "x": 360,
+                "y": 140,
+                "config": {
+                    "prompt": "আজকের ({{trigger.date}}) সিস্টেম ডাটাবেস স্ট্যাটাস এবং সংরক্ষিত প্রজেক্ট তথ্য রিভিউ করে একটি কার্যকর অ্যাকশন লিস্ট তৈরি করুন।",
+                    "system_instruction": "Check sqlite_schema_inspector or project memory tools first, then produce clear daily action items.",
+                    "model": "",
+                    "project_name": "myagent",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": "bn",
+                    "max_turns": 5
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "memory_save",
+                "title": "প্রজেক্ট মেমোরি আপডেট",
+                "x": 670,
+                "y": 140,
+                "config": {
+                    "project_name": "myagent",
+                    "key": "daily_brief_{{trigger.date}}",
+                    "category": "notes",
+                    "context": "production",
+                    "content": "{{prev.output}}",
+                    "save_to_vector": True
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "notify_channel",
+                "title": "চ্যাট ডাইজেস্টে পাঠান",
+                "x": 980,
+                "y": 140,
+                "config": {
+                    "target": "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "🤖 {{workflow.name}} ({{trigger.date}})",
+                    "message": "{{nodes.node_2.output}}",
+                    "custom_webhook_url": ""
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""}
+        ]
+    },
+    {
+        "id": "tpl_webhook_ai_pipeline",
+        "name": "🌐 ওয়েবহুক ট্রিগার্ড অটো এআই প্রসেসর",
+        "description": "যেকোনো বাহ্যিক অ্যাপ/স্ক্রিপ্ট থেকে Webhook POST পেলে স্বয়ংক্রিয়ভাবে এআই দিয়ে বিশ্লেষণ করে মেমোরি ও চ্যাটে সেভ করে।",
+        "icon": "🌐",
+        "trigger_type": "webhook",
+        "schedule_expr": "",
+        "daily_time": "",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 1,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_webhook",
+                "title": "ইনবাউন্ড ওয়েবহুক রিসিভার",
+                "x": 60,
+                "y": 140,
+                "config": {"method": "POST"}
+            },
+            {
+                "id": "node_2",
+                "type": "ai_agent",
+                "title": "এআই পেলোড প্রসেসর",
+                "x": 370,
+                "y": 140,
+                "config": {
+                    "prompt": "Webhook থেকে প্রাপ্ত নিচের ইভেন্ট/ডেটা বিশ্লেষণ করে সারসংক্ষেপ ও পরবর্তী করণীয় দিন:\n\n{{trigger.payload}}",
+                    "system_instruction": "Process incoming webhook events accurately and highlight action items.",
+                    "model": "",
+                    "project_name": "",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": "bn",
+                    "max_turns": 4
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "memory_save",
+                "title": "মেমোরিতে সংরক্ষণ",
+                "x": 680,
+                "y": 140,
+                "config": {
+                    "project_name": "myagent",
+                    "key": "webhook_event_{{trigger.date}}_{{trigger.time}}",
+                    "category": "notes",
+                    "context": "production",
+                    "content": "{{prev.output}}",
+                    "save_to_vector": True
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "notify_channel",
+                "title": "চ্যাট ও চ্যানেল নোটিফাই",
+                "x": 990,
+                "y": 140,
+                "config": {
+                    "target": "chat_and_channels",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "🌐 Webhook Processed: {{workflow.name}}",
+                    "message": "{{nodes.node_2.output}}",
+                    "custom_webhook_url": ""
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""}
+        ]
+    }
+]
+
+
+class WorkflowStore:
+    """SQLite persistence layer for n8n-style workflows and run execution histories inside ops.db."""
+
+    @classmethod
+    async def get_db(cls):
+        path = _get_ops_db_path()
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        db = await aiosqlite.connect(path)
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA journal_mode=WAL;")
+        return db
+
+    @classmethod
+    async def init_tables_and_seed(cls):
+        db = await cls.get_db()
+        try:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ops_workflows (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    icon TEXT DEFAULT '⚡',
+                    trigger_type TEXT DEFAULT 'daily',
+                    schedule_expr TEXT DEFAULT '0 9 * * *',
+                    daily_time TEXT DEFAULT '09:00',
+                    timezone TEXT DEFAULT 'Asia/Dhaka',
+                    nodes_json TEXT NOT NULL,
+                    edges_json TEXT NOT NULL,
+                    is_enabled INTEGER DEFAULT 1,
+                    webhook_secret TEXT DEFAULT '',
+                    last_run TEXT,
+                    next_run TEXT,
+                    next_run_ts REAL,
+                    last_status TEXT DEFAULT 'IDLE',
+                    run_count INTEGER DEFAULT 0,
+                    success_count INTEGER DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ops_workflow_runs (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT NOT NULL,
+                    workflow_name TEXT,
+                    trigger_source TEXT DEFAULT 'manual',
+                    status TEXT DEFAULT 'RUNNING',
+                    started_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    duration_ms INTEGER DEFAULT 0,
+                    node_results_json TEXT DEFAULT '[]',
+                    final_output TEXT DEFAULT '',
+                    error_message TEXT DEFAULT ''
+                )
+            """)
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_wf_runs_wfid ON ops_workflow_runs(workflow_id, started_at DESC)")
+            await db.commit()
+
+            # Seed prebuilt daily workflows if table is empty
+            async with db.execute("SELECT COUNT(*) as cnt FROM ops_workflows") as cur:
+                row = await cur.fetchone()
+                cnt = row["cnt"] if row else 0
+
+            if cnt == 0:
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                for tpl in WORKFLOW_TEMPLATES[:3]:
+                    wf_id = f"wf_{tpl['id'].replace('tpl_', '')}"
+                    is_en = int(tpl.get("is_enabled", 1))
+                    next_str, next_ts, _, _ = compute_next_run(
+                        tpl.get("schedule_expr"),
+                        tpl.get("timezone", "Asia/Dhaka"),
+                        tpl.get("trigger_type", "daily")
+                    ) if is_en else (None, None, "", "")
+                    wh_secret = f"whsec_{uuid.uuid4().hex[:16]}"
+                    await db.execute("""
+                        INSERT INTO ops_workflows (
+                            id, name, description, icon, trigger_type, schedule_expr,
+                            daily_time, timezone, nodes_json, edges_json, is_enabled,
+                            webhook_secret, next_run, next_run_ts, last_status,
+                            run_count, success_count, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDLE', 0, 0, ?, ?)
+                    """, (
+                        wf_id,
+                        tpl["name"],
+                        tpl["description"],
+                        tpl.get("icon", "⚡"),
+                        tpl.get("trigger_type", "daily"),
+                        tpl.get("schedule_expr", ""),
+                        tpl.get("daily_time", "09:00"),
+                        tpl.get("timezone", "Asia/Dhaka"),
+                        json.dumps(tpl["nodes"], ensure_ascii=False),
+                        json.dumps(tpl["edges"], ensure_ascii=False),
+                        is_en,
+                        wh_secret,
+                        next_str,
+                        next_ts,
+                        now_str,
+                        now_str,
+                    ))
+                await db.commit()
+                logger.info("Seeded default n8n-style daily workflows into ops_workflows.")
+        finally:
+            await db.close()
+
+    @classmethod
+    def _hydrate_row(cls, row: Any) -> Dict[str, Any]:
+        d = dict(row)
+        try:
+            d["nodes"] = json.loads(d.get("nodes_json") or "[]")
+        except Exception:
+            d["nodes"] = []
+        try:
+            d["edges"] = json.loads(d.get("edges_json") or "[]")
+        except Exception:
+            d["edges"] = []
+
+        # Human readable schedule
+        ttype = d.get("trigger_type", "daily")
+        expr = d.get("schedule_expr", "")
+        if ttype in ("manual", "webhook"):
+            d["human_en"] = "Webhook HTTP Trigger" if ttype == "webhook" else "Manual Trigger"
+            d["human_bn"] = "ওয়েবহুক HTTP ট্রিগার" if ttype == "webhook" else "ম্যানুয়াল ট্রিগার"
+        elif expr:
+            try:
+                cron = CronExpression(expr)
+                d["human_en"] = cron.to_human_en()
+                d["human_bn"] = cron.to_human_bn()
+            except Exception:
+                d["human_en"] = expr
+                d["human_bn"] = expr
+        else:
+            d["human_en"] = "Scheduled"
+            d["human_bn"] = "নির্ধারিত সময়"
+
+        d["is_enabled"] = bool(d.get("is_enabled", 0))
+        return d
+
+    @classmethod
+    async def list_workflows(cls) -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute("SELECT * FROM ops_workflows ORDER BY is_enabled DESC, updated_at DESC") as cur:
+                rows = await cur.fetchall()
+            return [cls._hydrate_row(r) for r in rows]
+        finally:
+            await db.close()
+
+    @classmethod
+    async def get_workflow(cls, workflow_id: str) -> Optional[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute("SELECT * FROM ops_workflows WHERE id = ?", (workflow_id,)) as cur:
+                row = await cur.fetchone()
+            return cls._hydrate_row(row) if row else None
+        finally:
+            await db.close()
+
+    @classmethod
+    async def create_workflow(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        wf_id = data.get("id") or f"wf_{uuid.uuid4().hex[:8]}"
+        name = (data.get("name") or "Untitled Auto-Workflow").strip()
+        description = (data.get("description") or "").strip()
+        icon = (data.get("icon") or "⚡").strip()
+        trigger_type = (data.get("trigger_type") or "daily").strip()
+        daily_time = (data.get("daily_time") or "09:00").strip()
+        timezone_str = (data.get("timezone") or "Asia/Dhaka").strip()
+        schedule_expr = (data.get("schedule_expr") or "").strip()
+        if trigger_type == "daily" and not schedule_expr:
+            schedule_expr = daily_time_to_cron(daily_time, "daily")
+        elif trigger_type in ("cron", "interval") and not schedule_expr:
+            schedule_expr = daily_time_to_cron(daily_time, "daily")
+
+        nodes = data.get("nodes") or [
+            {
+                "id": "node_1",
+                "type": "trigger_daily" if trigger_type in ("daily", "cron", "interval") else f"trigger_{trigger_type}",
+                "title": f"Daily Trigger ({daily_time})" if trigger_type == "daily" else "Workflow Trigger",
+                "x": 60,
+                "y": 140,
+                "config": {"daily_time": daily_time, "timezone": timezone_str, "frequency": trigger_type}
+            },
+            {
+                "id": "node_2",
+                "type": "ai_agent",
+                "title": "Autonomous AI Agent",
+                "x": 380,
+                "y": 140,
+                "config": {
+                    "prompt": description or "Check system health and summarize today's updates.",
+                    "system_instruction": "Execute tools if needed and return structured insights.",
+                    "model": "",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": "bn"
+                }
+            }
+        ]
+        edges = data.get("edges")
+        if edges is None:
+            edges = [{"id": "e1", "source": "node_1", "target": "node_2", "condition": ""}] if len(nodes) >= 2 else []
+
+        is_enabled = 1 if data.get("is_enabled", True) else 0
+        next_str, next_ts, _, _ = compute_next_run(schedule_expr, timezone_str, trigger_type) if is_enabled else (None, None, "", "")
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        wh_secret = data.get("webhook_secret") or f"whsec_{uuid.uuid4().hex[:16]}"
+
+        db = await cls.get_db()
+        try:
+            await db.execute("""
+                INSERT INTO ops_workflows (
+                    id, name, description, icon, trigger_type, schedule_expr,
+                    daily_time, timezone, nodes_json, edges_json, is_enabled,
+                    webhook_secret, next_run, next_run_ts, last_status,
+                    run_count, success_count, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDLE', 0, 0, ?, ?)
+            """, (
+                wf_id, name, description, icon, trigger_type, schedule_expr,
+                daily_time, timezone_str,
+                json.dumps(nodes, ensure_ascii=False),
+                json.dumps(edges, ensure_ascii=False),
+                is_enabled, wh_secret, next_str, next_ts, now_str, now_str
+            ))
+            await db.commit()
+        finally:
+            await db.close()
+
+        return await cls.get_workflow(wf_id)
+
+    @classmethod
+    async def update_workflow(cls, workflow_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        existing = await cls.get_workflow(workflow_id)
+        if not existing:
+            return None
+
+        name = (data.get("name", existing["name"]) or existing["name"]).strip()
+        description = (data.get("description", existing["description"]) or "").strip()
+        icon = (data.get("icon", existing["icon"]) or "⚡").strip()
+        trigger_type = (data.get("trigger_type", existing["trigger_type"]) or "daily").strip()
+        daily_time = (data.get("daily_time", existing["daily_time"]) or "09:00").strip()
+        timezone_str = (data.get("timezone", existing["timezone"]) or "Asia/Dhaka").strip()
+        schedule_expr = data.get("schedule_expr", existing["schedule_expr"])
+        if trigger_type == "daily" and "daily_time" in data and "schedule_expr" not in data:
+            schedule_expr = daily_time_to_cron(daily_time, "daily")
+
+        nodes = data.get("nodes", existing["nodes"])
+        edges = data.get("edges", existing["edges"])
+        is_enabled = 1 if data.get("is_enabled", existing["is_enabled"]) else 0
+
+        # Sync trigger node metadata if nodes exist
+        for n in nodes:
+            ntype = n.get("type", "")
+            if ntype.startswith("trigger_"):
+                cfg = n.setdefault("config", {})
+                if trigger_type == "daily":
+                    cfg["daily_time"] = daily_time
+                    cfg["timezone"] = timezone_str
+                break
+
+        next_str, next_ts, _, _ = compute_next_run(schedule_expr, timezone_str, trigger_type) if is_enabled else (None, None, "", "")
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        db = await cls.get_db()
+        try:
+            await db.execute("""
+                UPDATE ops_workflows
+                SET name = ?, description = ?, icon = ?, trigger_type = ?,
+                    schedule_expr = ?, daily_time = ?, timezone = ?,
+                    nodes_json = ?, edges_json = ?, is_enabled = ?,
+                    next_run = ?, next_run_ts = ?, updated_at = ?
+                WHERE id = ?
+            """, (
+                name, description, icon, trigger_type,
+                schedule_expr, daily_time, timezone_str,
+                json.dumps(nodes, ensure_ascii=False),
+                json.dumps(edges, ensure_ascii=False),
+                is_enabled, next_str, next_ts, now_str, workflow_id
+            ))
+            await db.commit()
+        finally:
+            await db.close()
+
+        return await cls.get_workflow(workflow_id)
+
+    @classmethod
+    async def toggle_workflow(cls, workflow_id: str) -> Optional[Dict[str, Any]]:
+        wf = await cls.get_workflow(workflow_id)
+        if not wf:
+            return None
+        new_enabled = 0 if wf["is_enabled"] else 1
+        next_str, next_ts, _, _ = (
+            compute_next_run(wf.get("schedule_expr"), wf.get("timezone", "Asia/Dhaka"), wf.get("trigger_type", "daily"))
+            if new_enabled else (None, None, "", "")
+        )
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db = await cls.get_db()
+        try:
+            await db.execute(
+                "UPDATE ops_workflows SET is_enabled = ?, next_run = ?, next_run_ts = ?, updated_at = ? WHERE id = ?",
+                (new_enabled, next_str, next_ts, now_str, workflow_id)
+            )
+            await db.commit()
+        finally:
+            await db.close()
+        return await cls.get_workflow(workflow_id)
+
+    @classmethod
+    async def delete_workflow(cls, workflow_id: str) -> bool:
+        db = await cls.get_db()
+        try:
+            cur = await db.execute("DELETE FROM ops_workflows WHERE id = ?", (workflow_id,))
+            await db.execute("DELETE FROM ops_workflow_runs WHERE workflow_id = ?", (workflow_id,))
+            await db.commit()
+            return cur.rowcount > 0
+        finally:
+            await db.close()
+
+    @classmethod
+    async def install_template(cls, template_id: str) -> Optional[Dict[str, Any]]:
+        tpl = next((t for t in WORKFLOW_TEMPLATES if t["id"] == template_id), None)
+        if not tpl:
+            return None
+        payload = dict(tpl)
+        payload["id"] = f"wf_{uuid.uuid4().hex[:8]}"
+        payload["is_enabled"] = True
+        return await cls.create_workflow(payload)
+
+    @classmethod
+    async def build_quick_daily_workflow(
+        cls,
+        name: str,
+        instruction: str,
+        daily_time: str = "09:00",
+        frequency: str = "daily",
+        timezone_str: str = "Asia/Dhaka",
+        model: str = "",
+        project_name: str = "",
+        save_report: bool = True,
+        save_memory: bool = False,
+        post_to_chat: bool = True,
+        notify_channels: bool = False,
+        custom_webhook_url: str = "",
+        language: str = "bn"
+    ) -> Dict[str, Any]:
+        """
+        Synthesizes a complete n8n-style multi-node DAG workflow from natural-language daily instructions.
+        """
+        schedule_expr = daily_time_to_cron(daily_time, frequency)
+        freq_map = {
+            "daily": f"প্রতিদিন {daily_time}",
+            "hourly": "প্রতি ঘণ্টায়",
+            "every_6h": "প্রতি ৬ ঘণ্টায়",
+            "weekly": f"সাপ্তাহিক ({daily_time})",
+            "every_15m": "প্রতি ১৫ মিনিটে"
+        }
+        trig_title = f"⏰ {freq_map.get(frequency, f'Daily {daily_time}')}"
+
+        nodes: List[Dict[str, Any]] = [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": trig_title,
+                "x": 50,
+                "y": 150,
+                "config": {"daily_time": daily_time, "timezone": timezone_str, "frequency": frequency}
+            },
+            {
+                "id": "node_2",
+                "type": "ai_agent",
+                "title": "🧠 অটোনোমাস এআই টাস্ক এজেন্ট",
+                "x": 360,
+                "y": 150,
+                "config": {
+                    "prompt": f"আজকের তারিখ: {{{{trigger.date}}}} ({{{{trigger.time}}}})\n\nদৈনিক অটোমেটেড টাস্ক নির্দেশনা:\n{instruction.strip()}",
+                    "system_instruction": (
+                        "You are an autonomous daily agent executing a scheduled user instruction. "
+                        "Use available tools (ping, port scan, SQLite inspector, memory search, python sandbox, skills) "
+                        "whenever verification or live data is helpful. Produce a clear, structured executive result."
+                    ),
+                    "model": model or "",
+                    "project_name": project_name or "",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": language or "bn",
+                    "max_turns": 6
+                }
+            }
+        ]
+        edges: List[Dict[str, Any]] = [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""}
+        ]
+
+        last_node_id = "node_2"
+        next_x = 680
+
+        if save_report:
+            rid = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": rid,
+                "type": "save_report",
+                "title": "📄 দৈনিক AI রিপোর্ট সেভ",
+                "x": next_x,
+                "y": 150,
+                "config": {
+                    "title": f"{name} - {{{{trigger.date}}}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_2.output}}",
+                    "index_in_memory": True
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": last_node_id, "target": rid, "condition": ""})
+            last_node_id = rid
+            next_x += 310
+
+        if save_memory:
+            mid = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": mid,
+                "type": "memory_save",
+                "title": "💾 প্রজেক্ট মেমোরিতে সেভ",
+                "x": next_x,
+                "y": 150,
+                "config": {
+                    "project_name": project_name or "myagent",
+                    "key": "daily_auto_{{trigger.date}}",
+                    "category": "notes",
+                    "context": "production",
+                    "content": "{{nodes.node_2.output}}",
+                    "save_to_vector": True
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": last_node_id, "target": mid, "condition": ""})
+            last_node_id = mid
+            next_x += 310
+
+        if post_to_chat or notify_channels or custom_webhook_url:
+            nid = f"node_{len(nodes) + 1}"
+            target_mode = "chat_and_channels" if notify_channels else "chat_session"
+            nodes.append({
+                "id": nid,
+                "type": "notify_channel",
+                "title": "📣 চ্যাট ও চ্যানেল নোটিফিকেশন",
+                "x": next_x,
+                "y": 150,
+                "config": {
+                    "target": target_mode,
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": f"⚡ {name} ({{{{trigger.date}}}})",
+                    "message": "{{nodes.node_2.output}}",
+                    "custom_webhook_url": custom_webhook_url or ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": last_node_id, "target": nid, "condition": ""})
+
+        return await cls.create_workflow({
+            "name": name,
+            "description": instruction.strip(),
+            "icon": "⚡",
+            "trigger_type": "daily" if frequency == "daily" else "cron",
+            "schedule_expr": schedule_expr,
+            "daily_time": daily_time,
+            "timezone": timezone_str,
+            "nodes": nodes,
+            "edges": edges,
+            "is_enabled": True
+        })
+
+    @classmethod
+    async def sync_missing_next_runs(cls):
+        """Ensures all enabled scheduled workflows have a valid future next_run_ts."""
+        try:
+            db = await cls.get_db()
+            try:
+                now_ts = time.time()
+                async with db.execute(
+                    "SELECT id, trigger_type, schedule_expr, timezone, next_run_ts FROM ops_workflows WHERE is_enabled = 1"
+                ) as cur:
+                    rows = await cur.fetchall()
+                for r in rows:
+                    ttype = (r["trigger_type"] or "daily").lower()
+                    if ttype in ("manual", "webhook"):
+                        continue
+                    nr_ts = r["next_run_ts"]
+                    if not nr_ts or float(nr_ts) <= now_ts:
+                        next_str, next_ts, _, _ = compute_next_run(
+                            r["schedule_expr"], r["timezone"] or "Asia/Dhaka", ttype
+                        )
+                        if next_ts:
+                            await db.execute(
+                                "UPDATE ops_workflows SET next_run = ?, next_run_ts = ? WHERE id = ?",
+                                (next_str, next_ts, r["id"])
+                            )
+                await db.commit()
+            finally:
+                await db.close()
+        except Exception as e:
+            logger.error(f"Error syncing workflow next runs: {e}")
+
+    @classmethod
+    async def list_runs(cls, workflow_id: Optional[str] = None, limit: int = 30) -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            if workflow_id:
+                sql = "SELECT * FROM ops_workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?"
+                params = (workflow_id, limit)
+            else:
+                sql = "SELECT * FROM ops_workflow_runs ORDER BY started_at DESC LIMIT ?"
+                params = (limit,)
+            async with db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+            runs = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["node_results"] = json.loads(d.get("node_results_json") or "[]")
+                except Exception:
+                    d["node_results"] = []
+                runs.append(d)
+            return runs
+        finally:
+            await db.close()

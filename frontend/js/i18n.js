@@ -920,6 +920,11 @@ const I18N_TRANSLATIONS = {
     nav_profiles: "PROFILES (প্রোফাইলস)",
     nav_skills: "SKILLS (স্কিলস)",
     nav_webhooks: "WEBHOOKS (ওয়েবহুক)",
+    nav_workflows: "WORKFLOWS (অটো টাস্ক)",
+    tab_workflows_title: "⚡ n8n-স্টাইল অটো ওয়ার্কফ্লো ও দৈনিক টাস্ক স্টুডিও",
+    tab_workflows_desc: "প্রতিদিনের অটোমেটেড এআই এজেন্ট কাজ, ভিজ্যুয়াল নোড পাইপলাইন, কন্ডিশন, রিপোর্ট ও চ্যাট ডাইজেস্ট",
+    wf_studio_title: "n8n-স্টাইল অটোনোমাস ওয়ার্কফ্লো ও দৈনিক টাস্ক স্টুডিও",
+    wf_studio_desc: "প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট",
   },
 
   en: {
@@ -1835,6 +1840,11 @@ const I18N_TRANSLATIONS = {
     nav_profiles: "PROFILES",
     nav_skills: "SKILLS",
     nav_webhooks: "WEBHOOKS",
+    nav_workflows: "WORKFLOWS (Auto)",
+    tab_workflows_title: "⚡ n8n-Style Autonomous Workflow & Daily Task Studio",
+    tab_workflows_desc: "Schedule daily AI agent tasks, build visual DAG pipelines, condition branches, reports & notifications",
+    wf_studio_title: "n8n-Style Autonomous Workflow & Daily Task Studio",
+    wf_studio_desc: "Automate daily AI agent work — visual node graph, IF/Else branching, tool execution, reports & digests",
   }
 };
 

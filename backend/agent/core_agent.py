@@ -109,14 +109,6 @@ class CompanyAIAgent:
                 "active_model": settings.LLM_MODEL
             }
 
-_shared_agent_instance: Optional[CompanyAIAgent] = None
-
-def get_shared_agent() -> CompanyAIAgent:
-    global _shared_agent_instance
-    if _shared_agent_instance is None:
-        _shared_agent_instance = CompanyAIAgent()
-    return _shared_agent_instance
-
     @staticmethod
     def is_conversational_greeting(text: str) -> bool:
         """
@@ -1008,3 +1000,286 @@ def get_shared_agent() -> CompanyAIAgent:
             "sources": [s.model_dump() for s in sources],
             "model_used": target_model
         }
+
+    async def run_autonomous_task(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        system_instruction: Optional[str] = None,
+        project_name: Optional[str] = None,
+        use_memory: bool = True,
+        enable_tools: bool = True,
+        language: str = "bn",
+        temperature: float = 0.25,
+        max_turns: int = 6
+    ) -> Dict[str, Any]:
+        """
+        Headless multi-turn autonomous AI task runner for n8n-style Workflow Nodes & Daily Jobs.
+        Executes PromptFirewall + DLP, Hybrid RAG retrieval, ProjectMemory injection,
+        and iterative tool calling (native function calling + ReAct fallback).
+        """
+        audit_store = SecurityAuditStore()
+        clean_prompt = (prompt or "").strip()
+        if not clean_prompt:
+            return {
+                "success": False,
+                "output": "Empty task prompt provided.",
+                "tool_trace": [],
+                "sources": [],
+                "model_used": model or settings.LLM_MODEL
+            }
+
+        # 1. Firewall & DLP
+        fw = PromptFirewall.inspect_prompt(clean_prompt)
+        if fw.get("blocked"):
+            await audit_store.log_event(
+                action="WORKFLOW_PROMPT_BLOCKED",
+                username="workflow_engine",
+                user_role="admin",
+                resource="workflow_ai_node",
+                severity="CRITICAL",
+                details={"threat_types": fw.get("threat_types", []), "reason": fw.get("reason", "")}
+            )
+            return {
+                "success": False,
+                "output": f"Blocked by PromptFirewall: {fw.get('reason', 'Security violation')}",
+                "tool_trace": [],
+                "sources": [],
+                "model_used": model or settings.LLM_MODEL
+            }
+
+        dlp_res = DLPEngine.inspect_text(clean_prompt)
+        if dlp_res.get("redacted_count", 0) > 0:
+            clean_prompt = dlp_res["sanitized_text"]
+
+        # 2. Gather Hybrid RAG + Project Memory context
+        sources: List[SourceCitation] = []
+        context_sections: List[str] = []
+
+        if use_memory:
+            try:
+                _, sources = self._prepare_rag_context(
+                    clean_prompt, user_role="admin", has_attachments=True, language=language
+                )
+                if sources:
+                    rag_lines = [f"- [{s.source} p.{s.page}]: {s.content}" for s in sources]
+                    context_sections.append("### [Company Hybrid Vector Memory Hits]:\n" + "\n".join(rag_lines))
+            except Exception as rag_err:
+                logger.warning(f"Autonomous task RAG skipped: {rag_err}")
+
+        if project_name and project_name.strip():
+            try:
+                from memory.project_store import ProjectMemoryStore
+                p_info = await ProjectMemoryStore.get_project_info(project_name.strip())
+                p_mems = await ProjectMemoryStore.search_memories(project_name=project_name.strip(), limit=8)
+                proj_lines = []
+                if p_info:
+                    proj_lines.append(f"Project: {p_info.get('display_name') or p_info.get('project_name')} | Tech: {p_info.get('tech_stack', '')}")
+                    if p_info.get("description"):
+                        proj_lines.append(f"Summary: {p_info.get('description')}")
+                for m in p_mems:
+                    proj_lines.append(f"- [{m.get('category')}/{m.get('context')}] {m.get('key')}: {str(m.get('content', ''))[:300]}")
+                if proj_lines:
+                    context_sections.append("### [Project Persistent Memory]:\n" + "\n".join(proj_lines))
+            except Exception as pm_err:
+                logger.warning(f"Autonomous task ProjectMemory lookup skipped: {pm_err}")
+
+        user_content = clean_prompt
+        if context_sections:
+            user_content = "\n\n".join(context_sections) + f"\n\n### [Autonomous Task Instruction]:\n{clean_prompt}"
+
+        # 3. Build System Prompt
+        sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(agent_name=settings.AGENT_NAME)
+        if system_instruction and system_instruction.strip():
+            sys_prompt += f"\n\nNODE WORKFLOW ROLE INSTRUCTION:\n{system_instruction.strip()}"
+
+        if language == "en":
+            sys_prompt += "\n\nLANGUAGE: Produce a clear, structured, actionable final report/output in professional English."
+        else:
+            sys_prompt += "\n\nLANGUAGE: আপনার চূড়ান্ত বিশ্লেষণ ও উত্তরটি পরিষ্কার, গুছানো ও পেশাদার বাংলায় (Bangla) লিখুন (প্রয়োজনীয় টেকনিক্যাল টার্ম ও কোড বাদে)।"
+
+        if enable_tools:
+            sys_prompt += (
+                "\n\nAUTONOMOUS EXECUTION MODE: Use available tools whenever live telemetry, files, databases, "
+                "network ping, security checks, or memory queries are needed. Gather evidence first, then synthesize a crisp executive output."
+            )
+
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_content}
+        ]
+
+        active_client, target_model = self.get_client_for_model(model)
+        tools_schema = await AgentTools.get_all_tools_schema() if enable_tools else []
+        tool_trace: List[Dict[str, Any]] = []
+        reasoning_steps: List[str] = []
+        final_reply = ""
+
+        # 4. Multi-turn autonomous tool execution loop
+        for turn in range(max_turns):
+            response = None
+            try:
+                if enable_tools and tools_schema:
+                    response = await active_client.chat.completions.create(
+                        model=target_model,
+                        messages=messages,
+                        temperature=temperature,
+                        tools=tools_schema,
+                        tool_choice="auto",
+                        max_tokens=2048
+                    )
+                else:
+                    response = await active_client.chat.completions.create(
+                        model=target_model,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=2048
+                    )
+            except Exception as tool_err:
+                # Retry without tools parameter if provider rejects tools payload
+                if enable_tools and "tool" in str(tool_err).lower():
+                    try:
+                        response = await active_client.chat.completions.create(
+                            model=target_model,
+                            messages=messages,
+                            temperature=temperature,
+                            max_tokens=2048
+                        )
+                    except Exception as inner_err:
+                        return {
+                            "success": False,
+                            "output": f"LLM execution error ({target_model}): {str(inner_err)}",
+                            "tool_trace": tool_trace,
+                            "reasoning": "\n".join(reasoning_steps),
+                            "sources": [s.model_dump() for s in sources],
+                            "model_used": target_model,
+                            "error": str(inner_err)
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "output": f"LLM connection/execution error ({target_model}): {str(tool_err)}",
+                        "tool_trace": tool_trace,
+                        "reasoning": "\n".join(reasoning_steps),
+                        "sources": [s.model_dump() for s in sources],
+                        "model_used": target_model,
+                        "error": str(tool_err)
+                    }
+
+            if not response or not getattr(response, "choices", None):
+                break
+
+            choice_msg = response.choices[0].message
+            raw_content = getattr(choice_msg, "content", None) or ""
+
+            # Capture thought/reasoning blocks
+            thought_matches = re.findall(r'<(?:thought|think)>([\s\S]*?)</(?:thought|think)>', raw_content, flags=re.IGNORECASE)
+            if thought_matches:
+                reasoning_steps.extend([t.strip() for t in thought_matches if t.strip()])
+            r_attr = getattr(choice_msg, "reasoning_content", None) or getattr(choice_msg, "reasoning", None)
+            if r_attr:
+                reasoning_steps.append(str(r_attr).strip())
+
+            native_tcs = getattr(choice_msg, "tool_calls", None) or []
+            detected_calls: List[Dict[str, Any]] = []
+            is_native = False
+
+            if native_tcs and enable_tools:
+                is_native = True
+                for tc in native_tcs:
+                    fn = getattr(tc, "function", None)
+                    if fn and getattr(fn, "name", None):
+                        detected_calls.append({
+                            "id": getattr(tc, "id", f"call_{turn}_{len(detected_calls)}"),
+                            "name": fn.name,
+                            "arguments": getattr(fn, "arguments", "{}") or "{}"
+                        })
+            elif enable_tools and raw_content:
+                detected_calls = self._extract_text_tool_calls(raw_content, turn)
+
+            if not detected_calls:
+                clean = re.sub(r'<(?:thought|think)>[\s\S]*?</(?:thought|think)>', '', raw_content, flags=re.IGNORECASE).strip()
+                final_reply = clean or raw_content
+                break
+
+            # Record assistant turn & run tools
+            if is_native:
+                messages.append({
+                    "role": "assistant",
+                    "content": raw_content if raw_content else None,
+                    "tool_calls": [
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {"name": tc["name"], "arguments": tc["arguments"]}
+                        } for tc in detected_calls
+                    ]
+                })
+            else:
+                messages.append({"role": "assistant", "content": raw_content})
+
+            for tc in detected_calls:
+                fn_name = tc["name"].strip()
+                try:
+                    fn_args = json.loads(tc["arguments"]) if isinstance(tc["arguments"], str) else (tc["arguments"] or {})
+                except Exception:
+                    fn_args = {}
+
+                t_start = asyncio.get_event_loop().time()
+                t_out = await AgentTools.dispatch_tool(fn_name, fn_args)
+                t_ms = int((asyncio.get_event_loop().time() - t_start) * 1000)
+
+                tool_trace.append({
+                    "turn": turn + 1,
+                    "tool": fn_name,
+                    "args": fn_args,
+                    "duration_ms": t_ms,
+                    "output_preview": t_out[:800] if isinstance(t_out, str) else str(t_out)[:800]
+                })
+
+                if is_native:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "name": fn_name,
+                        "content": str(t_out)
+                    })
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": f"<tool_response name=\"{fn_name}\">\n{t_out}\n</tool_response>\nContinue with your analysis and final summary."
+                    })
+
+        # If max turns exhausted without non-tool final text, force final synthesis pass
+        if not final_reply and tool_trace:
+            try:
+                messages.append({"role": "user", "content": "Provide the final structured summary/result now based on all tool results above."})
+                synth = await active_client.chat.completions.create(
+                    model=target_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=1536
+                )
+                raw_last = synth.choices[0].message.content if synth and synth.choices else ""
+                final_reply = re.sub(r'<(?:thought|think)>[\s\S]*?</(?:thought|think)>', '', raw_last or "", flags=re.IGNORECASE).strip()
+            except Exception:
+                final_reply = "\n\n".join(f"### Tool `{t['tool']}`:\n{t['output_preview']}" for t in tool_trace)
+
+        return {
+            "success": True,
+            "output": final_reply or "Task completed without text response.",
+            "tool_trace": tool_trace,
+            "reasoning": "\n".join(reasoning_steps),
+            "sources": [s.model_dump() for s in sources],
+            "model_used": target_model
+        }
+
+
+_shared_agent_instance: Optional[CompanyAIAgent] = None
+
+
+def get_shared_agent() -> CompanyAIAgent:
+    global _shared_agent_instance
+    if _shared_agent_instance is None:
+        _shared_agent_instance = CompanyAIAgent()
+    return _shared_agent_instance

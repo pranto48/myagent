@@ -352,7 +352,7 @@ function toggleMobileSidebar() {
 // Tab Switching across all views (including Autonomous Operations Suite, Full-Page Admin & Settings)
 function switchTab(tabName) {
   const tabs = [
-    'chat', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
+    'chat', 'workflows', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
     'channels', 'webhooks', 'pairing', 'profiles', 
     'admin', 'dashboard', 'reports', 'users', 'knowledge', 'security', 'backup', 'settings'
   ];
@@ -379,6 +379,7 @@ function switchTab(tabName) {
 
   const tabTitles = {
     chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+    workflows: { title: 'tab_workflows_title', desc: 'tab_workflows_desc' },
     sessions: { title: 'tab_sessions_title', desc: 'tab_sessions_desc' },
     files: { title: 'tab_files_title', desc: 'tab_files_desc' },
     models: { title: 'tab_models_title', desc: 'tab_models_desc' },
@@ -407,7 +408,8 @@ function switchTab(tabName) {
   }
 
   // Autonomous Operations Module Loaders
-  if (tabName === 'sessions' && typeof loadOpsSessions === 'function') loadOpsSessions();
+  if (tabName === 'workflows' && typeof loadWorkflowsStudio === 'function') loadWorkflowsStudio();
+  else if (tabName === 'sessions' && typeof loadOpsSessions === 'function') loadOpsSessions();
   else if (tabName === 'files') {
     if (typeof loadOpsFilesExplorer === 'function') loadOpsFilesExplorer();
     else if (typeof loadOpsFiles === 'function') loadOpsFiles();
@@ -1732,6 +1734,7 @@ window.addEventListener('appLanguageChanged', (e) => {
       const tabKey = activeTabBtn.id.replace('nav-', '').replace('-btn', '');
       const tabTitles = {
         chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
+        workflows: { title: 'tab_workflows_title', desc: 'tab_workflows_desc' },
         admin: { title: 'tab_admin_title', desc: 'tab_admin_desc' },
         dashboard: { title: 'tab_dash_title', desc: 'tab_dash_desc' },
         users: { title: 'tab_users_title', desc: 'tab_users_desc' },
@@ -1811,7 +1814,8 @@ window.addEventListener('appLanguageChanged', (e) => {
     const activeViewEl = document.querySelector('.tab-view.active');
     if (activeViewEl) {
       const activeId = activeViewEl.id;
-      if (activeId === 'view-admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
+      if (activeId === 'view-workflows' && typeof loadWorkflowsStudio === 'function') loadWorkflowsStudio();
+      else if (activeId === 'view-admin' && typeof loadAdminDashboard === 'function') loadAdminDashboard();
       else if (activeId === 'view-dashboard' && typeof loadDashboardFull === 'function') loadDashboardFull();
       else if (activeId === 'view-users' && typeof loadUsersList === 'function') loadUsersList();
       else if (activeId === 'view-knowledge') {
