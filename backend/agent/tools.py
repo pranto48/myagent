@@ -1301,6 +1301,39 @@ class AgentTools:
         except Exception as e:
             return f"Workflow execution error: {str(e)}"
 
+    @staticmethod
+    async def architect_workflow_from_goal(
+        goal: str,
+        name: Optional[str] = None,
+        daily_time: str = "09:00",
+        frequency: str = "daily",
+        project_name: Optional[str] = None
+    ) -> str:
+        """Designs a complete multi-node branched n8n workflow DAG automatically from any natural-language goal."""
+        try:
+            from workflows.store import WorkflowStore
+            await WorkflowStore.init_tables_and_seed()
+            wf = await WorkflowStore.architect_workflow_from_goal(
+                goal=goal,
+                name=name or "",
+                daily_time=daily_time or "09:00",
+                frequency=frequency or "daily",
+                timezone_str="Asia/Dhaka",
+                project_name=project_name or "",
+                auto_enable=True
+            )
+            return json.dumps({
+                "success": True,
+                "workflow_id": wf["id"],
+                "name": wf["name"],
+                "schedule_expr": wf["schedule_expr"],
+                "next_run": wf["next_run"],
+                "nodes_count": len(wf.get("nodes", [])),
+                "edges_count": len(wf.get("edges", []))
+            }, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"Workflow architect error: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -1507,6 +1540,14 @@ class AgentTools:
                 return await cls.list_workflows()
             elif tool_name == "run_workflow_now":
                 return await cls.run_workflow_now(workflow_id=args.get("workflow_id", ""))
+            elif tool_name == "architect_workflow_from_goal":
+                return await cls.architect_workflow_from_goal(
+                    goal=args.get("goal", ""),
+                    name=args.get("name"),
+                    daily_time=args.get("daily_time", "09:00"),
+                    frequency=args.get("frequency", "daily"),
+                    project_name=args.get("project_name")
+                )
 
             else:
                 # Check dynamic MCP manager
@@ -1803,6 +1844,24 @@ class AgentTools:
                             "workflow_id": {"type": "string", "description": "Target workflow ID from list_workflows"}
                         },
                         "required": ["workflow_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "architect_workflow_from_goal",
+                    "description": "Automatically designs and schedules a branched multi-node n8n workflow DAG (ping/port scan/HTTP/Python/AI Agent/IF-Else/Alert/Report) from any complex goal.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "goal": {"type": "string", "description": "Full automation goal (servers to check, conditions, alerts, Python processing, etc.)"},
+                            "name": {"type": "string", "description": "Optional workflow title"},
+                            "daily_time": {"type": "string", "description": "HH:MM time in Asia/Dhaka (default 09:00)"},
+                            "frequency": {"type": "string", "enum": ["daily", "hourly", "every_6h", "weekly", "every_15m"]},
+                            "project_name": {"type": "string", "description": "Optional project memory context"}
+                        },
+                        "required": ["goal"]
                     }
                 }
             },

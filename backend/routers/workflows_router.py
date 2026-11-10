@@ -152,6 +152,53 @@ async def create_quick_daily_workflow(
     }
 
 
+@router.post("/ai-architect")
+async def ai_architect_workflow(
+    data: Dict[str, Any] = Body(...),
+    user=Depends(get_optional_current_user)
+):
+    """Designs & activates a rich branched multi-node n8n workflow DAG from a plain goal description."""
+    goal = (data.get("goal") or data.get("instruction") or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="Goal prompt cannot be empty.")
+
+    name = (data.get("name") or "").strip()
+    daily_time = (data.get("daily_time") or "09:00").strip()
+    frequency = (data.get("frequency") or "daily").strip()
+    timezone_str = (data.get("timezone") or "Asia/Dhaka").strip()
+    model = (data.get("model") or "").strip()
+    project_name = (data.get("project_name") or "").strip()
+
+    wf = await WorkflowStore.architect_workflow_from_goal(
+        goal=goal,
+        name=name,
+        daily_time=daily_time,
+        frequency=frequency,
+        timezone_str=timezone_str,
+        model=model,
+        project_name=project_name,
+        auto_enable=bool(data.get("is_enabled", True))
+    )
+    return {
+        "success": True,
+        "workflow": wf,
+        "message": f"AI Architect built workflow '{wf['name']}' with {len(wf.get('nodes', []))} connected nodes."
+    }
+
+
+@router.post("/import")
+async def import_workflow_json(
+    data: Dict[str, Any] = Body(...),
+    user=Depends(get_optional_current_user)
+):
+    """Imports a shared/exported n8n-style workflow JSON into MyAgent."""
+    try:
+        wf = await WorkflowStore.import_workflow(data)
+        return {"success": True, "workflow": wf, "message": f"Imported workflow '{wf['name']}'."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/node/test")
 async def test_single_workflow_node(
     data: Dict[str, Any] = Body(...),
@@ -232,6 +279,51 @@ async def create_workflow(
         raise HTTPException(status_code=400, detail="Workflow name cannot be empty.")
     wf = await WorkflowStore.create_workflow(data)
     return {"success": True, "workflow": wf, "message": "Workflow created successfully."}
+
+
+@router.get("/{workflow_id}/live-status")
+async def get_workflow_live_status(
+    workflow_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Returns real-time node execution progress while a workflow is running."""
+    return {"success": True, **workflow_engine.get_live_status(workflow_id)}
+
+
+@router.post("/{workflow_id}/duplicate")
+async def duplicate_workflow(
+    workflow_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Duplicates an existing workflow so users can clone and customize variations safely."""
+    cloned = await WorkflowStore.duplicate_workflow(workflow_id)
+    if not cloned:
+        raise HTTPException(status_code=404, detail="Workflow not found.")
+    return {"success": True, "workflow": cloned, "message": f"Cloned '{cloned['name']}'."}
+
+
+@router.get("/{workflow_id}/export")
+async def export_workflow_json(
+    workflow_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Exports workflow schema as clean portable JSON."""
+    wf = await WorkflowStore.get_workflow(workflow_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found.")
+    export_obj = {
+        "schema_version": "myagent_workflow_v1",
+        "name": wf["name"],
+        "description": wf.get("description", ""),
+        "icon": wf.get("icon", "⚡"),
+        "trigger_type": wf.get("trigger_type", "daily"),
+        "schedule_expr": wf.get("schedule_expr", ""),
+        "daily_time": wf.get("daily_time", "09:00"),
+        "timezone": wf.get("timezone", "Asia/Dhaka"),
+        "nodes": wf.get("nodes", []),
+        "edges": wf.get("edges", [])
+    }
+    return {"success": True, "workflow": export_obj}
 
 
 @router.get("/{workflow_id}")
@@ -316,3 +408,4 @@ async def get_workflow_runs(
     """Returns execution runs for a specific workflow."""
     runs = await WorkflowStore.list_runs(workflow_id=workflow_id, limit=limit)
     return {"success": True, "runs": runs}
+

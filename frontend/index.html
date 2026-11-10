@@ -2970,6 +2970,8 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক ডেইলি বিল্ডার</button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('wf-import-file').click()" title="Export করা JSON ওয়ার্কফ্লো ইমপোর্ট করুন">⬆️ ইমপোর্ট JSON</button>
+              <input type="file" id="wf-import-file" accept=".json" style="display:none;" onchange="importWorkflowFromFile(event)">
               <button type="button" class="btn-secondary" onclick="loadWorkflowsStudio()">🔄 রিফ্রেশ</button>
               <button type="button" class="btn-primary" onclick="createBlankWorkflow()">➕ নতুন ওয়ার্কফ্লো</button>
             </div>
@@ -3057,9 +3059,14 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                   <label><input type="checkbox" id="wf-quick-notify-channels"> 📡 Telegram/Discord</label>
                   <label><input type="checkbox" id="wf-quick-run-now"> ⚡ তৈরি করেই এখনই রান করুন</label>
                 </div>
-                <button type="submit" id="btn-wf-quick-create" class="btn-primary">
-                  ⚡ অটো ওয়ার্কফ্লো তৈরি ও অ্যাক্টিভেট করুন
-                </button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button type="button" id="btn-wf-ai-architect" class="btn-secondary wf-btn-architect" onclick="architectWorkflowFromBuilder()" title="লক্ষ্য বিশ্লেষণ করে অটোমেটিক ব্রাঞ্চড পিং/পোর্ট/পাইথন/IF-Else/রিপোর্ট DAG তৈরি করবে">
+                    🧠 AI Multi-Node Architect
+                  </button>
+                  <button type="submit" id="btn-wf-quick-create" class="btn-primary">
+                    ⚡ অটো ওয়ার্কফ্লো তৈরি ও অ্যাক্টিভেট করুন
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3075,15 +3082,22 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
           <div id="wf-subtab-studio" class="wf-workspace-grid">
             <!-- Left Pane: Saved Workflows & Node Palette -->
             <div class="wf-left-pane">
-              <div class="wf-pane-header">📋 ওয়ার্কফ্লো তালিকা</div>
+              <div class="wf-pane-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>📋 ওয়ার্কফ্লো তালিকা</span>
+                <span id="wf-sidebar-count" style="font-size:0.68rem; color:#38bdf8;">0</span>
+              </div>
+              <div style="padding:6px 8px 0;">
+                <input type="text" id="wf-search-input" class="text-input" placeholder="🔍 ওয়ার্কফ্লো খুঁজুন..." style="padding:5px 8px; font-size:0.76rem;" oninput="renderWorkflowsSidebar()">
+              </div>
               <div id="wf-list-container" class="wf-list-scroll"></div>
-              <div class="wf-pane-header" style="margin-top:8px;">🧩 নোড প্যালেট (ক্লিক করে যোগ করুন)</div>
+              <div class="wf-pane-header" style="margin-top:4px;">🧩 নোড প্যালেট (ক্লিক করে যোগ করুন)</div>
               <div id="wf-node-palette" class="wf-palette-list"></div>
             </div>
 
             <!-- Center Pane: Interactive Dotted Canvas -->
             <div class="wf-center-pane">
               <div id="wf-canvas-toolbar" class="wf-canvas-toolbar"></div>
+              <div id="wf-next-runs-strip" class="wf-next-runs-strip"></div>
               <div id="wf-canvas-viewport" class="wf-canvas-viewport" onclick="onCanvasBackgroundClick(event)">
                 <div id="wf-canvas-stage" class="wf-canvas-stage">
                   <svg id="wf-edges-svg" class="wf-edges-svg"></svg>
@@ -3091,7 +3105,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 </div>
               </div>
               <div class="wf-canvas-hint">
-                💡 টিপস: নোড ড্র্যাগ করে সাজান • আউটপুট পোর্ট (ডান পাশের ডট / T / F) থেকে অন্য নোডের বাম ডটে ক্লিক করে কানেক্ট করুন • সংযোগের লেবেলে ক্লিক করলে লিংক মুছবে।
+                💡 শর্টকাট: নোড ড্র্যাগ করুন • পোর্ট ক্লিক করে সংযোগ • Ctrl+S সেভ • Delete নোড মুছুন • Esc সংযোগ বাতিল • ⏸️ মিউট/বাইপাস • ❐ ডুপ্লিকেট নোড
               </div>
             </div>
 

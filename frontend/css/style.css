@@ -9283,6 +9283,106 @@ body.light-theme .wf-run-summary-card {
   background: #f8fafc;
 }
 
+/* Enhanced Workflow v3.4 Studio Additions */
+.wf-btn-architect {
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  color: #c084fc !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+}
+
+.wf-btn-architect:hover {
+  background: rgba(168, 85, 247, 0.24) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+}
+
+.wf-zoom-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wf-btn-mini {
+  padding: 4px 7px !important;
+  font-size: 0.72rem !important;
+  font-family: 'Fira Code', monospace;
+}
+
+.wf-next-runs-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  background: rgba(6, 182, 212, 0.06);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wf-upcoming-chip {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.71rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.wf-node-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.wf-node-mini-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.wf-node-mini-btn:hover {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.wf-node-disabled {
+  opacity: 0.55;
+  border-style: dashed !important;
+}
+
+.wf-var-copy {
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.wf-var-copy:hover {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+}
+
+.wf-node-run-badge.running {
+  background: rgba(56, 189, 248, 0.22);
+  color: #38bdf8;
+  animation: pulseDirty 1s infinite;
+}
+
+.wf-edge-animated {
+  stroke-dasharray: 8 5;
+  animation: wfEdgeFlow 0.75s linear infinite;
+}
+
+@keyframes wfEdgeFlow {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
 @media (max-width: 1220px) {
   .wf-workspace-grid {
     grid-template-columns: 240px 1fr;

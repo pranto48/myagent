@@ -43,7 +43,13 @@ def _get_reports_db_dir() -> str:
 
 
 def _resolve_template_value(value: Any, ctx: Dict[str, Any]) -> Any:
-    """Recursively interpolates {{trigger.date}}, {{prev.output}}, {{nodes.id.output}}, {{workflow.name}}."""
+    """
+    Recursively interpolates template expressions:
+      - {{trigger.date}}, {{trigger.iso}}, {{trigger.payload.key}}
+      - {{prev.output}}, {{prev.json.field}}, {{prev.error}}
+      - {{nodes.node_2.output}}, {{nodes.node_2.data.status_code}}
+      - Optional truncation filter: {{prev.output|500}}
+    """
     if isinstance(value, dict):
         return {k: _resolve_template_value(v, ctx) for k, v in value.items()}
     if isinstance(value, list):
@@ -52,21 +58,51 @@ def _resolve_template_value(value: Any, ctx: Dict[str, Any]) -> Any:
         return value
 
     def _lookup(expr: str) -> str:
-        path = expr.strip()
-        parts = path.split(".")
+        raw_expr = expr.strip()
+        trunc_len: Optional[int] = None
+        if "|" in raw_expr:
+            path_part, mod_part = raw_expr.split("|", 1)
+            raw_expr = path_part.strip()
+            if mod_part.strip().isdigit():
+                trunc_len = int(mod_part.strip())
+
+        parts = raw_expr.split(".")
         cur: Any = ctx
-        for p in parts:
+        for idx, p in enumerate(parts):
             if isinstance(cur, dict) and p in cur:
                 cur = cur[p]
+            elif p == "json" and isinstance(cur, dict) and "output" in cur:
+                try:
+                    cur = json.loads(str(cur["output"]))
+                except Exception:
+                    return ""
+            elif isinstance(cur, str):
+                # Attempt JSON traversal if upstream output is JSON string
+                try:
+                    parsed = json.loads(cur)
+                    if isinstance(parsed, dict) and p in parsed:
+                        cur = parsed[p]
+                    else:
+                        return ""
+                except Exception:
+                    return ""
+            elif isinstance(cur, list) and p.isdigit() and 0 <= int(p) < len(cur):
+                cur = cur[int(p)]
             else:
                 return ""
-        if cur is None:
-            return ""
-        if isinstance(cur, (dict, list)):
-            return json.dumps(cur, ensure_ascii=False, indent=2)
-        return str(cur)
 
-    return re.sub(r"\{\{\s*([a-zA-Z0-9_\.\-]+)\s*\}\}", lambda m: _lookup(m.group(1)), value)
+        if cur is None:
+            res = ""
+        elif isinstance(cur, (dict, list)):
+            res = json.dumps(cur, ensure_ascii=False, indent=2)
+        else:
+            res = str(cur)
+
+        if trunc_len is not None and len(res) > trunc_len:
+            res = res[:trunc_len] + "..."
+        return res
+
+    return re.sub(r"\{\{\s*([a-zA-Z0-9_\.\-\|]+)\s*\}\}", lambda m: _lookup(m.group(1)), value)
 
 
 def _evaluate_condition(target_val: str, operator: str, expected_val: str) -> bool:
@@ -111,9 +147,17 @@ class WorkflowEngine:
 
     def __init__(self):
         self._active_runs: Set[str] = set()
+        self._live_progress: Dict[str, Dict[str, Any]] = {}
 
     def is_running(self, workflow_id: str) -> bool:
         return workflow_id in self._active_runs
+
+    def get_live_status(self, workflow_id: str) -> Dict[str, Any]:
+        prog = self._live_progress.get(workflow_id)
+        return {
+            "is_running": workflow_id in self._active_runs,
+            "progress": dict(prog) if prog else None
+        }
 
     async def execute_workflow(
         self,
@@ -141,6 +185,15 @@ class WorkflowEngine:
         tz = _get_tzinfo(wf.get("timezone", "Asia/Dhaka"))
         now_tz = datetime.now(tz)
         started_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._live_progress[workflow_id] = {
+            "run_id": run_id,
+            "status": "RUNNING",
+            "started_at": started_str,
+            "current_node_id": None,
+            "completed_count": 0,
+            "total_count": len(wf.get("nodes") or []),
+            "node_results": []
+        }
 
         # Mark RUNNING in DB
         try:
@@ -174,12 +227,13 @@ class WorkflowEngine:
                     "date": now_tz.strftime("%Y-%m-%d"),
                     "time": now_tz.strftime("%H:%M:%S"),
                     "datetime": now_tz.strftime("%Y-%m-%d %H:%M:%S"),
+                    "iso": now_tz.isoformat(),
                     "weekday": now_tz.strftime("%A"),
                     "timezone": wf.get("timezone", "Asia/Dhaka"),
                     "payload": trigger_payload or {}
                 },
                 "nodes": {},
-                "prev": {"output": "", "status": "IDLE", "node_id": ""}
+                "prev": {"output": "", "status": "IDLE", "node_id": "", "error": "", "data": {}}
             }
 
             if not nodes:
@@ -285,15 +339,58 @@ class WorkflowEngine:
                                 "node_id": last_src,
                                 "output": src_entry.get("output", ""),
                                 "status": src_entry.get("status", "SUCCESS"),
+                                "error": src_entry.get("output", "") if src_entry.get("status") == "FAILED" else "",
                                 "data": src_entry.get("data", {})
                             }
 
-                    # Execute this node
+                    # Node Bypass / Mute Check
+                    node_cfg = node.get("config") or {}
+                    if node.get("disabled") or node_cfg.get("disabled"):
+                        bypass_entry = {
+                            "node_id": nid,
+                            "type": ntype,
+                            "title": node.get("title", ntype),
+                            "status": "SKIPPED",
+                            "duration_ms": 0,
+                            "output": ctx["prev"].get("output", ""),
+                            "summary": "Muted / Bypassed",
+                            "data": {"bypassed": True}
+                        }
+                        ctx["nodes"][nid] = bypass_entry
+                        node_results.append(bypass_entry)
+                        if workflow_id in self._live_progress:
+                            self._live_progress[workflow_id]["node_results"] = list(node_results)
+                            self._live_progress[workflow_id]["completed_count"] = len(node_results)
+                        for e in outgoing[nid]:
+                            active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+                        continue
+
+                    # Update live telemetry before node executes
+                    if workflow_id in self._live_progress:
+                        self._live_progress[workflow_id]["current_node_id"] = nid
+
+                    # Retry-aware node execution
+                    max_retries = max(0, min(3, int(node_cfg.get("retry_count", 0) or 0)))
+                    continue_on_fail = bool(node_cfg.get("continue_on_fail", False))
                     n_res = await self.execute_single_node(node, ctx)
+                    for r_attempt in range(max_retries):
+                        if n_res["status"] != "FAILED":
+                            break
+                        await asyncio.sleep(min(2.0 * (r_attempt + 1), 5.0))
+                        n_res = await self.execute_single_node(node, ctx)
+                        if n_res["status"] != "FAILED":
+                            n_res["summary"] = f"{n_res.get('summary', '')} (retry #{r_attempt + 1})".strip()
+
                     ctx["nodes"][nid] = n_res
                     node_results.append(n_res)
 
+                    if workflow_id in self._live_progress:
+                        self._live_progress[workflow_id]["node_results"] = list(node_results)
+                        self._live_progress[workflow_id]["completed_count"] = len(node_results)
+
                     if n_res["status"] == "FAILED":
+                        if continue_on_fail:
+                            n_res["summary"] = f"{n_res.get('summary', '')} [continue-on-fail]".strip()
                         failed_count += 1
                     else:
                         succeeded_count += 1
@@ -301,20 +398,22 @@ class WorkflowEngine:
                             executed_outputs_ordered.append(n_res["output"])
                             final_output = n_res["output"]
 
-                    # Activate outgoing edges
-                    if ntype == "condition":
-                        matched = bool(n_res.get("data", {}).get("matched", False))
-                        for e in outgoing[nid]:
-                            cond = (e.get("condition") or "").strip().lower()
-                            if (
-                                cond in ("", "always")
-                                or (cond in ("true", "yes", "1", "match") and matched)
-                                or (cond in ("false", "no", "0", "else") and not matched)
-                            ):
+                    # Halt unconfigured downstream branches if non-recoverable failure unless continue_on_fail is checked
+                    should_propagate = (n_res["status"] != "FAILED") or continue_on_fail
+                    if should_propagate:
+                        if ntype == "condition":
+                            matched = bool(n_res.get("data", {}).get("matched", False))
+                            for e in outgoing[nid]:
+                                cond = (e.get("condition") or "").strip().lower()
+                                if (
+                                    cond in ("", "always")
+                                    or (cond in ("true", "yes", "1", "match") and matched)
+                                    or (cond in ("false", "no", "0", "else") and not matched)
+                                ):
+                                    active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+                        else:
+                            for e in outgoing[nid]:
                                 active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
-                    else:
-                        for e in outgoing[nid]:
-                            active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
 
                 non_trigger_success = sum(
                     1 for r in node_results
@@ -342,6 +441,9 @@ class WorkflowEngine:
             logger.error(f"Workflow '{workflow_id}' execution error: {exec_err}")
         finally:
             self._active_runs.discard(workflow_id)
+            if workflow_id in self._live_progress:
+                self._live_progress[workflow_id]["status"] = overall_status
+                self._live_progress[workflow_id]["current_node_id"] = None
 
         duration_ms = int((time.time() - t0) * 1000)
         finished_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -501,8 +603,22 @@ class WorkflowEngine:
                     "reasoning": res.get("reasoning", "")
                 }
                 if not res.get("success"):
-                    status = "FAILED"
-                    summary = f"AI Agent failed ({res.get('model_used')})"
+                    if bool(cfg.get("fallback_on_error", False)):
+                        upstream_txt = ctx.get("prev", {}).get("output", "")
+                        err_detail = res.get("error") or res.get("output") or "LLM unavailable"
+                        data["degraded_offline"] = True
+                        data["llm_error"] = err_detail
+                        status = "SUCCESS"
+                        summary = f"WARNING: Offline Telemetry Fallback ({res.get('model_used')})"
+                        output = (
+                            f"⚠️ **[WARNING: AI মডেল সংযোগ পাওয়া যায়নি ({res.get('model_used')}) — অফলাইন টেলিমেট্রি ডাইজেস্ট]**\n"
+                            f"- ত্রুটির কারণ: {err_detail}\n"
+                            f"- সময়: {ctx.get('trigger', {}).get('datetime', '')}\n\n"
+                            f"### সংগৃহীত পূর্ববর্তী ধাপের ডেটা:\n{upstream_txt or '(কোনো আপস্ট্রিম ডেটা পাওয়া যায়নি)'}"
+                        )
+                    else:
+                        status = "FAILED"
+                        summary = f"AI Agent failed ({res.get('model_used')})"
                 else:
                     tc_cnt = len(data["tool_trace"])
                     summary = f"Model: {data['model_used']} | {tc_cnt} tool call(s)"
@@ -562,6 +678,179 @@ class WorkflowEngine:
                 output = str(t_out)
                 data = {"tool_name": tool_name, "args": tool_args}
                 summary = f"Tool '{tool_name}' executed"
+
+            # 4B. Python Data Transform Node
+            elif ntype == "python_transform":
+                import io
+                import math
+                import csv
+                import statistics
+                import collections
+                import itertools
+                import contextlib
+                import datetime as _dt
+
+                code = str(raw_cfg.get("code") or cfg.get("code") or "").strip()
+                if not code:
+                    raise ValueError("Python Transform node code is empty.")
+
+                nodes_data_view = {
+                    nid_k: {
+                        "output": nv.get("output", ""),
+                        "status": nv.get("status", ""),
+                        "data": nv.get("data", {})
+                    }
+                    for nid_k, nv in (ctx.get("nodes") or {}).items()
+                }
+                prev_raw = ctx.get("prev", {}).get("output", "")
+                prev_json = None
+                try:
+                    prev_json = json.loads(str(prev_raw))
+                except Exception:
+                    pass
+
+                safe_env = {
+                    "__builtins__": __builtins__,
+                    "prev_output": prev_raw,
+                    "prev_json": prev_json,
+                    "prev_data": ctx.get("prev", {}).get("data", {}),
+                    "nodes_data": nodes_data_view,
+                    "trigger": ctx.get("trigger", {}),
+                    "workflow": ctx.get("workflow", {}),
+                    "json": json,
+                    "re": re,
+                    "math": math,
+                    "csv": csv,
+                    "statistics": statistics,
+                    "collections": collections,
+                    "itertools": itertools,
+                    "datetime": _dt,
+                    "time": time,
+                    "len": len,
+                    "any": any,
+                    "all": all,
+                    "sum": sum,
+                    "min": min,
+                    "max": max,
+                    "round": round,
+                    "abs": abs,
+                    "sorted": sorted,
+                    "enumerate": enumerate,
+                    "isinstance": isinstance,
+                }
+                try:
+                    import pandas as pd
+                    safe_env["pd"] = pd
+                    safe_env["pandas"] = pd
+                except Exception:
+                    pass
+                try:
+                    import numpy as np
+                    safe_env["np"] = np
+                    safe_env["numpy"] = np
+                except Exception:
+                    pass
+
+                stdout_buf = io.StringIO()
+                def _run_py():
+                    with contextlib.redirect_stdout(stdout_buf):
+                        exec(code, safe_env)
+                    return stdout_buf.getvalue().strip()
+
+                py_out = await asyncio.wait_for(asyncio.to_thread(_run_py), timeout=30.0)
+                output = py_out or "(Python executed cleanly with empty stdout)"
+                data = {"lines": len(output.splitlines())}
+                summary = f"Python transformed ({len(output)} chars)"
+
+            # 4C. ForEach Batch Loop Iterator Node
+            elif ntype == "loop_foreach":
+                from agent.tools import AgentTools
+                raw_items = cfg.get("items_text") or ""
+                if not raw_items.strip():
+                    raw_items = str(ctx.get("prev", {}).get("output", ""))
+
+                items: List[str] = []
+                # Try JSON list first
+                try:
+                    parsed_items = json.loads(raw_items.strip())
+                    if isinstance(parsed_items, list):
+                        items = [str(x).strip() for x in parsed_items if str(x).strip()]
+                except Exception:
+                    pass
+                if not items:
+                    for ln in re.split(r"[\r\n,]+", raw_items):
+                        val = ln.strip()
+                        if val and not val.startswith("#"):
+                            items.append(val)
+                items = items[:25]
+                if not items:
+                    raise ValueError("No items supplied for ForEach Batch Loop.")
+
+                action_type = (cfg.get("action_type") or "ping").strip().lower()
+                tool_name = (cfg.get("tool_name") or "network_port_scan").strip()
+                args_tpl = str(cfg.get("args_template_json") or "{\"target\": \"{{item}}\"}")
+                http_url_tpl = str(cfg.get("http_url") or "")
+                http_method = (cfg.get("http_method") or "GET").strip().upper()
+
+                batch_results: List[Dict[str, Any]] = []
+                lines_md: List[str] = [f"| # | Item | Status | Summary |", "|---|---|---|---|"]
+
+                for idx_i, item_val in enumerate(items, 1):
+                    item_status = "OK"
+                    item_out = ""
+                    try:
+                        if action_type == "ping":
+                            from agent.subagents.ping_agent import NetworkPingSubAgent
+                            p_res = await asyncio.wait_for(
+                                NetworkPingSubAgent.ping_target(target=item_val),
+                                timeout=15.0
+                            )
+                            ok_p = bool(p_res.get("success", False))
+                            item_status = "ONLINE" if ok_p else "OFFLINE"
+                            lat = p_res.get("latency_ms", "-")
+                            item_out = f"{p_res.get('status', item_status)} ({lat} ms) - {p_res.get('detail', p_res.get('method', 'ICMP'))}"
+                        elif action_type == "http" and http_url_tpl:
+                            url_i = http_url_tpl.replace("{{item}}", item_val)
+                            async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
+                                resp_i = await client.request(http_method, url_i)
+                                item_status = f"HTTP {resp_i.status_code}"
+                                if resp_i.status_code >= 400:
+                                    item_status = f"ERROR HTTP {resp_i.status_code}"
+                                item_out = resp_i.text[:350]
+                        else:
+                            args_str = args_tpl.replace("{{item}}", item_val)
+                            try:
+                                parsed_args = json.loads(args_str)
+                            except Exception:
+                                parsed_args = {"target": item_val}
+                            t_res = await asyncio.wait_for(
+                                AgentTools.dispatch_tool(tool_name, parsed_args),
+                                timeout=25.0
+                            )
+                            item_out = str(t_res).strip()
+                            low_out = item_out.lower()
+                            if any(bad in low_out for bad in ("error", "failed", "100% packet loss", "unreachable", "offline")):
+                                item_status = "ERROR"
+                    except Exception as it_err:
+                        item_status = "ERROR"
+                        item_out = str(it_err)
+
+                    batch_results.append({"item": item_val, "status": item_status, "output": item_out[:600]})
+                    one_line = " ".join(item_out.splitlines())[:120].replace("|", "/")
+                    lines_md.append(f"| {idx_i} | `{item_val}` | **{item_status}** | {one_line} |")
+
+                err_items = sum(1 for b in batch_results if b["status"] in ("ERROR", "OFFLINE") or "ERROR" in b["status"])
+                data = {"total_items": len(batch_results), "error_items": err_items, "items": batch_results}
+                output = "\n".join(lines_md)
+                summary = f"Loop {len(batch_results)} item(s) ({err_items} error)"
+
+            # 4D. Delay / Wait Timer Node
+            elif ntype == "delay_wait":
+                sec = min(max(float(cfg.get("seconds", 2) or 2), 0.1), 60.0)
+                await asyncio.sleep(sec)
+                output = ctx.get("prev", {}).get("output", "") or f"Waited {sec:.1f}s"
+                data = {"waited_seconds": sec}
+                summary = f"Waited {sec:.1f}s"
 
             # 5. IF / Else Conditional Branching Node
             elif ntype == "condition":

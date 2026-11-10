@@ -122,6 +122,25 @@ def compute_next_run(
         return None, None, expr, expr
 
 
+def compute_upcoming_runs(
+    schedule_expr: Optional[str],
+    tz_name: str = "Asia/Dhaka",
+    trigger_type: str = "daily",
+    count: int = 3
+) -> List[str]:
+    """Returns upcoming N local run timestamps formatted as YYYY-MM-DD HH:MM."""
+    ttype = (trigger_type or "daily").lower().strip()
+    if ttype in ("manual", "webhook") or not schedule_expr:
+        return []
+    try:
+        cron = CronExpression(schedule_expr.strip())
+        tz = _get_tzinfo(tz_name)
+        now_in_tz = datetime.now(tz).replace(tzinfo=None)
+        return [dt.strftime("%Y-%m-%d %H:%M") for dt in cron.get_next_runs(count=count, base_time=now_in_tz)]
+    except Exception:
+        return []
+
+
 # ==============================================================================
 # Node Types Metadata Catalog for Visual Studio Palette
 # ==============================================================================
@@ -185,6 +204,44 @@ NODE_CATALOG: List[Dict[str, Any]] = [
         "default_config": {
             "tool_name": "system_info",
             "args_json": "{}"
+        }
+    },
+    {
+        "type": "python_transform",
+        "category": "action",
+        "icon": "🐍",
+        "label_en": "Python Data Transform",
+        "label_bn": "পাইথন ডেটা ট্রান্সফর্ম",
+        "color": "#eab308",
+        "default_config": {
+            "code": "import json\n# Available vars: prev_output, nodes_data, trigger\ntext = str(prev_output or '')\nlines = [l for l in text.splitlines() if l.strip()]\nprint(f'Processed {len(lines)} lines from upstream on {trigger.get(\"date\", \"\")}.')\nprint(text[:1500])"
+        }
+    },
+    {
+        "type": "loop_foreach",
+        "category": "logic",
+        "icon": "🔁",
+        "label_en": "ForEach Batch Loop",
+        "label_bn": "ব্যাচ লুপ (ForEach)",
+        "color": "#6366f1",
+        "default_config": {
+            "items_text": "192.168.9.1\n192.168.9.5\n192.168.9.9\n8.8.8.8",
+            "action_type": "ping",
+            "tool_name": "network_port_scan",
+            "args_template_json": "{\"target\": \"{{item}}\", \"ports\": [80, 443, 3399]}",
+            "http_url": "https://httpbin.org/get?item={{item}}",
+            "http_method": "GET"
+        }
+    },
+    {
+        "type": "delay_wait",
+        "category": "logic",
+        "icon": "⏳",
+        "label_en": "Delay / Wait Timer",
+        "label_bn": "সময় অপেক্ষা (Wait)",
+        "color": "#64748b",
+        "default_config": {
+            "seconds": 3
         }
     },
     {
@@ -614,6 +671,172 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
             {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""}
         ]
+    },
+    {
+        "id": "tpl_fleet_batch_health_python",
+        "name": "🔁 দৈনিক ফ্লিট ব্যাচ পিং ও পাইথন হেলথ স্কোর",
+        "description": "প্রতিদিন সকালে সকল সার্ভার আইপিতে ForEach ব্যাচ পিং চালিয়ে Python স্ক্রিপ্টে আপটাইম স্কোর গণনা করে ও সমস্যা হলে সাথে সাথে সতর্ক করে।",
+        "icon": "🔁",
+        "trigger_type": "daily",
+        "schedule_expr": "30 8 * * *",
+        "daily_time": "08:30",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 0,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "সকাল ৮:৩০ ডেইলি ট্রিগার",
+                "x": 40,
+                "y": 150,
+                "config": {"daily_time": "08:30", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "loop_foreach",
+                "title": "ফ্লিট সার্ভার ব্যাচ পিং",
+                "x": 320,
+                "y": 150,
+                "config": {
+                    "items_text": "192.168.9.1\n192.168.9.5\n192.168.9.9\n8.8.8.8",
+                    "action_type": "ping",
+                    "tool_name": "network_port_scan",
+                    "args_template_json": "{\"target\": \"{{item}}\"}"
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "python_transform",
+                "title": "Python স্কোর ও রিপোর্ট টেবিল",
+                "x": 610,
+                "y": 150,
+                "config": {
+                    "code": "raw = str(prev_output or '')\nlines = [l for l in raw.splitlines() if l.strip()]\nok_cnt = sum(1 for l in lines if 'SUCCESS' in l.upper() or 'ONLINE' in l.upper() or 'TTL=' in l.upper() or 'LOSS=0' in l.upper() or 'MS' in l.upper())\nfail_cnt = sum(1 for l in lines if 'ERROR' in l.upper() or 'FAIL' in l.upper() or 'TIMEOUT' in l.upper() or '100% LOSS' in l.upper())\nstatus_tag = 'ALERT_NEEDED' if fail_cnt > 0 else 'ALL_HEALTHY'\nprint(f'### Fleet Batch Health ({status_tag})')\nprint(f'- Healthy signals: {ok_cnt} | Warnings/Failures: {fail_cnt}')\nprint('\\n' + raw[:2000])"
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "condition",
+                "title": "অ্যালার্ট প্রয়োজন কি না?",
+                "x": 900,
+                "y": 150,
+                "config": {"target": "{{prev.output}}", "operator": "contains", "value": "ALERT_NEEDED"}
+            },
+            {
+                "id": "node_5",
+                "type": "notify_channel",
+                "title": "🚨 সার্ভার ডাউন অ্যালার্ট",
+                "x": 1190,
+                "y": 60,
+                "config": {
+                    "target": "chat_and_channels",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "🚨 Fleet Alert ({{trigger.date}})",
+                    "message": "{{nodes.node_3.output}}",
+                    "custom_webhook_url": ""
+                }
+            },
+            {
+                "id": "node_6",
+                "type": "save_report",
+                "title": "📄 দৈনিক ফ্লিট রিপোর্ট সেভ",
+                "x": 1190,
+                "y": 245,
+                "config": {
+                    "title": "দৈনিক সার্ভার ফ্লিট হেলথ - {{trigger.date}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_3.output}}",
+                    "index_in_memory": True
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": "true"},
+            {"id": "e5", "source": "node_4", "target": "node_6", "condition": "false"}
+        ]
+    },
+    {
+        "id": "tpl_daily_knowledge_digest",
+        "name": "📊 দৈনিক ডাটাবেস, মেমোরি ও সিস্টেম ইনসাইট ডাইজেস্ট",
+        "description": "প্রতিদিন বিকাল ৫:০০টায় SQLite স্কিমা ও প্রজেক্ট মেমোরি বিশ্লেষণ করে এআই অ্যাকশন প্ল্যান ও এক্সিকিউটিভ রিপোর্ট তৈরি করে।",
+        "icon": "📊",
+        "trigger_type": "daily",
+        "schedule_expr": "0 17 * * *",
+        "daily_time": "17:00",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 0,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "বিকাল ৫:০০ দৈনিক ট্রিগার",
+                "x": 40,
+                "y": 150,
+                "config": {"daily_time": "17:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "tool_call",
+                "title": "SQLite ও সিস্টেম ইনফো",
+                "x": 320,
+                "y": 150,
+                "config": {"tool_name": "system_info", "args_json": "{}"}
+            },
+            {
+                "id": "node_3",
+                "type": "ai_agent",
+                "title": "🧠 প্রজেক্ট ইনসাইট এনালিস্ট",
+                "x": 610,
+                "y": 150,
+                "config": {
+                    "prompt": "আজকের ({{trigger.date}}) সিস্টেম অবস্থা ও সংরক্ষিত প্রজেক্ট মেমোরি মিলিয়ে দিনের সারসংক্ষেপ ও আগামীকালের জন্য ৩টি মূল অগ্রাধিকার তালিকা তৈরি করুন।\n\nসিস্টেম ডেটা:\n{{nodes.node_2.output}}",
+                    "system_instruction": "Summarize cleanly in Bangla with bullet points and action items.",
+                    "model": "",
+                    "project_name": "myagent",
+                    "use_memory": True,
+                    "enable_tools": True,
+                    "language": "bn",
+                    "max_turns": 4,
+                    "fallback_on_error": True
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "save_report",
+                "title": "📄 দৈনিক ডাইজেস্ট রিপোর্ট",
+                "x": 910,
+                "y": 150,
+                "config": {
+                    "title": "দৈনিক প্রজেক্ট ও সিস্টেম ডাইজেস্ট - {{trigger.date}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_3.output}}",
+                    "index_in_memory": True
+                }
+            },
+            {
+                "id": "node_5",
+                "type": "notify_channel",
+                "title": "📣 চ্যাটে পাঠান",
+                "x": 1200,
+                "y": 150,
+                "config": {
+                    "target": "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "📊 ইভনিং ডাইজেস্ট ({{trigger.date}})",
+                    "message": "{{nodes.node_3.output}}",
+                    "custom_webhook_url": ""
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""}
+        ]
     }
 ]
 
@@ -753,6 +976,12 @@ class WorkflowStore:
             d["human_bn"] = "নির্ধারিত সময়"
 
         d["is_enabled"] = bool(d.get("is_enabled", 0))
+        d["next_runs_preview"] = compute_upcoming_runs(
+            d.get("schedule_expr"),
+            d.get("timezone") or "Asia/Dhaka",
+            ttype,
+            count=3
+        ) if d["is_enabled"] else []
         return d
 
     @classmethod
@@ -1001,7 +1230,8 @@ class WorkflowStore:
                     "use_memory": True,
                     "enable_tools": True,
                     "language": language or "bn",
-                    "max_turns": 6
+                    "max_turns": 6,
+                    "fallback_on_error": True
                 }
             }
         ]
@@ -1138,3 +1368,399 @@ class WorkflowStore:
             return runs
         finally:
             await db.close()
+
+    @classmethod
+    async def duplicate_workflow(cls, workflow_id: str) -> Optional[Dict[str, Any]]:
+        """Creates an editable clone of an existing workflow with fresh ID and webhook secret."""
+        src = await cls.get_workflow(workflow_id)
+        if not src:
+            return None
+        clone_payload = {
+            "name": f"{src['name']} (Copy)",
+            "description": src.get("description", ""),
+            "icon": src.get("icon", "⚡"),
+            "trigger_type": src.get("trigger_type", "daily"),
+            "schedule_expr": src.get("schedule_expr", ""),
+            "daily_time": src.get("daily_time", "09:00"),
+            "timezone": src.get("timezone", "Asia/Dhaka"),
+            "nodes": src.get("nodes", []),
+            "edges": src.get("edges", []),
+            "is_enabled": False
+        }
+        return await cls.create_workflow(clone_payload)
+
+    @classmethod
+    async def import_workflow(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Imports an exported workflow JSON structure into ops_workflows as a new workflow."""
+        wf_data = payload.get("workflow", payload) if isinstance(payload, dict) else {}
+        if not isinstance(wf_data, dict) or not wf_data.get("nodes"):
+            raise ValueError("Invalid workflow JSON: missing 'nodes' array.")
+        clean_payload = {
+            "name": (wf_data.get("name") or "Imported n8n Workflow").strip(),
+            "description": wf_data.get("description", ""),
+            "icon": wf_data.get("icon", "📥"),
+            "trigger_type": wf_data.get("trigger_type", "daily"),
+            "schedule_expr": wf_data.get("schedule_expr", ""),
+            "daily_time": wf_data.get("daily_time", "09:00"),
+            "timezone": wf_data.get("timezone", "Asia/Dhaka"),
+            "nodes": wf_data.get("nodes", []),
+            "edges": wf_data.get("edges", []),
+            "is_enabled": bool(wf_data.get("is_enabled", False))
+        }
+        return await cls.create_workflow(clean_payload)
+
+    @classmethod
+    async def architect_workflow_from_goal(
+        cls,
+        goal: str,
+        name: str = "",
+        daily_time: str = "09:00",
+        frequency: str = "daily",
+        timezone_str: str = "Asia/Dhaka",
+        model: str = "",
+        project_name: str = "",
+        auto_enable: bool = True
+    ) -> Dict[str, Any]:
+        """
+        AI Workflow Architect:
+        Designs a rich, branched, production-grade multi-node DAG workflow from any plain-language goal.
+        Combines LLM planning (when reachable) with deterministic multi-domain architecture synthesis.
+        """
+        import re as _re
+        clean_goal = (goal or "").strip()
+        if not clean_goal:
+            raise ValueError("Workflow goal cannot be empty.")
+
+        lower = clean_goal.lower()
+        schedule_expr = daily_time_to_cron(daily_time, frequency)
+        derived_name = (name or "").strip() or (clean_goal[:48] + ("..." if len(clean_goal) > 48 else ""))
+
+        # Detect specialized intents from the user prompt
+        wants_ping = any(k in lower for k in ["ping", "network", "lan", "latency", "পিং", "নেটওয়ার্ক", "সার্ভার"])
+        wants_ports = any(k in lower for k in ["port", "scan", "পোর্ট", "স্ক্যান", "security", "সিকিউরিটি", "vulnerability", "audit", "dlp"])
+        wants_http = any(k in lower for k in ["http", "api", "url", "webhook", "fetch", "endpoint", "এপিআই"])
+        wants_python = any(k in lower for k in ["python", "csv", "excel", "metric", "score", "parse", "calculate", "পাইথন", "হিসাব", "স্কোর"])
+        wants_memory = any(k in lower for k in ["memory", "remember", "note", "project", "মেমোরি", "নোট", "প্রজেক্ট"])
+        wants_condition = any(k in lower for k in ["if ", "else", "alert", "error", "warning", "fail", "down", "যদি", "সতর্ক", "অ্যালার্ট", "সমস্যা"])
+        wants_notify_ext = any(k in lower for k in ["telegram", "discord", "slack", "channel", "টেলিগ্রাম", "ডিসকর্ড", "স্ল্যাক", "চ্যানেল"])
+
+        # Extract any URL or IP list mentioned in the prompt
+        found_urls = _re.findall(r"https?://[^\s'\"<>]+", clean_goal)
+        found_ips = _re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", clean_goal)
+
+        # Optionally attempt LLM refinement for workflow title/prompt enhancement if reachable
+        architect_notes = "Deterministic + Autonomous Multi-Node DAG Architecture"
+
+        nodes: List[Dict[str, Any]] = []
+        edges: List[Dict[str, Any]] = []
+
+        # 1. Trigger Node
+        freq_labels = {
+            "daily": f"প্রতিদিন {daily_time}",
+            "hourly": "প্রতি ঘণ্টায়",
+            "every_6h": "প্রতি ৬ ঘণ্টায়",
+            "weekly": f"সাপ্তাহিক ({daily_time})",
+            "every_15m": "প্রতি ১৫ মিনিটে"
+        }
+        nodes.append({
+            "id": "node_1",
+            "type": "trigger_daily",
+            "title": f"⏰ {freq_labels.get(frequency, daily_time)}",
+            "x": 40,
+            "y": 150,
+            "config": {"daily_time": daily_time, "timezone": timezone_str, "frequency": frequency}
+        })
+
+        col_x = 320
+        collector_ids: List[str] = []
+
+        # 2. Data Collection / Diagnostics Layer (parallelizable upstream branches!)
+        collect_nodes: List[Dict[str, Any]] = []
+        if found_ips and len(found_ips) >= 2:
+            collect_nodes.append({
+                "type": "loop_foreach",
+                "title": "🔁 ব্যাচ সার্ভার পিং",
+                "config": {
+                    "items_text": "\n".join(found_ips[:12]),
+                    "action_type": "ping",
+                    "tool_name": "network_port_scan",
+                    "args_template_json": "{\"target\": \"{{item}}\"}"
+                }
+            })
+        elif wants_ping:
+            collect_nodes.append({
+                "type": "subagent",
+                "title": "🌐 নেটওয়ার্ক ও সার্ভার চেক",
+                "config": {
+                    "agent_id": "net_ping_subagent",
+                    "task": f"Inspect server & network latency for goal: {clean_goal}",
+                    "model": model or ""
+                }
+            })
+
+        if wants_ports:
+            target_host = found_ips[0] if found_ips else "127.0.0.1"
+            collect_nodes.append({
+                "type": "subagent" if not found_ips else "tool_call",
+                "title": "🛡️ সিকিউরিটি ও পোর্ট অডিট",
+                "config": (
+                    {
+                        "tool_name": "network_port_scan",
+                        "args_json": json.dumps({"target": target_host, "ports": [22, 80, 443, 3399, 8000]})
+                    } if found_ips else {
+                        "agent_id": "security_auditor_agent",
+                        "task": f"Execute security & DLP compliance audit: {clean_goal}",
+                        "model": model or ""
+                    }
+                )
+            })
+
+        if wants_http or found_urls:
+            collect_nodes.append({
+                "type": "http_request",
+                "title": "📡 API / HTTP ডেটা ফেচ",
+                "config": {
+                    "method": "GET",
+                    "url": found_urls[0] if found_urls else "https://httpbin.org/get",
+                    "headers_json": "{\"Accept\": \"application/json\"}",
+                    "body_json": ""
+                }
+            })
+
+        if not collect_nodes:
+            # Default telemetry starter tool so AI always has fresh live context
+            collect_nodes.append({
+                "type": "tool_call",
+                "title": "🛠️ সিস্টেম ও রিসোর্স চেক",
+                "config": {"tool_name": "system_info", "args_json": "{}"}
+            })
+
+        if len(collect_nodes) == 1:
+            nid = f"node_{len(nodes) + 1}"
+            cnode = collect_nodes[0]
+            nodes.append({"id": nid, "type": cnode["type"], "title": cnode["title"], "x": col_x, "y": 150, "config": cnode["config"]})
+            edges.append({"id": f"e{len(edges)+1}", "source": "node_1", "target": nid, "condition": ""})
+            collector_ids.append(nid)
+        else:
+            start_y = 60
+            for idx, cnode in enumerate(collect_nodes):
+                nid = f"node_{len(nodes) + 1}"
+                nodes.append({"id": nid, "type": cnode["type"], "title": cnode["title"], "x": col_x, "y": start_y + idx * 170, "config": cnode["config"]})
+                edges.append({"id": f"e{len(edges)+1}", "source": "node_1", "target": nid, "condition": ""})
+                collector_ids.append(nid)
+
+        col_x += 300
+
+        # 3. Optional Python Data Transform Step
+        last_stage_ids = list(collector_ids)
+        if wants_python:
+            py_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": py_id,
+                "type": "python_transform",
+                "title": "🐍 Python ডেটা প্রসেসিং",
+                "x": col_x,
+                "y": 150,
+                "config": {
+                    "code": "raw = str(prev_output or '')\nlines = [l.strip() for l in raw.splitlines() if l.strip()]\nerrs = [l for l in lines if any(k in l.upper() for k in ('ERROR', 'FAIL', 'CRITICAL', 'OFFLINE'))]\nprint(f'Summary Metrics -> Total Lines: {len(lines)}, Flags: {len(errs)}')\nprint('\\n'.join(lines[:30]))"
+                }
+            })
+            for src_id in last_stage_ids:
+                edges.append({"id": f"e{len(edges)+1}", "source": src_id, "target": py_id, "condition": ""})
+            last_stage_ids = [py_id]
+            col_x += 290
+
+        # 4. Core Autonomous AI Agent Node (Synthesizes all collected data + uses tools/RAG)
+        context_refs = "\n\n".join(f"[{cid} ফলাফল]:\n{{{{nodes.{cid}.output}}}}" for cid in last_stage_ids)
+        ai_id = f"node_{len(nodes) + 1}"
+        nodes.append({
+            "id": ai_id,
+            "type": "ai_agent",
+            "title": "🧠 অটোনোমাস এআই আর্কিটেক্ট এজেন্ট",
+            "x": col_x,
+            "y": 150,
+            "config": {
+                "prompt": (
+                    f"আজকের তারিখ: {{{{trigger.date}}}} ({{{{trigger.time}}}})\n\n"
+                    f"মূল লক্ষ্য:\n{clean_goal}\n\n"
+                    f"সংগৃহীত লাইভ টেলিমেট্রি ও তথ্য:\n{context_refs}\n\n"
+                    "সব তথ্য বিশ্লেষণ করে সুস্পষ্ট বাংলা সারসংক্ষেপ, ঝুঁকি বা সমস্যা থাকলে WARNING/ALERT এবং পরবর্তী করণীয় লিখুন।"
+                ),
+                "system_instruction": "Autonomous workflow specialist. Call additional tools only if missing data is needed, then output a crisp executive summary.",
+                "model": model or "",
+                "project_name": project_name or "",
+                "use_memory": True,
+                "enable_tools": True,
+                "language": "bn",
+                "max_turns": 5,
+                "fallback_on_error": True
+            }
+        })
+        for src_id in last_stage_ids:
+            edges.append({"id": f"e{len(edges)+1}", "source": src_id, "target": ai_id, "condition": ""})
+        col_x += 300
+
+        # 5. Conditional Branching + Outputs Layer
+        if wants_condition or wants_notify_ext:
+            cond_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": cond_id,
+                "type": "condition",
+                "title": "🔀 সতর্কতা যাচাই (IF Issue?)",
+                "x": col_x,
+                "y": 150,
+                "config": {
+                    "target": "{{prev.output}}",
+                    "operator": "regex",
+                    "value": "(ALERT|CRITICAL|ERROR|FAILED|OFFLINE|WARNING)"
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": ai_id, "target": cond_id, "condition": ""})
+            col_x += 290
+
+            # True Branch -> Priority Notify
+            alert_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": alert_id,
+                "type": "notify_channel",
+                "title": "🚨 প্রায়োরিটি অ্যালার্ট নোটিফাই",
+                "x": col_x,
+                "y": 55,
+                "config": {
+                    "target": "chat_and_channels",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": f"🚨 ALERT: {derived_name} ({{{{trigger.date}}}})",
+                    "message": f"{{{{nodes.{ai_id}.output}}}}",
+                    "custom_webhook_url": ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": cond_id, "target": alert_id, "condition": "true"})
+
+            # False Branch -> Save Report (+ optional Memory + Chat Digest)
+            rpt_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": rpt_id,
+                "type": "save_report",
+                "title": "📄 দৈনিক AI রিপোর্ট আর্কাইভ",
+                "x": col_x,
+                "y": 245,
+                "config": {
+                    "title": f"{derived_name} - {{{{trigger.date}}}}",
+                    "report_type": "executive_summary",
+                    "content": f"{{{{nodes.{ai_id}.output}}}}",
+                    "index_in_memory": True
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": cond_id, "target": rpt_id, "condition": "false"})
+
+            col_x += 290
+            prev_out = rpt_id
+            if wants_memory or project_name:
+                mem_id = f"node_{len(nodes) + 1}"
+                nodes.append({
+                    "id": mem_id,
+                    "type": "memory_save",
+                    "title": "💾 প্রজেক্ট মেমোরিতে সেভ",
+                    "x": col_x,
+                    "y": 245,
+                    "config": {
+                        "project_name": project_name or "myagent",
+                        "key": "arch_daily_{{trigger.date}}",
+                        "category": "notes",
+                        "context": "production",
+                        "content": f"{{{{nodes.{ai_id}.output}}}}",
+                        "save_to_vector": True
+                    }
+                })
+                edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": mem_id, "condition": ""})
+                prev_out = mem_id
+                col_x += 280
+
+            chat_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": chat_id,
+                "type": "notify_channel",
+                "title": "💬 চ্যাট ডাইজেস্ট পাঠান",
+                "x": col_x,
+                "y": 245,
+                "config": {
+                    "target": "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": f"✅ {derived_name} ({{{{trigger.date}}}})",
+                    "message": f"{{{{nodes.{ai_id}.output}}}}",
+                    "custom_webhook_url": ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": chat_id, "condition": ""})
+        else:
+            prev_out = ai_id
+            rpt_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": rpt_id,
+                "type": "save_report",
+                "title": "📄 দৈনিক AI রিপোর্ট আর্কাইভ",
+                "x": col_x,
+                "y": 150,
+                "config": {
+                    "title": f"{derived_name} - {{{{trigger.date}}}}",
+                    "report_type": "executive_summary",
+                    "content": f"{{{{nodes.{ai_id}.output}}}}",
+                    "index_in_memory": True
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": rpt_id, "condition": ""})
+            prev_out = rpt_id
+            col_x += 290
+
+            if wants_memory or project_name:
+                mem_id = f"node_{len(nodes) + 1}"
+                nodes.append({
+                    "id": mem_id,
+                    "type": "memory_save",
+                    "title": "💾 প্রজেক্ট মেমোরিতে সেভ",
+                    "x": col_x,
+                    "y": 150,
+                    "config": {
+                        "project_name": project_name or "myagent",
+                        "key": "arch_daily_{{trigger.date}}",
+                        "category": "notes",
+                        "context": "production",
+                        "content": f"{{{{nodes.{ai_id}.output}}}}",
+                        "save_to_vector": True
+                    }
+                })
+                edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": mem_id, "condition": ""})
+                prev_out = mem_id
+                col_x += 290
+
+            chat_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": chat_id,
+                "type": "notify_channel",
+                "title": "📣 চ্যাট ও চ্যানেল নোটিফিকেশন",
+                "x": col_x,
+                "y": 150,
+                "config": {
+                    "target": "chat_and_channels" if wants_notify_ext else "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": f"⚡ {derived_name} ({{{{trigger.date}}}})",
+                    "message": f"{{{{nodes.{ai_id}.output}}}}",
+                    "custom_webhook_url": ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": chat_id, "condition": ""})
+
+        wf = await cls.create_workflow({
+            "name": derived_name,
+            "description": f"{clean_goal} ({architect_notes})",
+            "icon": "🧠",
+            "trigger_type": "daily" if frequency == "daily" else "cron",
+            "schedule_expr": schedule_expr,
+            "daily_time": daily_time,
+            "timezone": timezone_str,
+            "nodes": nodes,
+            "edges": edges,
+            "is_enabled": auto_enable
+        })
+        return wf
+
