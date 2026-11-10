@@ -91,9 +91,14 @@ class MyAgentMCPServer:
         """Returns live status, exposed tools list, and 1-click configs for external clients."""
         tools = await cls.get_exposed_tools()
         
-        sse_url = f"http://{host}/api/mcp/server/sse"
-        rpc_url = f"http://{host}/api/mcp/server/rpc"
-        messages_url = f"http://{host}/api/mcp/server/messages"
+        # Ensure external port 3399 is present if host lacks port
+        clean_host = host
+        if ":" not in clean_host and settings.WEB_PORT not in (80, 443):
+            clean_host = f"{clean_host}:{settings.WEB_PORT}"
+
+        sse_url = f"http://{clean_host}/api/mcp/server/sse"
+        rpc_url = f"http://{clean_host}/api/mcp/server/rpc"
+        messages_url = f"http://{clean_host}/api/mcp/server/messages"
 
         # Ready-to-copy client configurations
         configs = {
@@ -434,3 +439,4 @@ class MyAgentMCPServer:
                     "message": f"Internal MCP server error: {str(e)}"
                 }
             }
+

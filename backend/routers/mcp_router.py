@@ -212,13 +212,17 @@ async def toggle_myagent_mcp_server(req: ToggleServerRequest):
     }
 
 @router.post("/server/rpc")
-async def myagent_mcp_rpc(payload: Any, request: Request):
+async def myagent_mcp_rpc(request: Request):
     """
     Stateless HTTP JSON-RPC 2.0 handler for MyAgent MCP Server.
     Supports single JSON-RPC calls or batches for tools/list, tools/call, prompts, resources.
     """
     if not MyAgentMCPServer.is_enabled():
         raise HTTPException(status_code=503, detail="MyAgent MCP Server is currently disabled.")
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error: Invalid JSON"}}
     host = request.headers.get("host", "192.168.9.9:3399")
     return await MyAgentMCPServer.handle_rpc(payload, host=host)
 
@@ -266,7 +270,6 @@ async def myagent_mcp_sse(request: Request):
 
 @router.post("/server/messages")
 async def myagent_mcp_messages(
-    payload: Any,
     request: Request,
     sessionId: Optional[str] = None,
     session_id: Optional[str] = None
@@ -277,6 +280,11 @@ async def myagent_mcp_messages(
     """
     if not MyAgentMCPServer.is_enabled():
         raise HTTPException(status_code=503, detail="MyAgent MCP Server is currently disabled.")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error: Invalid JSON"}}
 
     sid = sessionId or session_id
     host = request.headers.get("host", "192.168.9.9:3399")
