@@ -67,7 +67,10 @@ class CompanyAIAgent:
         )
 
         if is_openrouter:
-            clean_model = target_model.replace("openrouter/", "") if target_model else "deepseek/deepseek-r1"
+            if target_model in ("openrouter/free", "openrouter/auto", "openrouter/bodybuilder"):
+                clean_model = target_model
+            else:
+                clean_model = target_model[len("openrouter/"):] if target_model and target_model.startswith("openrouter/") else (target_model or "deepseek/deepseek-r1")
             return OpenRouterService.get_client(), clean_model
 
         return self.client, target_model
@@ -1136,35 +1139,61 @@ class CompanyAIAgent:
                         max_tokens=2048
                     )
             except Exception as tool_err:
-                # Retry without tools parameter if provider rejects tools payload
-                if enable_tools and "tool" in str(tool_err).lower():
+                err_str = str(tool_err)
+                # Automatic failover to OpenRouter if local/LAN LLM server is offline and OpenRouter is configured
+                is_conn_err = any(k in err_str.lower() for k in ("connection", "connecterror", "timeout", "unreachable", "refused"))
+                if is_conn_err:
                     try:
-                        response = await active_client.chat.completions.create(
-                            model=target_model,
-                            messages=messages,
-                            temperature=temperature,
-                            max_tokens=2048
-                        )
-                    except Exception as inner_err:
+                        from agent.openrouter_client import OpenRouterService
+                        if OpenRouterService.is_configured() and target_model != "openrouter/free":
+                            logger.warning(f"Primary LLM '{target_model}' unreachable in autonomous task; failing over to OpenRouter...")
+                            active_client = OpenRouterService.get_client()
+                            target_model = getattr(settings, "OPENROUTER_MODEL", "") or "openrouter/free"
+                            response = await active_client.chat.completions.create(
+                                model=target_model,
+                                messages=messages,
+                                temperature=temperature,
+                                tools=tools_schema if (enable_tools and tools_schema) else None,
+                                max_tokens=2048
+                            ) if (enable_tools and tools_schema) else await active_client.chat.completions.create(
+                                model=target_model,
+                                messages=messages,
+                                temperature=temperature,
+                                max_tokens=2048
+                            )
+                    except Exception as failover_err:
+                        tool_err = failover_err
+
+                if response is None:
+                    # Retry without tools parameter if provider rejects tools payload
+                    if enable_tools and "tool" in str(tool_err).lower():
+                        try:
+                            response = await active_client.chat.completions.create(
+                                model=target_model,
+                                messages=messages,
+                                temperature=temperature,
+                                max_tokens=2048
+                            )
+                        except Exception as inner_err:
+                            return {
+                                "success": False,
+                                "output": f"LLM execution error ({target_model}): {str(inner_err)}",
+                                "tool_trace": tool_trace,
+                                "reasoning": "\n".join(reasoning_steps),
+                                "sources": [s.model_dump() for s in sources],
+                                "model_used": target_model,
+                                "error": str(inner_err)
+                            }
+                    else:
                         return {
                             "success": False,
-                            "output": f"LLM execution error ({target_model}): {str(inner_err)}",
+                            "output": f"LLM connection/execution error ({target_model}): {str(tool_err)}",
                             "tool_trace": tool_trace,
                             "reasoning": "\n".join(reasoning_steps),
                             "sources": [s.model_dump() for s in sources],
                             "model_used": target_model,
-                            "error": str(inner_err)
+                            "error": str(tool_err)
                         }
-                else:
-                    return {
-                        "success": False,
-                        "output": f"LLM connection/execution error ({target_model}): {str(tool_err)}",
-                        "tool_trace": tool_trace,
-                        "reasoning": "\n".join(reasoning_steps),
-                        "sources": [s.model_dump() for s in sources],
-                        "model_used": target_model,
-                        "error": str(tool_err)
-                    }
 
             if not response or not getattr(response, "choices", None):
                 break
