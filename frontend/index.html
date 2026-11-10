@@ -152,6 +152,14 @@
           <span data-i18n="nav_workflow_docs">AUTO GUIDE (গাইড)</span>
         </button>
 
+        <!-- 0.2 UNIFIED CHAT AI & WORKFLOWS HISTORY -->
+        <button class="nav-btn ops-btn" id="nav-history-btn" onclick="switchTab('history')">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span data-i18n="nav_history">HISTORY (চ্যাট ও অটো)</span>
+        </button>
+
         <!-- SESSIONS -->
         <button class="nav-btn ops-btn" id="nav-sessions-btn" onclick="switchTab('sessions')">
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8">
@@ -310,7 +318,13 @@
       <div class="sessions-panel">
         <div class="sessions-header">
           <span data-i18n="sessions_title">চ্যাট সেশনসমূহ</span>
-          <button class="icon-btn-sm" title="নতুন চ্যাট" data-i18n-title="new_chat_btn_title" onclick="createNewChatSession()">+</button>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button type="button" class="icon-btn-sm" title="Chat AI ও Workflow সম্পূর্ণ ইতিহাস দেখুন" onclick="switchTab('history', 'chat')">📜</button>
+            <button class="icon-btn-sm" title="নতুন চ্যাট" data-i18n-title="new_chat_btn_title" onclick="createNewChatSession()">+</button>
+          </div>
+        </div>
+        <div class="sessions-search-wrap">
+          <input type="text" id="chat-session-search" class="text-input" placeholder="🔍 চ্যাট ইতিহাস খুঁজুন..." oninput="onChatSessionSidebarSearch(this.value)" style="padding:4px 8px; font-size:0.74rem;">
         </div>
         <div class="sessions-list" id="sessions-list">
           <div style="font-size: 0.75rem; color: var(--text-muted); padding: 8px;" data-i18n="sessions_empty">সেশন লোড হচ্ছে...</div>
@@ -3190,21 +3204,49 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
           <!-- SUBTAB 2: Execution History -->
           <div id="wf-subtab-history" style="display:none;">
             <div class="ops-card" style="padding:0; overflow:hidden;">
-              <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:700; font-size:0.95rem;">📜 সাম্প্রতিক অটোনোমাস ওয়ার্কফ্লো রান ইতিহাস</span>
-                <button type="button" class="btn-sm-action-cyber" onclick="refreshRecentWorkflowRuns()">🔄 রিফ্রেশ</button>
+              <div class="wf-hist-toolbar">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                  <span style="font-weight:700; font-size:0.95rem;">📜 অটোনোমাস ওয়ার্কফ্লো রান ইতিহাস ও ট্রেস</span>
+                  <div id="wf-hist-stats-bar" class="wf-hist-stats-bar"></div>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                  <input type="text" id="wf-hist-search" class="text-input" placeholder="🔍 Run ID / ওয়ার্কফ্লো / আউটপুট খুঁজুন..." style="width:210px; padding:5px 9px; font-size:0.78rem;" oninput="onWfHistoryFilterInput()">
+                  <select id="wf-hist-wf-filter" class="text-input" style="width:170px; padding:5px 8px; font-size:0.78rem;" onchange="refreshRecentWorkflowRuns()">
+                    <option value="">সব ওয়ার্কফ্লো</option>
+                  </select>
+                  <select id="wf-hist-status-filter" class="text-input" style="width:120px; padding:5px 8px; font-size:0.78rem;" onchange="refreshRecentWorkflowRuns()">
+                    <option value="ALL">সব স্ট্যাটাস</option>
+                    <option value="SUCCESS">SUCCESS</option>
+                    <option value="FAILED">FAILED</option>
+                    <option value="RUNNING">RUNNING</option>
+                    <option value="STOPPED">STOPPED</option>
+                  </select>
+                  <select id="wf-hist-trigger-filter" class="text-input" style="width:130px; padding:5px 8px; font-size:0.78rem;" onchange="refreshRecentWorkflowRuns()">
+                    <option value="all">সব ট্রিগার</option>
+                    <option value="manual">manual</option>
+                    <option value="daily">daily</option>
+                    <option value="cron">cron</option>
+                    <option value="webhook">webhook</option>
+                    <option value="telegram_chat">telegram_chat</option>
+                    <option value="sub_workflow">sub_workflow</option>
+                  </select>
+                  <button type="button" class="btn-sm-action-cyber" onclick="switchTab('history', 'chat')">💬 Chat AI ইতিহাস</button>
+                  <button type="button" class="btn-sm-action-cyber" onclick="exportWfHistoryRunsJson()">⬇️ JSON</button>
+                  <button type="button" class="btn-sm-action-cyber" onclick="histClearWorkflowRuns('failed')">🧹 ব্যর্থ ক্লিন</button>
+                  <button type="button" class="btn-sm-action-cyber" onclick="refreshRecentWorkflowRuns()">🔄 রিফ্রেশ</button>
+                </div>
               </div>
               <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.84rem; text-align:left;">
                   <thead>
                     <tr style="background:rgba(255,255,255,0.03); color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
                       <th style="padding:10px 14px;">Run ID</th>
-                      <th style="padding:10px 14px;">Workflow Name</th>
+                      <th style="padding:10px 14px;">Workflow &amp; Output Preview</th>
                       <th style="padding:10px 14px;">Trigger</th>
                       <th style="padding:10px 14px;">Status</th>
-                      <th style="padding:10px 14px;">Duration</th>
+                      <th style="padding:10px 14px;">Duration / Nodes</th>
                       <th style="padding:10px 14px;">Started At</th>
-                      <th style="padding:10px 14px; text-align:right;">Trace</th>
+                      <th style="padding:10px 14px; text-align:right;">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="wf-runs-history-tbody"></tbody>
@@ -3378,6 +3420,79 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
       <section class="tab-view" id="view-workflow-docs">
         <div class="ops-view-layout" id="wf-docs-root">
           <!-- Rendered cleanly by workflow_docs.js -->
+        </div>
+      </section>
+
+      <!-- Ops View: UNIFIED CHAT AI & WORKFLOWS (AUTO) HISTORY HUB -->
+      <section class="tab-view" id="view-history">
+        <div class="ops-view-layout hist-hub-container">
+          <div class="ops-header-banner">
+            <div class="ops-title">
+              <h3><span>📜</span> <span>Chat AI ও WORKFLOWS (Auto) সম্পূর্ণ ইতিহাস</span></h3>
+              <p>এআই চ্যাট সেশন, প্রতিটি প্রশ্ন-উত্তর, অটোমেটেড ওয়ার্কফ্লো রান ট্রেস এবং টেলিগ্রাম রিপোর্ট ইতিহাস একসাথে অনুসন্ধান ও এক্সপোর্ট করুন</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button type="button" class="btn-secondary" onclick="switchTab('chat')">💬 Chat AI</button>
+              <button type="button" class="btn-secondary" onclick="switchTab('workflows')">⚡ WORKFLOWS</button>
+              <button type="button" class="btn-secondary" onclick="exportUnifiedHistory('md')">📝 Export MD</button>
+              <button type="button" class="btn-secondary" onclick="exportUnifiedHistory('json')">⬇️ Export JSON</button>
+              <button type="button" class="btn-primary" onclick="loadHistoryHub()">🔄 রিফ্রেশ</button>
+            </div>
+          </div>
+
+          <div class="wf-kpi-strip" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">💬 মোট চ্যাট সেশন</span>
+              <span class="wf-kpi-val" id="hist-kpi-sessions">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">💭 মোট চ্যাট মেসেজ</span>
+              <span class="wf-kpi-val" style="color:#38bdf8;" id="hist-kpi-messages">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">⚡ মোট ওয়ার্কফ্লো রান</span>
+              <span class="wf-kpi-val" style="color:#a855f7;" id="hist-kpi-runs">0</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">✅ ওয়ার্কফ্লো সাফল্য</span>
+              <span class="wf-kpi-val" style="color:#10b981;" id="hist-kpi-success">100%</span>
+            </div>
+            <div class="wf-kpi-card">
+              <span class="wf-kpi-label">✈️ টেলিগ্রাম চ্যাট ও রিপোর্ট</span>
+              <span class="wf-kpi-val" style="color:#f59e0b;" id="hist-kpi-telegram">0</span>
+            </div>
+          </div>
+
+          <div class="hist-toolbar-card">
+            <div class="wf-subtabs-bar" style="margin-bottom:0;">
+              <button type="button" id="hist-tab-all" class="wf-subtab-btn active" onclick="switchHistorySubTab('all')">🔀 সব টাইমলাইন</button>
+              <button type="button" id="hist-tab-chat" class="wf-subtab-btn" onclick="switchHistorySubTab('chat')">💬 Chat AI History</button>
+              <button type="button" id="hist-tab-workflow" class="wf-subtab-btn" onclick="switchHistorySubTab('workflow')">⚡ WORKFLOWS (Auto) History</button>
+              <button type="button" id="hist-tab-telegram" class="wf-subtab-btn" onclick="switchHistorySubTab('telegram')">✈️ Telegram History</button>
+            </div>
+            <div class="hist-filter-controls">
+              <input type="text" id="hist-search-input" class="text-input" placeholder="🔍 যেকোনো চ্যাট মেসেজ, সেশন, ওয়ার্কফ্লো বা আউটপুট খুঁজুন..." oninput="onHistorySearchInput(this.value)" style="flex:1; min-width:220px;">
+              <select id="hist-filter-workflow" class="text-input" style="width:190px;" onchange="onHistoryFilterChange()">
+                <option value="">সব ওয়ার্কফ্লো (All Workflows)</option>
+              </select>
+              <select id="hist-filter-status" class="text-input" style="width:140px;" onchange="onHistoryFilterChange()">
+                <option value="ALL">সব স্ট্যাটাস</option>
+                <option value="SUCCESS">SUCCESS</option>
+                <option value="FAILED">FAILED</option>
+                <option value="RUNNING">RUNNING</option>
+                <option value="STOPPED">STOPPED</option>
+              </select>
+              <select id="hist-filter-role" class="text-input" style="width:130px;" onchange="onHistoryFilterChange()">
+                <option value="ALL">সব চ্যাট রোল</option>
+                <option value="user">👤 User</option>
+                <option value="assistant">🤖 AI Assistant</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="hist-main-content">
+            <div class="wf-empty-hint" style="padding:28px;">ইতিহাস লোড হচ্ছে...</div>
+          </div>
         </div>
       </section>
 
@@ -4495,7 +4610,25 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
   <script src="js/ops_manager.js"></script>
   <script src="js/workflows_manager.js"></script>
   <script src="js/workflow_docs.js"></script>
+  <script src="js/history_manager.js"></script>
   <script src="js/app.js"></script>
+    <!-- Unified Chat AI & Workflow Trace Detail Modal -->
+    <div class="modal-overlay" id="history-detail-modal" style="display:none;">
+      <div class="modal-box cyber-modal" style="max-width:860px; width:94%; max-height:88vh; display:flex; flex-direction:column;">
+        <div class="modal-header">
+          <div>
+            <h4 id="hist-detail-title" style="margin:0; font-size:1.05rem;">📜 ইতিহাস বিস্তারিত</h4>
+            <div id="hist-detail-sub" style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">লোড হচ্ছে...</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div id="hist-detail-actions" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+            <button type="button" class="btn-close-modal" onclick="closeHistoryDetailModal()">✕</button>
+          </div>
+        </div>
+        <div id="hist-detail-body" class="modal-body custom-scroll" style="padding:16px 20px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;">
+        </div>
+      </div>
+    </div>
     <!-- Subagent Interactive Task Runner Modal -->
     <div class="modal-overlay" id="modal-subagent-task" style="display:none;">
       <div class="modal-box cyber-modal" style="max-width:680px; width:92%;">

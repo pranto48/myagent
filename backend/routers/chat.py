@@ -205,11 +205,18 @@ async def stream_chat_endpoint(
 
     # Record user message in persistent session store
     if session_id:
-        await ChatSessionStore.add_message(session_id=session_id, role="user", content=request.prompt)
+        await ChatSessionStore.add_message(
+            session_id=session_id,
+            role="user",
+            content=request.prompt,
+            model_name=request.model,
+            source="webchat",
+        )
 
     async def event_generator():
         assistant_full_reply = ""
         citations = []
+        used_model = request.model
         try:
             generator = agent.stream_chat(
                 prompt=request.prompt,
@@ -235,6 +242,8 @@ async def stream_chat_endpoint(
                                 assistant_full_reply += data.get("token", "")
                             elif data.get("type") == "sources":
                                 citations = data.get("sources", [])
+                            elif data.get("type") == "done" and data.get("model_used"):
+                                used_model = data.get("model_used")
                         except Exception:
                             pass
 
@@ -244,7 +253,9 @@ async def stream_chat_endpoint(
                     session_id=session_id,
                     role="assistant",
                     content=assistant_full_reply,
-                    sources=citations
+                    sources=citations,
+                    model_name=used_model,
+                    source="webchat",
                 )
 
         except Exception as e:
@@ -268,7 +279,13 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
     """
     session_id = request.session_id
     if session_id:
-        await ChatSessionStore.add_message(session_id=session_id, role="user", content=request.prompt)
+        await ChatSessionStore.add_message(
+            session_id=session_id,
+            role="user",
+            content=request.prompt,
+            model_name=request.model,
+            source="webchat",
+        )
 
     try:
         res = await agent.generate_response(
@@ -286,7 +303,9 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
                 session_id=session_id,
                 role="assistant",
                 content=res["reply"],
-                sources=res["sources"]
+                sources=res["sources"],
+                model_name=res.get("model_used") or request.model,
+                source="webchat",
             )
 
         return ChatResponse(

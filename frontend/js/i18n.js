@@ -928,6 +928,9 @@ const I18N_TRANSLATIONS = {
     nav_workflow_docs: "AUTO GUIDE (গাইড)",
     tab_workflow_docs_title: "📖 দৈনিক অটো কাজ ও ওয়ার্কফ্লো ডকুমেন্টেশন",
     tab_workflow_docs_desc: "প্রতিদিনের স্বয়ংক্রিয় এআই টাস্ক তৈরি করার ধাপ, ১৩টি নোডের বিবরণ, ভেরিয়েবল, ওয়েবহুক ও প্রম্পট রেসিপি",
+    nav_history: "HISTORY (চ্যাট ও অটো)",
+    tab_history_title: "📜 Chat AI ও WORKFLOWS (Auto) ইতিহাস",
+    tab_history_desc: "সকল Chat AI কথোপকথন, অটোনোমাস ওয়ার্কফ্লো রান ট্রেস ও টেলিগ্রাম রিপোর্ট ইতিহাস অনুসন্ধান ও পরিচালনা",
   },
 
   en: {
@@ -1851,6 +1854,9 @@ const I18N_TRANSLATIONS = {
     nav_workflow_docs: "AUTO GUIDE & DOCS",
     tab_workflow_docs_title: "📖 Daily Auto Work Tasks Guide & Documentation",
     tab_workflow_docs_desc: "Step-by-step instructions, 13-node catalog reference, template variables, webhooks & recipes",
+    nav_history: "HISTORY (Chat & Auto)",
+    tab_history_title: "📜 Chat AI & WORKFLOWS (Auto) History",
+    tab_history_desc: "Search, inspect, trace & export all Chat AI conversations, autonomous workflow runs & Telegram reports",
   }
 };
 

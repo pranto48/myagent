@@ -362,9 +362,9 @@ function toggleMobileSidebar() {
 }
 
 // Tab Switching across all views (including Autonomous Operations Suite, Full-Page Admin & Settings)
-function switchTab(tabName) {
+function switchTab(tabName, subOption = null) {
   const tabs = [
-    'chat', 'workflows', 'workflow-docs', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
+    'chat', 'workflows', 'workflow-docs', 'history', 'sessions', 'files', 'models', 'logs', 'cron', 'skills', 'plugins', 'mcp', 
     'channels', 'webhooks', 'pairing', 'profiles', 
     'admin', 'dashboard', 'reports', 'users', 'knowledge', 'security', 'backup', 'settings'
   ];
@@ -393,6 +393,7 @@ function switchTab(tabName) {
     chat: { title: 'tab_chat_title', desc: 'tab_chat_desc' },
     workflows: { title: 'tab_workflows_title', desc: 'tab_workflows_desc' },
     'workflow-docs': { title: 'tab_workflow_docs_title', desc: 'tab_workflow_docs_desc' },
+    history: { title: 'tab_history_title', desc: 'tab_history_desc' },
     sessions: { title: 'tab_sessions_title', desc: 'tab_sessions_desc' },
     files: { title: 'tab_files_title', desc: 'tab_files_desc' },
     models: { title: 'tab_models_title', desc: 'tab_models_desc' },
@@ -421,8 +422,13 @@ function switchTab(tabName) {
   }
 
   // Autonomous Operations Module Loaders
-  if (tabName === 'workflows' && typeof loadWorkflowsStudio === 'function') loadWorkflowsStudio();
+  if (tabName === 'workflows' && typeof loadWorkflowsStudio === 'function') {
+    loadWorkflowsStudio().then(() => {
+      if (subOption && typeof switchWorkflowsSubTab === 'function') switchWorkflowsSubTab(subOption);
+    });
+  }
   else if (tabName === 'workflow-docs' && typeof renderWorkflowDocsPage === 'function') renderWorkflowDocsPage('wf-docs-root');
+  else if (tabName === 'history' && typeof loadHistoryHub === 'function') loadHistoryHub(subOption);
   else if (tabName === 'sessions' && typeof loadOpsSessions === 'function') loadOpsSessions();
   else if (tabName === 'files') {
     if (typeof loadOpsFilesExplorer === 'function') loadOpsFilesExplorer();
@@ -598,34 +604,50 @@ function usePrompt(keyOrText) {
 }
 
 // Persistent Chat Sessions Management
-async function loadChatSessions() {
+let chatSessionSearchTimer = null;
+function onChatSessionSidebarSearch(val) {
+  clearTimeout(chatSessionSearchTimer);
+  chatSessionSearchTimer = setTimeout(() => loadChatSessions(val || ''), 200);
+}
+
+async function loadChatSessions(searchQuery = null) {
   const listEl = document.getElementById('sessions-list');
   if (!listEl) return;
 
+  const q = searchQuery !== null
+    ? String(searchQuery)
+    : (document.getElementById('chat-session-search')?.value || '');
+
   try {
-    const res = await fetch('/api/sessions', { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {} });
+    const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+    const res = await fetch(`/api/sessions${qs}`, { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {} });
     if (res.ok) {
       const sessions = await res.json();
       const isEn = (typeof getAppLanguage === 'function' && getAppLanguage() === 'en');
       if (!sessions || sessions.length === 0) {
-        listEl.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">${isEn ? 'No previous chats.' : 'কোনো পূর্ববর্তী চ্যাট নেই।'}</div>`;
-        if (!currentSessionId) {
+        listEl.innerHTML = `<div style="font-size: 0.72rem; color: var(--text-muted); padding: 6px;">${q.trim() ? (isEn ? 'No matching chats.' : 'মিলে যাওয়া চ্যাট পাওয়া যায়নি।') : (isEn ? 'No previous chats.' : 'কোনো পূর্ববর্তী চ্যাট নেই।')}</div>`;
+        if (!currentSessionId && !q.trim()) {
           await createNewChatSession();
         }
         return;
       }
 
-      listEl.innerHTML = sessions.map(s => `
-        <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="switchSession('${s.id}')" id="session-item-${s.id}">
-          <span class="session-title-text" title="${escapeHtml(s.title)}">💬 ${escapeHtml(s.title)}</span>
+      listEl.innerHTML = sessions.map(s => {
+        const prefix = (s.source === 'automation' || String(s.id).startsWith('session_daily')) ? '📅' : '💬';
+        const cntBadge = typeof s.msg_count === 'number' ? `<span class="session-msg-badge" title="মোট মেসেজ">${s.msg_count}</span>` : '';
+        return `
+        <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="switchSession('${s.id}')" id="session-item-${s.id}" title="${escapeHtml((s.last_snippet || s.title || '') + (s.updated_at ? ' • ' + s.updated_at : ''))}">
+          <span class="session-title-text">${prefix} ${escapeHtml(s.title)}</span>
           <div class="session-actions">
+            ${cntBadge}
             <button class="session-del-btn" title="${typeof t === 'function' ? t('btn_delete', 'ডিলিট করুন') : 'ডিলিট করুন'}" onclick="deleteChatSession('${s.id}', event)">&times;</button>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       // Auto-select first session if none is currently active
-      if (!currentSessionId && sessions.length > 0) {
+      if (!currentSessionId && sessions.length > 0 && !q.trim()) {
         await switchSession(sessions[0].id);
       }
     }

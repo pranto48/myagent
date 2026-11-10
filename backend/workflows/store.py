@@ -1975,14 +1975,30 @@ class WorkflowStore:
         }
 
     @classmethod
-    async def list_telegram_chats(cls, limit: int = 40) -> List[Dict[str, Any]]:
+    async def list_telegram_chats(
+        cls,
+        limit: int = 40,
+        q: str = "",
+        intent: str = "",
+    ) -> List[Dict[str, Any]]:
         db = await cls.get_db()
         try:
             await cls._ensure_telegram_tables(db)
-            async with db.execute(
-                "SELECT * FROM ops_telegram_chats ORDER BY created_at DESC, rowid DESC LIMIT ?",
-                (int(limit),)
-            ) as cur:
+            clauses = ["1=1"]
+            params: List[Any] = []
+            clean_q = (q or "").strip()
+            if clean_q:
+                like_q = f"%{clean_q}%"
+                clauses.append(
+                    "(user_message LIKE ? OR reply_message LIKE ? OR sender_name LIKE ? OR workflow_status_summary LIKE ?)"
+                )
+                params.extend([like_q, like_q, like_q, like_q])
+            if intent and intent.strip().lower() != "all":
+                clauses.append("LOWER(intent) = ?")
+                params.append(intent.strip().lower())
+            params.append(max(1, min(int(limit or 40), 200)))
+            sql = f"SELECT * FROM ops_telegram_chats WHERE {' AND '.join(clauses)} ORDER BY created_at DESC, rowid DESC LIMIT ?"
+            async with db.execute(sql, tuple(params)) as cur:
                 return [dict(r) for r in await cur.fetchall()]
         finally:
             await db.close()
@@ -2225,16 +2241,107 @@ class WorkflowStore:
             logger.error(f"Error syncing workflow next runs: {e}")
 
     @classmethod
-    async def list_runs(cls, workflow_id: Optional[str] = None, limit: int = 30) -> List[Dict[str, Any]]:
+    def _build_runs_where(
+        cls,
+        workflow_id: Optional[str] = None,
+        status: Optional[str] = None,
+        trigger_source: Optional[str] = None,
+        q: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+    ) -> tuple[str, List[Any]]:
+        clauses = ["1=1"]
+        params: List[Any] = []
+        if workflow_id:
+            clauses.append("workflow_id = ?")
+            params.append(workflow_id)
+        if status and status.upper() != "ALL":
+            clauses.append("UPPER(status) = ?")
+            params.append(status.upper())
+        if trigger_source and trigger_source.lower() != "all":
+            clauses.append("LOWER(trigger_source) = ?")
+            params.append(trigger_source.lower())
+        clean_q = (q or "").strip()
+        if clean_q:
+            like_q = f"%{clean_q}%"
+            clauses.append(
+                "(id LIKE ? OR workflow_name LIKE ? OR workflow_id LIKE ? OR final_output LIKE ? OR error_message LIKE ? OR node_results_json LIKE ?)"
+            )
+            params.extend([like_q, like_q, like_q, like_q, like_q, like_q])
+        if date_from:
+            clauses.append("substr(started_at, 1, 10) >= ?")
+            params.append(date_from[:10])
+        if date_to:
+            clauses.append("substr(started_at, 1, 10) <= ?")
+            params.append(date_to[:10])
+        return " AND ".join(clauses), params
+
+    @classmethod
+    async def list_runs(
+        cls,
+        workflow_id: Optional[str] = None,
+        limit: int = 30,
+        status: Optional[str] = None,
+        trigger_source: Optional[str] = None,
+        q: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        res = await cls.query_runs(
+            workflow_id=workflow_id,
+            status=status,
+            trigger_source=trigger_source,
+            q=q,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
+        return res["runs"]
+
+    @classmethod
+    async def query_runs(
+        cls,
+        workflow_id: Optional[str] = None,
+        status: Optional[str] = None,
+        trigger_source: Optional[str] = None,
+        q: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
         db = await cls.get_db()
         try:
-            if workflow_id:
-                sql = "SELECT * FROM ops_workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?"
-                params = (workflow_id, limit)
-            else:
-                sql = "SELECT * FROM ops_workflow_runs ORDER BY started_at DESC LIMIT ?"
-                params = (limit,)
-            async with db.execute(sql, params) as cur:
+            where_sql, params = cls._build_runs_where(
+                workflow_id=workflow_id,
+                status=status,
+                trigger_source=trigger_source,
+                q=q,
+                date_from=date_from,
+                date_to=date_to,
+            )
+            async with db.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN UPPER(status) = 'SUCCESS' THEN 1 ELSE 0 END) AS success_cnt,
+                    SUM(CASE WHEN UPPER(status) = 'FAILED' THEN 1 ELSE 0 END) AS failed_cnt,
+                    SUM(CASE WHEN UPPER(status) = 'RUNNING' THEN 1 ELSE 0 END) AS running_cnt,
+                    SUM(CASE WHEN UPPER(status) = 'STOPPED' THEN 1 ELSE 0 END) AS stopped_cnt,
+                    AVG(COALESCE(duration_ms, 0)) AS avg_ms
+                FROM ops_workflow_runs
+                WHERE {where_sql}
+                """,
+                tuple(params),
+            ) as sc:
+                srow = dict(await sc.fetchone())
+
+            safe_limit = max(1, min(int(limit or 50), 200))
+            safe_offset = max(0, int(offset or 0))
+            sql = f"SELECT * FROM ops_workflow_runs WHERE {where_sql} ORDER BY started_at DESC LIMIT ? OFFSET ?"
+            async with db.execute(sql, tuple(params + [safe_limit, safe_offset])) as cur:
                 rows = await cur.fetchall()
             runs = []
             for r in rows:
@@ -2244,7 +2351,79 @@ class WorkflowStore:
                 except Exception:
                     d["node_results"] = []
                 runs.append(d)
-            return runs
+
+            total = int(srow.get("total") or 0)
+            succ = int(srow.get("success_cnt") or 0)
+            return {
+                "runs": runs,
+                "total": total,
+                "limit": safe_limit,
+                "offset": safe_offset,
+                "stats": {
+                    "total": total,
+                    "success": succ,
+                    "failed": int(srow.get("failed_cnt") or 0),
+                    "running": int(srow.get("running_cnt") or 0),
+                    "stopped": int(srow.get("stopped_cnt") or 0),
+                    "avg_duration_ms": int(round(srow.get("avg_ms") or 0)),
+                    "success_rate": round((succ / total) * 100, 1) if total > 0 else 100.0,
+                },
+            }
+        finally:
+            await db.close()
+
+    @classmethod
+    async def get_run(cls, run_id: str) -> Optional[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute("SELECT * FROM ops_workflow_runs WHERE id = ?", (run_id,)) as cur:
+                row = await cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["node_results"] = json.loads(d.get("node_results_json") or "[]")
+            except Exception:
+                d["node_results"] = []
+            return d
+        finally:
+            await db.close()
+
+    @classmethod
+    async def delete_run(cls, run_id: str) -> bool:
+        db = await cls.get_db()
+        try:
+            cur = await db.execute("DELETE FROM ops_workflow_runs WHERE id = ?", (run_id,))
+            await db.commit()
+            return (cur.rowcount or 0) > 0
+        finally:
+            await db.close()
+
+    @classmethod
+    async def clear_runs(
+        cls,
+        workflow_id: Optional[str] = None,
+        older_than_days: Optional[int] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        db = await cls.get_db()
+        try:
+            clauses = ["UPPER(status) != 'RUNNING'"]
+            params: List[Any] = []
+            if workflow_id:
+                clauses.append("workflow_id = ?")
+                params.append(workflow_id)
+            if status and status.upper() != "ALL":
+                clauses.append("UPPER(status) = ?")
+                params.append(status.upper())
+            if older_than_days is not None and int(older_than_days) > 0:
+                cutoff = (datetime.now() - timedelta(days=int(older_than_days))).strftime("%Y-%m-%d %H:%M:%S")
+                clauses.append("started_at < ?")
+                params.append(cutoff)
+            where_sql = " AND ".join(clauses)
+            cur = await db.execute(f"DELETE FROM ops_workflow_runs WHERE {where_sql}", tuple(params))
+            await db.commit()
+            return int(cur.rowcount or 0)
         finally:
             await db.close()
 

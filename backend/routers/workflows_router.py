@@ -479,12 +479,14 @@ async def clear_workflow_telegram_logs(user=Depends(get_optional_current_user)):
 
 @router.get("/telegram/chats")
 async def get_workflow_telegram_chats(
-    limit: int = Query(40, le=120),
+    limit: int = Query(50, le=200),
+    q: str = Query(""),
+    intent: str = Query(""),
     user=Depends(get_optional_current_user)
 ):
     """Returns two-way Telegram chat conversations, automated reports, and current WORKFLOWS (Auto) status."""
     await WorkflowStore.init_tables_and_seed()
-    chats = await WorkflowStore.list_telegram_chats(limit=limit)
+    chats = await WorkflowStore.list_telegram_chats(limit=limit, q=q, intent=intent)
     digest = await WorkflowStore.build_workflows_status_report(max_workflows=6, max_runs=4)
     cfg = _with_tg_runtime(await WorkflowStore.get_telegram_config(include_plaintext_token=False))
     return {"success": True, "chats": chats, "workflow_digest": digest, "telegram": cfg}
@@ -631,12 +633,182 @@ async def receive_telegram_bot_webhook(data: Dict[str, Any] = Body(...)):
 
 @router.get("/runs/recent")
 async def list_recent_workflow_runs(
-    limit: int = Query(30, le=100),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    workflow_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    trigger_source: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     user=Depends(get_optional_current_user)
 ):
-    """Returns recent workflow runs across all workflows."""
-    runs = await WorkflowStore.list_runs(limit=limit)
-    return {"success": True, "runs": runs}
+    """Returns searchable & filterable recent workflow runs across all workflows with aggregate stats."""
+    res = await WorkflowStore.query_runs(
+        workflow_id=workflow_id or None,
+        status=status or None,
+        trigger_source=trigger_source or None,
+        q=q or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
+        limit=limit,
+        offset=offset,
+    )
+    return {"success": True, **res}
+
+
+@router.post("/runs/clear")
+async def clear_workflow_run_history(
+    data: Dict[str, Any] = Body(default={}),
+    user=Depends(get_optional_current_user)
+):
+    """Clears completed workflow run history (optionally filtered by workflow_id, status, or older_than_days)."""
+    deleted = await WorkflowStore.clear_runs(
+        workflow_id=data.get("workflow_id") or None,
+        older_than_days=data.get("older_than_days"),
+        status=data.get("status") or None,
+    )
+    return {"success": True, "deleted": deleted}
+
+
+@router.get("/runs/{run_id}")
+async def get_single_workflow_run(
+    run_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Fetches a single workflow run with its complete step-by-step node trace."""
+    run = await WorkflowStore.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found.")
+    return {"success": True, "run": run}
+
+
+@router.delete("/runs/{run_id}")
+async def delete_single_workflow_run(
+    run_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Deletes a single workflow execution history record."""
+    deleted = await WorkflowStore.delete_run(run_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Workflow run not found.")
+    return {"success": True, "deleted_run_id": run_id}
+
+
+@router.get("/history/unified")
+async def get_unified_chat_and_workflow_history(
+    kind: str = Query("all"),
+    q: str = Query(""),
+    status: str = Query(""),
+    workflow_id: str = Query(""),
+    role: str = Query(""),
+    limit: int = Query(60, ge=1, le=200),
+    user=Depends(get_optional_current_user)
+):
+    """Returns a combined chronological timeline and statistics across Chat AI, WORKFLOWS (Auto), and Telegram Chat."""
+    from memory.chat_session_store import ChatSessionStore
+
+    await WorkflowStore.init_tables_and_seed()
+    norm_kind = (kind or "all").strip().lower()
+
+    chat_sessions = await ChatSessionStore.list_sessions(q=q if norm_kind in ("all", "chat") else "", include_archived=True, limit=limit)
+    chat_msgs_data = await ChatSessionStore.search_messages(
+        q=q if norm_kind in ("all", "chat") else "",
+        role=role if role else None,
+        limit=limit,
+    )
+    all_chat_msgs_stats = await ChatSessionStore.search_messages(q="", limit=1)
+    all_chat_sessions_all = await ChatSessionStore.list_sessions(q="", include_archived=True, limit=300)
+
+    runs_res = await WorkflowStore.query_runs(
+        workflow_id=workflow_id or None,
+        status=status or None,
+        q=q if norm_kind in ("all", "workflow") else None,
+        limit=limit,
+    )
+    all_runs_stats = (await WorkflowStore.query_runs(limit=1))["stats"]
+
+    tg_chats = await WorkflowStore.list_telegram_chats(
+        limit=limit,
+        q=q if norm_kind in ("all", "telegram") else "",
+    )
+    all_tg_chats = await WorkflowStore.list_telegram_chats(limit=200)
+
+    timeline: List[Dict[str, Any]] = []
+    if norm_kind in ("all", "chat"):
+        for m in chat_msgs_data.get("items", []):
+            timeline.append({
+                "kind": "chat",
+                "id": f"msg_{m['id']}",
+                "raw_id": m["id"],
+                "session_id": m["session_id"],
+                "title": m.get("session_title") or "Chat AI",
+                "subtitle": f"{str(m.get('role', 'user')).upper()} • {m.get('model_name') or 'AI'}",
+                "status": "AUTOMATION" if m.get("session_source") == "automation" else str(m.get("role") or "user").upper(),
+                "preview": (m.get("content") or "")[:360],
+                "content": m.get("content") or "",
+                "model_name": m.get("model_name") or "",
+                "role": m.get("role") or "user",
+                "timestamp": m.get("created_at") or "",
+                "meta": {"session_source": m.get("session_source") or "webchat", "sources": m.get("sources") or []},
+            })
+
+    if norm_kind in ("all", "workflow"):
+        for r in runs_res.get("runs", []):
+            steps = r.get("node_results") or []
+            timeline.append({
+                "kind": "workflow",
+                "id": r["id"],
+                "raw_id": r["id"],
+                "workflow_id": r.get("workflow_id"),
+                "title": r.get("workflow_name") or r.get("workflow_id"),
+                "subtitle": f"Trigger: {r.get('trigger_source', 'manual')} • {len(steps)} nodes • {r.get('duration_ms', 0)} ms",
+                "status": r.get("status") or "UNKNOWN",
+                "preview": (r.get("final_output") or r.get("error_message") or "")[:360],
+                "content": r.get("final_output") or r.get("error_message") or "",
+                "duration_ms": r.get("duration_ms") or 0,
+                "trigger_source": r.get("trigger_source") or "manual",
+                "timestamp": r.get("started_at") or "",
+                "meta": {"node_count": len(steps), "finished_at": r.get("finished_at") or ""},
+            })
+
+    if norm_kind in ("all", "telegram"):
+        for tg in tg_chats:
+            preview_txt = f"Q: {tg.get('user_message') or ''}\nA: {tg.get('reply_message') or ''}".strip()
+            timeline.append({
+                "kind": "telegram",
+                "id": tg["id"],
+                "raw_id": tg["id"],
+                "workflow_id": tg.get("linked_workflow_id") or "",
+                "title": f"Telegram ({tg.get('sender_name') or tg.get('chat_id') or 'Bot'})",
+                "subtitle": f"Intent: {tg.get('intent') or 'chat'} • {tg.get('latency_ms') or 0} ms",
+                "status": tg.get("status") or "SUCCESS",
+                "preview": preview_txt[:360],
+                "content": preview_txt,
+                "timestamp": tg.get("created_at") or "",
+                "meta": {"direction": tg.get("direction") or "incoming", "intent": tg.get("intent") or "chat"},
+            })
+
+    timeline.sort(key=lambda item: str(item.get("timestamp") or ""), reverse=True)
+    timeline = timeline[:limit]
+
+    return {
+        "success": True,
+        "kind": norm_kind,
+        "summary": {
+            "total_chat_sessions": len(all_chat_sessions_all),
+            "total_chat_messages": all_chat_msgs_stats.get("total", 0),
+            "total_workflow_runs": all_runs_stats.get("total", 0),
+            "workflow_success_rate": all_runs_stats.get("success_rate", 100.0),
+            "workflow_failed_runs": all_runs_stats.get("failed", 0),
+            "total_telegram_chats": len(all_tg_chats),
+        },
+        "timeline": timeline,
+        "chat_sessions": chat_sessions,
+        "chat_messages": chat_msgs_data,
+        "workflow_runs": runs_res,
+        "telegram_chats": tg_chats,
+    }
 
 
 @router.post("/quick-daily")

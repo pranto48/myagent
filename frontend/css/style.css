@@ -10499,3 +10499,246 @@ body.light-theme .wf-canvas-minimap,
 body.light-theme .wf-quick-picker {
   background: rgba(255, 255, 255, 0.95);
 }
+
+/* ==============================================================================
+ * Unified Chat AI & WORKFLOWS (Auto) History Hub
+ * ============================================================================== */
+.sessions-search-wrap {
+  padding: 0 2px 6px;
+}
+.session-msg-badge {
+  font-size: 0.65rem;
+  font-family: 'Fira Code', monospace;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.wf-hist-toolbar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wf-hist-stats-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+}
+.wf-hist-stats-bar span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+}
+
+.hist-hub-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hist-toolbar-card {
+  background: rgba(15, 23, 42, 0.58);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hist-filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hist-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hist-timeline-card,
+.hist-session-card,
+.hist-msg-row,
+.hist-modal-msg {
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hist-timeline-card.kind-chat {
+  border-left: 3px solid #38bdf8;
+}
+.hist-timeline-card.kind-workflow {
+  border-left: 3px solid #a855f7;
+}
+.hist-timeline-card.kind-telegram {
+  border-left: 3px solid #f59e0b;
+}
+.hist-session-card {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hist-split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 14px;
+}
+.hist-scroll-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.hist-section-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hist-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hist-card-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.hist-snippet-line {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+.hist-ts {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+}
+.hist-kind-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.hist-kind-badge.kind-chat {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+}
+.hist-kind-badge.kind-workflow {
+  background: rgba(168, 85, 247, 0.16);
+  color: #c084fc;
+}
+.hist-kind-badge.kind-telegram {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+.hist-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.hist-pill.success { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+.hist-pill.failed { background: rgba(244, 63, 94, 0.16); color: #fb7185; }
+.hist-pill.running { background: rgba(56, 189, 248, 0.18); color: #38bdf8; }
+.hist-pill.stopped { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.hist-pill.automation { background: rgba(168, 85, 247, 0.18); color: #c084fc; }
+.hist-pill.info { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+.hist-meta-chip {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+.hist-preview-pre,
+.hist-detail-pre {
+  margin: 4px 0 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.77rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.hist-detail-pre {
+  max-height: 340px;
+  color: var(--text-primary);
+}
+.hist-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.hist-wf-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--border-subtle);
+}
+.hist-wf-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+[data-theme="light"] .hist-toolbar-card,
+body.light-theme .hist-toolbar-card,
+[data-theme="light"] .hist-timeline-card,
+body.light-theme .hist-timeline-card,
+[data-theme="light"] .hist-session-card,
+body.light-theme .hist-session-card,
+[data-theme="light"] .hist-msg-row,
+body.light-theme .hist-msg-row,
+[data-theme="light"] .hist-modal-msg,
+body.light-theme .hist-modal-msg,
+[data-theme="light"] .hist-wf-bar,
+body.light-theme .hist-wf-bar {
+  background: rgba(255, 255, 255, 0.92);
+}
+[data-theme="light"] .hist-preview-pre,
+body.light-theme .hist-preview-pre,
+[data-theme="light"] .hist-detail-pre,
+body.light-theme .hist-detail-pre {
+  background: rgba(241, 245, 249, 0.9);
+  color: #1e293b;
+}

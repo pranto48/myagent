@@ -196,6 +196,7 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
 
     updateWorkflowKpis(wfData.stats || {});
     renderWorkflowsSidebar();
+    populateWfHistoryWorkflowFilter();
     renderExecutionHistoryTable();
 
     const targetId = preserveActiveId || (wfState.activeWorkflow ? wfState.activeWorkflow.id : null);
@@ -2830,12 +2831,42 @@ function renderRunOutputPanel() {
   `;
 }
 
+let _wfHistSearchTimer = null;
+function onWfHistoryFilterInput() {
+  clearTimeout(_wfHistSearchTimer);
+  _wfHistSearchTimer = setTimeout(() => refreshRecentWorkflowRuns(), 220);
+}
+
+function populateWfHistoryWorkflowFilter() {
+  const sel = document.getElementById('wf-hist-wf-filter');
+  if (!sel) return;
+  const cur = sel.value || '';
+  const opts = ['<option value="">সব ওয়ার্কফ্লো</option>'];
+  (wfState.workflows || []).forEach(w => {
+    opts.push(`<option value="${wfEsc(w.id)}">${wfEsc(w.icon || '⚡')} ${wfEsc(w.name)}</option>`);
+  });
+  sel.innerHTML = opts.join('');
+  sel.value = cur;
+}
+
 async function refreshRecentWorkflowRuns() {
   try {
-    const res = await wfFetch('/api/workflows/runs/recent?limit=35');
+    populateWfHistoryWorkflowFilter();
+    const params = new URLSearchParams({ limit: '80' });
+    const q = (document.getElementById('wf-hist-search')?.value || '').trim();
+    const wfId = document.getElementById('wf-hist-wf-filter')?.value || '';
+    const status = document.getElementById('wf-hist-status-filter')?.value || 'ALL';
+    const trig = document.getElementById('wf-hist-trigger-filter')?.value || 'all';
+    if (q) params.set('q', q);
+    if (wfId) params.set('workflow_id', wfId);
+    if (status && status !== 'ALL') params.set('status', status);
+    if (trig && trig !== 'all') params.set('trigger_source', trig);
+
+    const res = await wfFetch(`/api/workflows/runs/recent?${params.toString()}`);
     const data = await res.json();
     if (data && data.success) {
       wfState.recentRuns = data.runs || [];
+      wfState.recentRunsStats = data.stats || null;
       renderExecutionHistoryTable();
     }
   } catch (err) {
@@ -2845,27 +2876,75 @@ async function refreshRecentWorkflowRuns() {
 
 function renderExecutionHistoryTable() {
   const tbody = document.getElementById('wf-runs-history-tbody');
-  if (!tbody) return;
+  const statsBar = document.getElementById('wf-hist-stats-bar');
   const runs = wfState.recentRuns || [];
+
+  if (statsBar) {
+    const st = wfState.recentRunsStats || {
+      total: runs.length,
+      success: runs.filter(r => r.status === 'SUCCESS').length,
+      failed: runs.filter(r => r.status === 'FAILED').length,
+      avg_duration_ms: runs.length ? Math.round(runs.reduce((a, b) => a + (b.duration_ms || 0), 0) / runs.length) : 0,
+    };
+    statsBar.innerHTML = `
+      <span>মোট: <strong>${st.total ?? runs.length}</strong></span>
+      <span style="color:#34d399;">সফল: <strong>${st.success ?? 0}</strong></span>
+      <span style="color:#fb7185;">ব্যর্থ: <strong>${st.failed ?? 0}</strong></span>
+      <span style="color:#38bdf8;">গড়: <strong>${st.avg_duration_ms ?? 0} ms</strong></span>
+    `;
+  }
+
+  if (!tbody) return;
   tbody.innerHTML = !runs.length
-    ? '<tr><td colspan="7" style="padding:18px; text-align:center; color:var(--text-muted);">এখনও কোনো রান ইতিহাস নেই।</td></tr>'
-    : runs.map(r => `
+    ? '<tr><td colspan="7" style="padding:18px; text-align:center; color:var(--text-muted);">ফিল্টার অনুযায়ী কোনো রান ইতিহাস নেই।</td></tr>'
+    : runs.map(r => {
+      const steps = r.node_results || [];
+      const snippet = (r.error_message || r.final_output || '').replace(/\s+/g, ' ').trim().slice(0, 95);
+      return `
     <tr style="border-bottom:1px solid var(--border-subtle);">
       <td style="padding:10px 14px; font-family:'Fira Code', monospace; font-size:0.75rem;">${wfEsc(r.id)}</td>
-      <td style="padding:10px 14px; font-weight:600;">${wfEsc(r.workflow_name || r.workflow_id)}</td>
+      <td style="padding:10px 14px;">
+        <div style="font-weight:600;">${wfEsc(r.workflow_name || r.workflow_id)}</div>
+        ${snippet ? `<div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">${wfEsc(snippet)}</div>` : ''}
+      </td>
       <td style="padding:10px 14px;"><span class="wf-source-badge">${wfEsc(r.trigger_source || 'manual')}</span></td>
       <td style="padding:10px 14px;"><span class="wf-status-pill ${(r.status || '').toLowerCase()}">${wfEsc(r.status)}</span></td>
-      <td style="padding:10px 14px; font-family:'Fira Code', monospace; font-size:0.78rem;">${r.duration_ms || 0} ms</td>
+      <td style="padding:10px 14px; font-family:'Fira Code', monospace; font-size:0.78rem;">${r.duration_ms || 0} ms • ${steps.length} nodes</td>
       <td style="padding:10px 14px; font-size:0.78rem; color:var(--text-muted);">${wfEsc(r.started_at || '')}</td>
-      <td style="padding:10px 14px; text-align:right;">
-        <button type="button" class="btn-sm-action-cyber" onclick="inspectHistoricalRun('${wfEsc(r.id)}')">🔍 Trace দেখুন</button>
+      <td style="padding:10px 14px; text-align:right; white-space:nowrap;">
+        ${typeof openWorkflowRunDetailModal === 'function' ? `<button type="button" class="btn-sm-action-cyber" onclick="openWorkflowRunDetailModal('${wfEsc(r.id)}')">🔍 ট্রেস</button>` : ''}
+        <button type="button" class="btn-sm-action-cyber" onclick="inspectHistoricalRun('${wfEsc(r.id)}')" title="Visual Studio-তে খুলুন">🎨 স্টুডিও</button>
+        ${typeof histRerunWorkflow === 'function' ? `<button type="button" class="btn-sm-action-cyber" onclick="histRerunWorkflow('${wfEsc(r.workflow_id || '')}')" title="আবার চালান">▶</button>` : ''}
+        ${typeof histDeleteWorkflowRun === 'function' ? `<button type="button" class="btn-sm-action-cyber danger" onclick="histDeleteWorkflowRun('${wfEsc(r.id)}')" title="ইতিহাস মুছুন">🗑️</button>` : ''}
       </td>
     </tr>
-  `).join('');
+  `;
+    }).join('');
+}
+
+function exportWfHistoryRunsJson() {
+  const runs = wfState.recentRuns || [];
+  const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), runs }, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `myagent_workflow_runs_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  wfToast('✅ ওয়ার্কফ্লো রান ইতিহাস (JSON) ডাউনলোড হয়েছে!', 'success');
 }
 
 async function inspectHistoricalRun(runId) {
-  const found = (wfState.recentRuns || []).find(r => r.id === runId);
+  let found = (wfState.recentRuns || []).find(r => r.id === runId);
+  if (!found) {
+    try {
+      const res = await wfFetch(`/api/workflows/runs/${encodeURIComponent(runId)}`);
+      const data = await res.json();
+      if (res.ok && data.success && data.run) found = data.run;
+    } catch (e) {
+      console.warn('inspectHistoricalRun fetch error:', e);
+    }
+  }
   if (!found) return;
   await selectWorkflow(found.workflow_id, true);
   wfState.activeRun = found;
@@ -3726,3 +3805,6 @@ window.onViewportMouseDown = onViewportMouseDown;
 window.onCanvasWheel = onCanvasWheel;
 window.refreshWorkflowMcpServer = refreshWorkflowMcpServer;
 window.applyMcpSampleArgs = applyMcpSampleArgs;
+window.onWfHistoryFilterInput = onWfHistoryFilterInput;
+window.exportWfHistoryRunsJson = exportWfHistoryRunsJson;
+window.populateWfHistoryWorkflowFilter = populateWfHistoryWorkflowFilter;

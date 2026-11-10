@@ -161,6 +161,10 @@ function setOpsSessionView(view, btn) {
     parent.querySelectorAll('.ops-filter-btn').forEach(b => b.classList.remove('active'));
   }
   if (btn) btn.classList.add('active');
+  if (view === 'history' && typeof switchTab === 'function') {
+    switchTab('history', 'chat');
+    return;
+  }
   renderOpsRecentSessions();
 }
 
