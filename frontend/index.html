@@ -3110,7 +3110,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
           <!-- SUBTAB 1: Visual Studio -->
           <div id="wf-subtab-studio" class="wf-workspace-grid">
             <!-- Left Pane: Saved Workflows & Node Palette -->
-            <div class="wf-left-pane">
+            <div class="wf-left-pane" id="wf-left-pane">
               <div class="wf-pane-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <span>📋 ওয়ার্কফ্লো তালিকা</span>
                 <span id="wf-sidebar-count" style="font-size:0.68rem; color:#38bdf8;">0</span>
@@ -3119,7 +3119,21 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 <input type="text" id="wf-search-input" class="text-input" placeholder="🔍 ওয়ার্কফ্লো খুঁজুন..." style="padding:5px 8px; font-size:0.76rem;" oninput="renderWorkflowsSidebar()">
               </div>
               <div id="wf-list-container" class="wf-list-scroll"></div>
-              <div class="wf-pane-header" style="margin-top:4px;">🧩 নোড প্যালেট (ক্লিক করে যোগ করুন)</div>
+              <div class="wf-pane-header" style="margin-top:4px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🧩 নোড প্যালেট (ক্লিক/ড্র্যাগ)</span>
+                <span id="wf-palette-count" style="font-size:0.68rem; color:#38bdf8;">17</span>
+              </div>
+              <div class="wf-palette-search-box">
+                <input type="text" id="wf-palette-search" class="text-input" placeholder="🔍 নোড খুঁজুন..." style="padding:4px 8px; font-size:0.74rem;" oninput="onPaletteSearchInput(this.value)">
+                <div class="wf-palette-cat-pills" id="wf-palette-cat-pills">
+                  <button type="button" class="wf-cat-pill active" onclick="setPaletteCategory('all')">All</button>
+                  <button type="button" class="wf-cat-pill" onclick="setPaletteCategory('trigger')">Trig</button>
+                  <button type="button" class="wf-cat-pill" onclick="setPaletteCategory('ai')">AI</button>
+                  <button type="button" class="wf-cat-pill" onclick="setPaletteCategory('logic')">Logic</button>
+                  <button type="button" class="wf-cat-pill" onclick="setPaletteCategory('action')">Act</button>
+                  <button type="button" class="wf-cat-pill" onclick="setPaletteCategory('output')">Out</button>
+                </div>
+              </div>
               <div id="wf-node-palette" class="wf-palette-list"></div>
             </div>
 
@@ -3127,19 +3141,38 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <div class="wf-center-pane">
               <div id="wf-canvas-toolbar" class="wf-canvas-toolbar"></div>
               <div id="wf-next-runs-strip" class="wf-next-runs-strip"></div>
-              <div id="wf-canvas-viewport" class="wf-canvas-viewport" onclick="onCanvasBackgroundClick(event)">
-                <div id="wf-canvas-stage" class="wf-canvas-stage">
-                  <svg id="wf-edges-svg" class="wf-edges-svg"></svg>
-                  <div id="wf-nodes-layer" class="wf-nodes-layer"></div>
+              <div class="wf-canvas-wrap">
+                <div id="wf-canvas-viewport"
+                     class="wf-canvas-viewport"
+                     onclick="onCanvasBackgroundClick(event)"
+                     onmousedown="onViewportMouseDown(event)"
+                     ondblclick="onCanvasDoubleClick(event)"
+                     ondragover="onCanvasDragOver(event)"
+                     ondrop="onCanvasDrop(event)"
+                     onwheel="onCanvasWheel(event)"
+                     onscroll="renderCanvasMinimap()">
+                  <div id="wf-canvas-stage" class="wf-canvas-stage">
+                    <svg id="wf-edges-svg" class="wf-edges-svg"></svg>
+                    <div id="wf-nodes-layer" class="wf-nodes-layer"></div>
+                  </div>
                 </div>
+
+                <!-- Floating Canvas HUD -->
+                <div id="wf-canvas-hud" class="wf-canvas-hud"></div>
+
+                <!-- Interactive Live Minimap -->
+                <div id="wf-canvas-minimap" class="wf-canvas-minimap" title="ক্লিক বা ড্র্যাগ করে ক্যানভাস প্যান করুন"></div>
+
+                <!-- Floating Quick Node Picker (Canvas Double-Click / Edge Insert) -->
+                <div id="wf-quick-picker" class="wf-quick-picker" style="display:none;" onclick="event.stopPropagation()"></div>
               </div>
               <div class="wf-canvas-hint">
-                💡 শর্টকাট: নোড ড্র্যাগ করুন • পোর্ট ক্লিক করে সংযোগ • Ctrl+S সেভ • Delete নোড মুছুন • Esc সংযোগ বাতিল • ⏸️ মিউট/বাইপাস • ❐ ডুপ্লিকেট নোড
+                💡 ড্র্যাগ-ড্রপ নোড • ক্যানভাস ড্র্যাগ করে প্যান • Ctrl+Wheel জুম • F ফিট • Double-Click দ্রুত নোড • তারের `+`-এ মিড-ইনসার্ট • Ctrl+Z/Y Undo/Redo • Ctrl+D ডুপ্লিকেট • Ctrl+Enter রান
               </div>
             </div>
 
             <!-- Right Pane: Dynamic Node Inspector & Run Trace -->
-            <div class="wf-right-pane">
+            <div class="wf-right-pane" id="wf-right-pane">
               <div class="wf-inspector-tabs">
                 <button type="button" id="wf-insp-btn-node" class="wf-insp-tab active" onclick="switchWfInspectorTab('node')">⚙️ নোড সেটিংস</button>
                 <button type="button" id="wf-insp-btn-run" class="wf-insp-tab" onclick="switchWfInspectorTab('run')">📊 লাইভ আউটপুট</button>

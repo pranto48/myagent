@@ -10298,3 +10298,204 @@ body.light-theme .wf-tg-chat-reply {
   background: #f1f5f9;
   color: #0f172a;
 }
+
+/* Enhanced Visual n8n Studio Canvas Productivity Upgrades */
+.wf-palette-search-box {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.wf-palette-cat-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.wf-cat-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.wf-cat-pill:hover { border-color: #38bdf8; color: #38bdf8; }
+.wf-cat-pill.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.wf-canvas-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 490px;
+}
+.wf-canvas-viewport.wf-panning {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.wf-tb-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.wf-workspace-grid.wf-left-collapsed {
+  grid-template-columns: 0px 1fr 345px;
+  gap: 0 10px;
+}
+.wf-workspace-grid.wf-left-collapsed .wf-left-pane {
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.wf-workspace-grid.wf-right-collapsed {
+  grid-template-columns: 270px 1fr 0px;
+  gap: 0 10px;
+}
+.wf-workspace-grid.wf-right-collapsed .wf-right-pane {
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.wf-workspace-grid.wf-left-collapsed.wf-right-collapsed {
+  grid-template-columns: 0px 1fr 0px;
+  gap: 0;
+}
+.wf-workspace-grid.wf-studio-fullscreen {
+  position: fixed;
+  inset: 10px;
+  z-index: 950;
+  background: var(--bg-main, #050811);
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.78);
+  height: calc(100vh - 20px);
+  min-height: 0;
+}
+
+.wf-canvas-hud {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.wf-hud-stat {
+  font-size: 0.71rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 0 6px 0 2px;
+  font-family: 'Fira Code', monospace;
+}
+.wf-hud-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 6px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+.wf-hud-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+.wf-hud-btn.active { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #34d399; }
+
+.wf-canvas-minimap {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 15;
+  border-radius: 9px;
+  padding: 4px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  cursor: crosshair;
+  line-height: 0;
+}
+
+.wf-quick-picker {
+  position: absolute;
+  z-index: 25;
+  width: 265px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid #38bdf8;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+}
+.wf-qp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 215px;
+}
+.wf-qp-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-size: 0.77rem;
+  cursor: pointer;
+}
+.wf-qp-item:hover {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.wf-edge-controls {
+  pointer-events: all;
+}
+.wf-edge-plus-btn,
+.wf-edge-del-btn {
+  cursor: pointer;
+  opacity: 0.82;
+  transition: opacity 0.14s;
+}
+.wf-edge-plus-btn:hover,
+.wf-edge-del-btn:hover {
+  opacity: 1;
+}
+.wf-node-run-mini:hover {
+  color: #34d399 !important;
+}
+
+[data-theme="light"] .wf-canvas-hud,
+body.light-theme .wf-canvas-hud,
+[data-theme="light"] .wf-canvas-minimap,
+body.light-theme .wf-canvas-minimap,
+[data-theme="light"] .wf-quick-picker,
+body.light-theme .wf-quick-picker {
+  background: rgba(255, 255, 255, 0.95);
+}

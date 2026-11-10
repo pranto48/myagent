@@ -28,11 +28,27 @@ let wfState = {
   draggingNodeId: null,
   dragOffsetX: 0,
   dragOffsetY: 0,
+  dragMoved: false,
+  dragSnapshotTaken: false,
+  panState: null,
+  justPanned: false,
+  draggingPaletteType: null,
+  quickPicker: null,
+  undoStack: [],
+  redoStack: [],
+  snapGrid: true,
+  paletteCategory: 'all',
+  paletteQuery: '',
+  fullscreenCanvas: false,
+  leftCollapsed: false,
+  rightCollapsed: false,
   lastFocusedFieldId: null,
   subTab: 'studio',
   inspectorTab: 'node',
   dirty: false,
   zoom: 1.0,
+  stageWidth: 1200,
+  stageHeight: 540,
   mouseCanvasX: 0,
   mouseCanvasY: 0,
 };
@@ -516,6 +532,9 @@ async function selectWorkflow(workflowId, skipPrompt = false) {
       ? wfState.activeWorkflow.nodes[0].id
       : null;
     wfState.connectingFrom = null;
+    wfState.undoStack = [];
+    wfState.redoStack = [];
+    closeQuickPicker();
     wfState.dirty = false;
 
     renderWorkflowsSidebar();
@@ -637,13 +656,133 @@ async function importWorkflowFromFile(event) {
 }
 
 // ------------------------------------------------------------------------------
-// Palette, Canvas Actions, Zoom & Layout
+// Undo/Redo, Grid Snap, Palette Search & Drag-Drop, Layout & Studio Controls
 // ------------------------------------------------------------------------------
+function snapCoord(val) {
+  const num = Number(val || 0);
+  if (!wfState.snapGrid) return Math.max(12, Math.round(num));
+  return Math.max(20, Math.round(num / 20) * 20);
+}
+
+function pushUndoSnapshot() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  const snap = JSON.stringify({
+    name: wf.name,
+    is_enabled: wf.is_enabled,
+    nodes: wf.nodes || [],
+    edges: wf.edges || [],
+    selectedNodeId: wfState.selectedNodeId
+  });
+  if (wfState.undoStack.length && wfState.undoStack[wfState.undoStack.length - 1] === snap) {
+    return;
+  }
+  wfState.undoStack.push(snap);
+  if (wfState.undoStack.length > 30) wfState.undoStack.shift();
+  wfState.redoStack = [];
+}
+
+function applyHistorySnapshot(snapJson) {
+  const wf = wfState.activeWorkflow;
+  if (!wf || !snapJson) return;
+  const snap = JSON.parse(snapJson);
+  wf.name = snap.name;
+  wf.is_enabled = snap.is_enabled;
+  wf.nodes = wfClone(snap.nodes || []);
+  wf.edges = wfClone(snap.edges || []);
+  if (snap.selectedNodeId && wf.nodes.some(n => n.id === snap.selectedNodeId)) {
+    wfState.selectedNodeId = snap.selectedNodeId;
+  } else {
+    wfState.selectedNodeId = wf.nodes[0] ? wf.nodes[0].id : null;
+  }
+  markWfDirty();
+  renderWorkflowToolbar();
+  renderWorkflowCanvas();
+  renderNodeInspector();
+}
+
+function undoWorkflowChange() {
+  const wf = wfState.activeWorkflow;
+  if (!wf || !wfState.undoStack.length) {
+    wfToast('Undo করার মতো আর কোনো ধাপ নেই।', 'info');
+    return;
+  }
+  const current = JSON.stringify({
+    name: wf.name,
+    is_enabled: wf.is_enabled,
+    nodes: wf.nodes || [],
+    edges: wf.edges || [],
+    selectedNodeId: wfState.selectedNodeId
+  });
+  wfState.redoStack.push(current);
+  const prev = wfState.undoStack.pop();
+  applyHistorySnapshot(prev);
+  wfToast('↩️ পূর্ববর্তী অবস্থা Undo করা হয়েছে।', 'info');
+}
+
+function redoWorkflowChange() {
+  const wf = wfState.activeWorkflow;
+  if (!wf || !wfState.redoStack.length) {
+    wfToast('Redo করার মতো কোনো ধাপ নেই।', 'info');
+    return;
+  }
+  const current = JSON.stringify({
+    name: wf.name,
+    is_enabled: wf.is_enabled,
+    nodes: wf.nodes || [],
+    edges: wf.edges || [],
+    selectedNodeId: wfState.selectedNodeId
+  });
+  wfState.undoStack.push(current);
+  const nxt = wfState.redoStack.pop();
+  applyHistorySnapshot(nxt);
+  wfToast('↪️ পরিবর্তন পুনরায় Redo করা হয়েছে।', 'info');
+}
+
+function onPaletteSearchInput(q) {
+  wfState.paletteQuery = String(q || '').trim().toLowerCase();
+  renderNodePalette();
+}
+
+function setPaletteCategory(cat) {
+  wfState.paletteCategory = cat || 'all';
+  const wrap = document.getElementById('wf-palette-cat-pills');
+  if (wrap) {
+    wrap.querySelectorAll('.wf-cat-pill').forEach(btn => {
+      const m = /setPaletteCategory\('([^']+)'\)/.exec(btn.getAttribute('onclick') || '');
+      btn.classList.toggle('active', m && m[1] === wfState.paletteCategory);
+    });
+  }
+  renderNodePalette();
+}
+
 function renderNodePalette() {
   const el = document.getElementById('wf-node-palette');
+  const cntEl = document.getElementById('wf-palette-count');
   if (!el) return;
-  el.innerHTML = (wfState.nodeCatalog || []).map(item => `
-    <button type="button" class="wf-palette-chip" style="--node-color:${item.color};" onclick="addNodeToCanvas('${wfEsc(item.type)}')" title="${wfEsc(item.label_en)} যোগ করুন">
+  const q = (wfState.paletteQuery || '').toLowerCase();
+  const cat = wfState.paletteCategory || 'all';
+  const filtered = (wfState.nodeCatalog || []).filter(item => {
+    if (cat !== 'all' && item.category !== cat) return false;
+    if (q) {
+      const hay = `${item.type} ${item.label_bn || ''} ${item.label_en || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if (cntEl) cntEl.textContent = String(filtered.length);
+  if (!filtered.length) {
+    el.innerHTML = '<div class="wf-empty-hint">মিল পাওয়া যায়নি।</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(item => `
+    <button type="button"
+            class="wf-palette-chip"
+            style="--node-color:${item.color};"
+            draggable="true"
+            ondragstart="onPaletteDragStart(event, '${wfEsc(item.type)}')"
+            onclick="addNodeToCanvas('${wfEsc(item.type)}')"
+            title="ক্লিক করে যোগ করুন অথবা ক্যানভাসে ড্র্যাগ-ড্রপ করুন (${wfEsc(item.label_en)})">
       <span class="wf-palette-dot" style="background:${item.color};"></span>
       <span>${wfEsc(item.icon)} ${wfEsc(item.label_bn || item.label_en)}</span>
       <span class="wf-palette-plus">+</span>
@@ -651,28 +790,66 @@ function renderNodePalette() {
   `).join('');
 }
 
-function addNodeToCanvas(nodeType) {
-  if (!wfState.activeWorkflow) {
-    wfToast('প্রথমে একটি ওয়ার্কফ্লো নির্বাচন করুন বা তৈরি করুন।', 'warning');
+function onPaletteDragStart(event, nodeType) {
+  wfState.draggingPaletteType = nodeType;
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('text/plain', nodeType);
+    event.dataTransfer.effectAllowed = 'copy';
+  }
+}
+
+function onCanvasDragOver(event) {
+  if (wfState.draggingPaletteType || (event.dataTransfer && event.dataTransfer.types.includes('text/plain'))) {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  }
+}
+
+function onCanvasDrop(event) {
+  event.preventDefault();
+  const nodeType = wfState.draggingPaletteType || (event.dataTransfer ? event.dataTransfer.getData('text/plain') : '');
+  wfState.draggingPaletteType = null;
+  if (!nodeType || !wfState.activeWorkflow) return;
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!stage) {
+    addNodeToCanvas(nodeType);
     return;
   }
+  const rect = stage.getBoundingClientRect();
+  const zoom = wfState.zoom || 1.0;
+  const dropX = snapCoord((event.clientX - rect.left) / zoom - 110);
+  const dropY = snapCoord((event.clientY - rect.top) / zoom - 40);
+  addNodeToCanvas(nodeType, dropX, dropY, false);
+}
 
-  const meta = wfNodeMeta(nodeType);
-  const nodes = wfState.activeWorkflow.nodes || [];
-  const edges = wfState.activeWorkflow.edges || [];
-
+function _nextNodeId(nodes) {
   let maxIdx = nodes.length;
   nodes.forEach(n => {
     const m = /^node_(\d+)$/.exec(n.id || '');
     if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
   });
-  const newId = `node_${maxIdx + 1}`;
+  return `node_${maxIdx + 1}`;
+}
+
+function addNodeToCanvas(nodeType, customX = null, customY = null, autoWireAnchor = true) {
+  if (!wfState.activeWorkflow) {
+    wfToast('প্রথমে একটি ওয়ার্কফ্লো নির্বাচন করুন বা তৈরি করুন।', 'warning');
+    return null;
+  }
+  pushUndoSnapshot();
+
+  const meta = wfNodeMeta(nodeType);
+  const nodes = wfState.activeWorkflow.nodes || [];
+  const edges = wfState.activeWorkflow.edges || [];
+  const newId = _nextNodeId(nodes);
 
   const anchor = nodes.find(n => n.id === wfState.selectedNodeId) || nodes[nodes.length - 1];
-  const baseX = anchor ? (Number(anchor.x || 50) + 290) : 50;
-  let targetY = anchor ? Number(anchor.y || 140) : 140;
-  while (nodes.some(n => Math.abs((n.x || 0) - baseX) < 160 && Math.abs((n.y || 0) - targetY) < 95)) {
-    targetY += 130;
+  let baseX = customX !== null ? snapCoord(customX) : (anchor ? snapCoord(Number(anchor.x || 40) + 300) : 40);
+  let targetY = customY !== null ? snapCoord(customY) : (anchor ? snapCoord(Number(anchor.y || 140)) : 140);
+  if (customX === null) {
+    while (nodes.some(n => Math.abs((n.x || 0) - baseX) < 160 && Math.abs((n.y || 0) - targetY) < 95)) {
+      targetY = snapCoord(targetY + 140);
+    }
   }
 
   const newNode = {
@@ -686,11 +863,15 @@ function addNodeToCanvas(nodeType) {
   };
   nodes.push(newNode);
 
-  if (anchor && !nodeType.startsWith('trigger_')) {
+  if (autoWireAnchor && anchor && !nodeType.startsWith('trigger_')) {
     let cond = '';
     if (anchor.type === 'condition') {
       const hasTrue = edges.some(e => e.source === anchor.id && e.condition === 'true');
       cond = hasTrue ? 'false' : 'true';
+    } else if (anchor.type === 'switch_router') {
+      const hasR1 = edges.some(e => e.source === anchor.id && e.condition === 'route_1');
+      const hasR2 = edges.some(e => e.source === anchor.id && e.condition === 'route_2');
+      cond = !hasR1 ? 'route_1' : (!hasR2 ? 'route_2' : 'default');
     }
     edges.push({
       id: `e_${Date.now().toString(36)}`,
@@ -705,9 +886,11 @@ function addNodeToCanvas(nodeType) {
   wfState.selectedNodeId = newId;
   markWfDirty();
 
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   renderNodeInspector();
   switchWfInspectorTab('node');
+  return newNode;
 }
 
 function duplicateNodeById(event, nodeId) {
@@ -716,20 +899,17 @@ function duplicateNodeById(event, nodeId) {
   if (!wf) return;
   const src = (wf.nodes || []).find(n => n.id === nodeId);
   if (!src) return;
+  pushUndoSnapshot();
 
-  let maxIdx = wf.nodes.length;
-  wf.nodes.forEach(n => {
-    const m = /^node_(\d+)$/.exec(n.id || '');
-    if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
-  });
   const newNode = wfClone(src);
-  newNode.id = `node_${maxIdx + 1}`;
+  newNode.id = _nextNodeId(wf.nodes);
   newNode.title = `${src.title || src.type} (Copy)`;
-  newNode.x = Number(src.x || 50) + 40;
-  newNode.y = Number(src.y || 140) + 125;
+  newNode.x = snapCoord(Number(src.x || 40) + 40);
+  newNode.y = snapCoord(Number(src.y || 140) + 120);
   wf.nodes.push(newNode);
   wfState.selectedNodeId = newNode.id;
   markWfDirty();
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   renderNodeInspector();
   wfToast(`❐ নোড "${src.title}" ডুপ্লিকেট হয়েছে।`, 'info');
@@ -741,10 +921,12 @@ function toggleNodeDisabled(event, nodeId) {
   if (!wf) return;
   const node = (wf.nodes || []).find(n => n.id === nodeId);
   if (!node) return;
+  pushUndoSnapshot();
   node.disabled = !node.disabled;
   node.config = node.config || {};
   node.config.disabled = node.disabled;
   markWfDirty();
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   if (wfState.selectedNodeId === nodeId) renderNodeInspector();
   wfToast(node.disabled ? '⏸️ নোড সাময়িকভাবে মিউট/বাইপাস করা হয়েছে।' : '▶️ নোড পুনরায় সক্রিয় হয়েছে।', 'info');
@@ -759,29 +941,91 @@ function copyNodeVarRef(event, nodeId) {
   wfToast(`📋 কপি হয়েছে: ${token}`, 'info');
 }
 
+function toggleGridSnap() {
+  wfState.snapGrid = !wfState.snapGrid;
+  renderCanvasHud();
+  wfToast(wfState.snapGrid ? '🧲 20px গ্রিড স্ন্যাপ চালু।' : 'গ্রিড স্ন্যাপ বন্ধ।', 'info');
+}
+
+function toggleStudioPane(which) {
+  if (which === 'left') wfState.leftCollapsed = !wfState.leftCollapsed;
+  if (which === 'right') wfState.rightCollapsed = !wfState.rightCollapsed;
+  applyStudioLayoutClasses();
+  renderWorkflowToolbar();
+  setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); }, 40);
+}
+
+function toggleFullscreenCanvas(forceState = null) {
+  wfState.fullscreenCanvas = forceState !== null ? !!forceState : !wfState.fullscreenCanvas;
+  applyStudioLayoutClasses();
+  renderWorkflowToolbar();
+  renderCanvasHud();
+  setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); }, 50);
+}
+
+function applyStudioLayoutClasses() {
+  const studio = document.getElementById('wf-subtab-studio');
+  if (!studio) return;
+  studio.classList.toggle('wf-studio-fullscreen', !!wfState.fullscreenCanvas);
+  studio.classList.toggle('wf-left-collapsed', !!wfState.leftCollapsed);
+  studio.classList.toggle('wf-right-collapsed', !!wfState.rightCollapsed);
+}
+
 function setCanvasZoom(deltaOrReset) {
   if (deltaOrReset === 0) {
     wfState.zoom = 1.0;
   } else {
-    wfState.zoom = Math.max(0.6, Math.min(1.4, Number((wfState.zoom + deltaOrReset).toFixed(2))));
+    wfState.zoom = Math.max(0.45, Math.min(1.6, Number((wfState.zoom + deltaOrReset).toFixed(2))));
   }
   renderWorkflowToolbar();
   renderWorkflowCanvas();
 }
 
+function fitCanvasToView() {
+  const wf = wfState.activeWorkflow;
+  const vp = document.getElementById('wf-canvas-viewport');
+  if (!wf || !wf.nodes || !wf.nodes.length || !vp) {
+    setCanvasZoom(0);
+    return;
+  }
+  let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+  wf.nodes.forEach(n => {
+    const x = Number(n.x || 0);
+    const y = Number(n.y || 0);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + 245);
+    maxY = Math.max(maxY, y + 125);
+  });
+  const boxW = Math.max(300, maxX - minX + 90);
+  const boxH = Math.max(240, maxY - minY + 90);
+  const fitZ = Math.min(vp.clientWidth / boxW, vp.clientHeight / boxH);
+  wfState.zoom = Math.max(0.45, Math.min(1.15, Number(fitZ.toFixed(2))));
+  renderWorkflowToolbar();
+  renderWorkflowCanvas();
+  requestAnimationFrame(() => {
+    vp.scrollLeft = Math.max(0, (minX - 40) * wfState.zoom);
+    vp.scrollTop = Math.max(0, (minY - 40) * wfState.zoom);
+    renderCanvasMinimap();
+  });
+}
+
 function autoLayoutWorkflow() {
   const wf = wfState.activeWorkflow;
   if (!wf || !wf.nodes || !wf.nodes.length) return;
+  pushUndoSnapshot();
 
   const nodes = wf.nodes;
   const edges = wf.edges || [];
   const inDeg = {};
   const adj = {};
-  nodes.forEach(n => { inDeg[n.id] = 0; adj[n.id] = []; });
+  const parents = {};
+  nodes.forEach(n => { inDeg[n.id] = 0; adj[n.id] = []; parents[n.id] = []; });
   edges.forEach(e => {
     if (inDeg[e.target] !== undefined && adj[e.source]) {
       inDeg[e.target]++;
       adj[e.source].push(e);
+      parents[e.target].push(e);
     }
   });
 
@@ -796,7 +1040,7 @@ function autoLayoutWorkflow() {
     const lv = levelMap[u] || 0;
     (adj[u] || []).forEach(e => {
       const v = e.target;
-      if (levelMap[v] === undefined || levelMap[v] < lv + 1) {
+      if (levelMap[v] === undefined || (levelMap[v] < lv + 1 && lv < nodes.length + 2)) {
         levelMap[v] = lv + 1;
         queue.push(v);
       }
@@ -804,6 +1048,9 @@ function autoLayoutWorkflow() {
   }
 
   nodes.forEach(n => { if (levelMap[n.id] === undefined) levelMap[n.id] = 0; });
+  const nodeById = {};
+  nodes.forEach(n => { nodeById[n.id] = n; });
+
   const byLevel = {};
   nodes.forEach(n => {
     const lv = levelMap[n.id];
@@ -811,19 +1058,36 @@ function autoLayoutWorkflow() {
     byLevel[lv].push(n);
   });
 
-  Object.keys(byLevel).forEach(lvStr => {
-    const lv = Number(lvStr);
+  // Sort levels cleanly and order each column by parent average Y + branch priority (barycenter ordering)
+  Object.keys(byLevel).map(Number).sort((a, b) => a - b).forEach(lv => {
     const grp = byLevel[lv];
-    const startY = grp.length === 1 ? 155 : 55;
+    if (lv > 0) {
+      grp.sort((a, b) => {
+        const score = (node) => {
+          const ps = parents[node.id] || [];
+          if (!ps.length) return Number(node.y || 0);
+          let sum = 0;
+          ps.forEach(pe => {
+            const pNode = nodeById[pe.source];
+            const cond = (pe.condition || '').toLowerCase();
+            const branchBias = (cond === 'true' || cond === 'route_1') ? -40 : (cond === 'route_2' ? 0 : (cond === 'false' || cond === 'default') ? 40 : 0);
+            sum += (pNode ? Number(pNode.y || 0) : 0) + branchBias;
+          });
+          return sum / ps.length;
+        };
+        return score(a) - score(b);
+      });
+    }
+    const startY = grp.length === 1 ? 160 : 60;
     grp.forEach((n, idx) => {
-      n.x = 45 + lv * 290;
-      n.y = startY + idx * 170;
+      n.x = snapCoord(40 + lv * 300);
+      n.y = snapCoord(startY + idx * 160);
     });
   });
 
   markWfDirty();
-  renderWorkflowCanvas();
-  wfToast('📐 ক্যানভাস অটো-অ্যালাইন সম্পন্ন হয়েছে।', 'info');
+  fitCanvasToView();
+  wfToast('📐 ক্যানভাস ও তার অটো-অ্যালাইন + ফিট সম্পন্ন হয়েছে।', 'info');
 }
 
 function markWfDirty() {
@@ -845,9 +1109,12 @@ function renderWorkflowToolbar() {
     ? '🌐 Webhook'
     : `⏰ ${wf.daily_time || 'Scheduled'}`;
   const zoomPct = Math.round((wfState.zoom || 1) * 100);
+  const canUndo = wfState.undoStack.length > 0;
+  const canRedo = wfState.redoStack.length > 0;
 
   bar.innerHTML = `
     <div class="wf-tb-left">
+      <button type="button" class="wf-tb-btn wf-btn-mini ${wfState.leftCollapsed ? 'active' : ''}" onclick="toggleStudioPane('left')" title="বাম প্যানেল লুকান/দেখান">◧</button>
       <span class="wf-tb-icon">${wfEsc(wf.icon || '⚡')}</span>
       <input type="text" id="wf-active-name-input" class="wf-tb-name-input" value="${wfEsc(wf.name)}"
              onchange="updateActiveWorkflowMeta('name', this.value)" title="ওয়ার্কফ্লোর নাম এডিট করুন">
@@ -858,12 +1125,16 @@ function renderWorkflowToolbar() {
         <input type="checkbox" ${wf.is_enabled ? 'checked' : ''} onchange="updateActiveWorkflowMeta('is_enabled', this.checked)">
         <span>${wf.is_enabled ? 'ON' : 'OFF'}</span>
       </label>
+      <button type="button" class="wf-tb-btn wf-btn-mini" ${canUndo ? '' : 'disabled style="opacity:0.4;"'} onclick="undoWorkflowChange()" title="Undo (Ctrl+Z)">↩️</button>
+      <button type="button" class="wf-tb-btn wf-btn-mini" ${canRedo ? '' : 'disabled style="opacity:0.4;"'} onclick="redoWorkflowChange()" title="Redo (Ctrl+Y)">↪️</button>
       <div class="wf-zoom-group">
         <button type="button" class="wf-tb-btn wf-btn-mini" onclick="setCanvasZoom(-0.1)" title="Zoom Out">-</button>
-        <button type="button" class="wf-tb-btn wf-btn-mini" onclick="setCanvasZoom(0)" title="Reset Zoom">${zoomPct}%</button>
+        <button type="button" class="wf-tb-btn wf-btn-mini" onclick="setCanvasZoom(0)" title="Reset 100%">${zoomPct}%</button>
         <button type="button" class="wf-tb-btn wf-btn-mini" onclick="setCanvasZoom(0.1)" title="Zoom In">+</button>
+        <button type="button" class="wf-tb-btn wf-btn-mini" onclick="fitCanvasToView()" title="Fit Workflow to View (F)">⛶</button>
       </div>
-      <button type="button" class="wf-tb-btn" onclick="autoLayoutWorkflow()" title="অটো-লেআউট">📐</button>
+      <button type="button" class="wf-tb-btn" onclick="autoLayoutWorkflow()" title="অটো-অ্যালাইন ও ফিট">📐</button>
+      <button type="button" class="wf-tb-btn ${wfState.fullscreenCanvas ? 'active' : ''}" onclick="toggleFullscreenCanvas()" title="ক্যানভাস বড়/ফুলস্ক্রিন করুন">🖥️</button>
       <button type="button" class="wf-tb-btn" onclick="openWorkflowVersionsModal()" title="ভার্সন হিস্ট্রি ও রোলব্যাক">🕒</button>
       <button type="button" class="wf-tb-btn" onclick="duplicateActiveWorkflow()" title="ক্লোন ওয়ার্কফ্লো">📋</button>
       <button type="button" class="wf-tb-btn" onclick="exportActiveWorkflow()" title="Export JSON">⬇️</button>
@@ -875,6 +1146,7 @@ function renderWorkflowToolbar() {
         : `<button type="button" id="btn-wf-run-now" class="wf-tb-btn wf-btn-run" onclick="runActiveWorkflowNow()">▶ Run Now</button>`
       }
       <button type="button" class="wf-tb-btn wf-btn-del" onclick="deleteActiveWorkflow()" title="ডিলিট">🗑️</button>
+      <button type="button" class="wf-tb-btn wf-btn-mini ${wfState.rightCollapsed ? 'active' : ''}" onclick="toggleStudioPane('right')" title="ডান ইন্সপেক্টর লুকান/দেখান">◨</button>
     </div>
   `;
 }
@@ -1159,9 +1431,11 @@ function renderWorkflowCanvas() {
   const nodes = wf.nodes || [];
   let maxX = 1200, maxY = 540;
   nodes.forEach(n => {
-    maxX = Math.max(maxX, (Number(n.x) || 0) + 320);
-    maxY = Math.max(maxY, (Number(n.y) || 0) + 220);
+    maxX = Math.max(maxX, (Number(n.x) || 0) + 360);
+    maxY = Math.max(maxY, (Number(n.y) || 0) + 260);
   });
+  wfState.stageWidth = maxX;
+  wfState.stageHeight = maxY;
   if (stage) {
     stage.style.width = `${maxX}px`;
     stage.style.height = `${maxY}px`;
@@ -1245,8 +1519,9 @@ function renderWorkflowCanvas() {
             <span class="wf-node-title">${wfEsc(node.title || meta.label_bn)}</span>
           </div>
           <div class="wf-node-head-actions">
+            ${!isTrig ? `<button type="button" class="wf-node-mini-btn wf-node-run-mini" onclick="runNodeQuickTestFromCard(event, '${wfEsc(node.id)}')" title="এক-ক্লিক সিঙ্গেল নোড টেস্ট">🧪</button>` : ''}
             ${!isTrig ? `<button type="button" class="wf-node-mini-btn" onclick="toggleNodeDisabled(event, '${wfEsc(node.id)}')" title="${isDisabled ? 'সক্রিয় করুন' : 'মিউট/বাইপাস করুন'}">${isDisabled ? '▶️' : '⏸️'}</button>` : ''}
-            <button type="button" class="wf-node-mini-btn" onclick="duplicateNodeById(event, '${wfEsc(node.id)}')" title="নোড ডুপ্লিকেট">❐</button>
+            <button type="button" class="wf-node-mini-btn" onclick="duplicateNodeById(event, '${wfEsc(node.id)}')" title="নোড ডুপ্লিকেট (Ctrl+D)">❐</button>
             <button type="button" class="wf-node-del-btn" onclick="deleteNodeById(event, '${wfEsc(node.id)}')" title="নোড মুছুন">&times;</button>
           </div>
         </div>
@@ -1263,6 +1538,8 @@ function renderWorkflowCanvas() {
   }).join('');
 
   drawWorkflowEdges();
+  renderCanvasHud();
+  renderCanvasMinimap();
 }
 
 function drawWorkflowEdges() {
@@ -1335,15 +1612,25 @@ function drawWorkflowEdges() {
 
     const mx = (sx + tx) / 2;
     const my = (sy + ty) / 2;
-    const badgeLabel = cond ? cond.replace('route_', 'R').toUpperCase() : '✕';
+    const condTxt = cond ? cond.replace('route_', 'R').toUpperCase() : '';
 
     return `
-      <g class="wf-edge-group" onclick="removeEdgeById('${wfEsc(edge.id)}')" title="সংযোগ মুছে ফেলতে ক্লিক করুন">
+      <g class="wf-edge-group">
         <path class="wf-edge-hit" d="${d}" fill="none" stroke="transparent" stroke-width="16"></path>
         <path class="wf-edge-path ${isFlowActive ? 'wf-edge-animated' : ''}" d="${d}" fill="none" stroke="${color}" stroke-width="2.4" marker-end="${marker}"></path>
-        <g class="wf-edge-label" transform="translate(${mx}, ${my})">
-          <rect x="-18" y="-10" width="36" height="20" rx="10" fill="#0f172a" stroke="${color}" stroke-width="1.4"></rect>
-          <text x="0" y="4" text-anchor="middle" fill="${color}" font-size="9.5" font-weight="700" font-family="Fira Code, monospace">${wfEsc(badgeLabel)}</text>
+        <g class="wf-edge-controls" transform="translate(${mx}, ${my})">
+          ${condTxt ? `
+            <rect x="-24" y="-24" width="48" height="15" rx="7" fill="#0f172a" stroke="${color}" stroke-width="1.2"></rect>
+            <text x="0" y="-13" text-anchor="middle" fill="${color}" font-size="8.5" font-weight="800" font-family="Fira Code, monospace">${wfEsc(condTxt)}</text>
+          ` : ''}
+          <g class="wf-edge-plus-btn" onclick="openQuickPickerForEdge(event, '${wfEsc(edge.id)}')" title="মাঝে নতুন নোড যোগ করুন (+)">
+            <circle cx="-11" cy="0" r="10" fill="#0f172a" stroke="#10b981" stroke-width="1.5"></circle>
+            <text x="-11" y="4" text-anchor="middle" fill="#34d399" font-size="13" font-weight="800">+</text>
+          </g>
+          <g class="wf-edge-del-btn" onclick="removeEdgeById('${wfEsc(edge.id)}', event)" title="সংযোগ মুছে ফেলুন">
+            <circle cx="11" cy="0" r="10" fill="#0f172a" stroke="#f43f5e" stroke-width="1.4"></circle>
+            <text x="11" y="3.5" text-anchor="middle" fill="#fda4af" font-size="10.5" font-weight="800">✕</text>
+          </g>
         </g>
       </g>
     `;
@@ -1357,8 +1644,11 @@ function drawWorkflowEdges() {
     const h = srcEl ? srcEl.offsetHeight : 98;
     const sx = Number(srcNode.x || 0) + w;
     let sy = Number(srcNode.y || 0) + h / 2;
+    const cond = (wfState.connectingFrom.condition || '').toLowerCase();
     if (srcNode.type === 'condition') {
-      sy = Number(srcNode.y || 0) + (wfState.connectingFrom.condition === 'false' ? h * 0.72 : h * 0.32);
+      sy = Number(srcNode.y || 0) + (cond === 'false' ? h * 0.72 : h * 0.32);
+    } else if (srcNode.type === 'switch_router') {
+      sy = Number(srcNode.y || 0) + (cond === 'route_1' ? h * 0.24 : cond === 'route_2' ? h * 0.52 : h * 0.80);
     }
     const tx = wfState.mouseCanvasX || (sx + 80);
     const ty = wfState.mouseCanvasY || sy;
@@ -1370,7 +1660,235 @@ function drawWorkflowEdges() {
   svg.innerHTML = defs + paths + tempWire;
 }
 
-// Dragging & Port Wiring with Zoom scaling
+function renderCanvasHud() {
+  const hud = document.getElementById('wf-canvas-hud');
+  if (!hud) return;
+  const wf = wfState.activeWorkflow;
+  const nCnt = wf ? (wf.nodes || []).length : 0;
+  const eCnt = wf ? (wf.edges || []).length : 0;
+  const zoomPct = Math.round((wfState.zoom || 1) * 100);
+  hud.innerHTML = `
+    <span class="wf-hud-stat">${nCnt} Nodes • ${eCnt} Edges</span>
+    <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(-0.1)" title="Zoom Out">-</button>
+    <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(0)" title="100% Zoom">${zoomPct}%</button>
+    <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(0.1)" title="Zoom In">+</button>
+    <button type="button" class="wf-hud-btn" onclick="fitCanvasToView()" title="Fit Workflow (F)">⛶ Fit</button>
+    <button type="button" class="wf-hud-btn ${wfState.snapGrid ? 'active' : ''}" onclick="toggleGridSnap()" title="20px Grid Snap">${wfState.snapGrid ? '🧲 Snap' : 'Free'}</button>
+    <button type="button" class="wf-hud-btn" onclick="autoLayoutWorkflow()" title="অটো-অ্যালাইন ও ফিট">📐</button>
+  `;
+}
+
+function renderCanvasMinimap() {
+  const mm = document.getElementById('wf-canvas-minimap');
+  const vp = document.getElementById('wf-canvas-viewport');
+  const wf = wfState.activeWorkflow;
+  if (!mm || !vp || !wf || !(wf.nodes || []).length) {
+    if (mm) mm.innerHTML = '';
+    return;
+  }
+
+  const mw = 156, mh = 92;
+  const stW = Math.max(wfState.stageWidth || 1200, 1200);
+  const stH = Math.max(wfState.stageHeight || 540, 540);
+  const scale = Math.min(mw / stW, mh / stH);
+  const zoom = wfState.zoom || 1;
+
+  const rects = (wf.nodes || []).map(n => {
+    const meta = wfNodeMeta(n.type);
+    const rx = Math.round(Number(n.x || 0) * scale);
+    const ry = Math.round(Number(n.y || 0) * scale);
+    const rw = Math.max(10, Math.round(230 * scale));
+    const rh = Math.max(6, Math.round(92 * scale));
+    const isSel = wfState.selectedNodeId === n.id;
+    return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="2" fill="${meta.color || '#38bdf8'}" fill-opacity="${isSel ? '1' : '0.68'}" stroke="${isSel ? '#ffffff' : 'none'}" stroke-width="1"></rect>`;
+  }).join('');
+
+  const vx = Math.round((vp.scrollLeft / zoom) * scale);
+  const vy = Math.round((vp.scrollTop / zoom) * scale);
+  const vw = Math.min(mw, Math.round((vp.clientWidth / zoom) * scale));
+  const vh = Math.min(mh, Math.round((vp.clientHeight / zoom) * scale));
+
+  mm.innerHTML = `
+    <svg width="${mw}" height="${mh}" viewBox="0 0 ${mw} ${mh}" onclick="jumpCanvasFromMinimap(event, ${scale}, ${mw}, ${mh})">
+      ${rects}
+      <rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-width="1.3"></rect>
+    </svg>
+  `;
+}
+
+function jumpCanvasFromMinimap(event, scale) {
+  event.stopPropagation();
+  const vp = document.getElementById('wf-canvas-viewport');
+  const svg = event.currentTarget;
+  if (!vp || !svg) return;
+  const rect = svg.getBoundingClientRect();
+  const zoom = wfState.zoom || 1;
+  const targetCanvasX = (event.clientX - rect.left) / scale;
+  const targetCanvasY = (event.clientY - rect.top) / scale;
+  vp.scrollLeft = Math.max(0, targetCanvasX * zoom - vp.clientWidth / 2);
+  vp.scrollTop = Math.max(0, targetCanvasY * zoom - vp.clientHeight / 2);
+  renderCanvasMinimap();
+}
+
+// Floating Quick Node Picker (Canvas Double-Click / Edge Mid-Insert)
+function onCanvasDoubleClick(event) {
+  if (event.target.closest('.wf-node-card') || event.target.closest('.wf-edge-controls')) return;
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!stage || !wfState.activeWorkflow) return;
+  const rect = stage.getBoundingClientRect();
+  const zoom = wfState.zoom || 1;
+  const cx = snapCoord((event.clientX - rect.left) / zoom - 110);
+  const cy = snapCoord((event.clientY - rect.top) / zoom - 40);
+  openQuickPicker({ mode: 'canvas', canvasX: cx, canvasY: cy, clientX: event.clientX, clientY: event.clientY });
+}
+
+function openQuickPickerForEdge(event, edgeId) {
+  if (event) event.stopPropagation();
+  openQuickPicker({ mode: 'edge', edgeId, clientX: event ? event.clientX : 400, clientY: event ? event.clientY : 300 });
+}
+
+function openQuickPicker(opts) {
+  const picker = document.getElementById('wf-quick-picker');
+  const wrap = picker ? picker.parentElement : null;
+  if (!picker || !wrap) return;
+  wfState.quickPicker = opts;
+  const wrapRect = wrap.getBoundingClientRect();
+  const left = Math.max(12, Math.min(wrapRect.width - 270, (opts.clientX || wrapRect.left + 140) - wrapRect.left - 120));
+  const top = Math.max(12, Math.min(wrapRect.height - 290, (opts.clientY || wrapRect.top + 100) - wrapRect.top - 20));
+  picker.style.left = `${left}px`;
+  picker.style.top = `${top}px`;
+  picker.style.display = 'flex';
+  const titleTxt = opts.mode === 'edge' ? '➕ তারের মাঝে নোড যোগ করুন' : '⚡ ক্যানভাসে দ্রুত নোড যোগ করুন';
+  picker.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+      <strong style="font-size:0.78rem; color:#38bdf8;">${titleTxt}</strong>
+      <button type="button" class="wf-node-del-btn" onclick="closeQuickPicker()">&times;</button>
+    </div>
+    <input type="text" id="wf-qp-search" class="text-input" style="padding:5px 8px; font-size:0.76rem;" placeholder="🔍 সার্চ (python, switch, db, telegram...)" oninput="renderQuickPickerList(this.value)">
+    <div id="wf-qp-list" class="wf-qp-list"></div>
+  `;
+  renderQuickPickerList('');
+  setTimeout(() => document.getElementById('wf-qp-search')?.focus(), 20);
+}
+
+function renderQuickPickerList(q = '') {
+  const listEl = document.getElementById('wf-qp-list');
+  if (!listEl) return;
+  const low = String(q || '').trim().toLowerCase();
+  const items = (wfState.nodeCatalog || []).filter(c => {
+    if (wfState.quickPicker?.mode === 'edge' && (c.type || '').startsWith('trigger_')) return false;
+    if (!low) return true;
+    return `${c.type} ${c.label_bn || ''} ${c.label_en || ''}`.toLowerCase().includes(low);
+  });
+  listEl.innerHTML = items.map(c => `
+    <button type="button" class="wf-qp-item" onclick="pickQuickPickerNode('${wfEsc(c.type)}')">
+      <span>${wfEsc(c.icon)}</span>
+      <span style="flex:1; text-align:left;">${wfEsc(c.label_bn || c.label_en)}</span>
+      <span style="font-size:0.68rem; color:var(--text-muted);">${wfEsc(c.category)}</span>
+    </button>
+  `).join('') || '<div class="wf-empty-hint">মিল পাওয়া যায়নি।</div>';
+}
+
+function pickQuickPickerNode(nodeType) {
+  const opts = wfState.quickPicker;
+  const wf = wfState.activeWorkflow;
+  closeQuickPicker();
+  if (!wf || !opts) return;
+
+  if (opts.mode === 'edge' && opts.edgeId) {
+    const oldEdgeIdx = (wf.edges || []).findIndex(e => e.id === opts.edgeId);
+    if (oldEdgeIdx === -1) return;
+    pushUndoSnapshot();
+    const oldEdge = wf.edges[oldEdgeIdx];
+    const srcNode = (wf.nodes || []).find(n => n.id === oldEdge.source);
+    const tgtNode = (wf.nodes || []).find(n => n.id === oldEdge.target);
+    const midX = srcNode && tgtNode ? snapCoord((Number(srcNode.x || 0) + Number(tgtNode.x || 0)) / 2) : 340;
+    const midY = srcNode && tgtNode ? snapCoord((Number(srcNode.y || 0) + Number(tgtNode.y || 0)) / 2) : 160;
+
+    // Create node without taking duplicate undo or auto-wiring anchor
+    const meta = wfNodeMeta(nodeType);
+    const newId = _nextNodeId(wf.nodes);
+    const newNode = {
+      id: newId,
+      type: nodeType,
+      title: meta.label_bn || meta.label_en || nodeType,
+      x: midX,
+      y: midY,
+      disabled: false,
+      config: wfClone(meta.default_config || {})
+    };
+    wf.nodes.push(newNode);
+    // Shift downstream target slightly right if cramped cleanly
+    if (tgtNode && Math.abs((tgtNode.x || 0) - midX) < 250) {
+      tgtNode.x = snapCoord(midX + 280);
+    }
+    // Split oldEdge cleanly into source->newNode and newNode->target
+    const condOut = nodeType === 'condition' ? 'true' : (nodeType === 'switch_router' ? 'route_1' : '');
+    wf.edges.splice(oldEdgeIdx, 1,
+      { id: `e_${Date.now().toString(36)}_1`, source: oldEdge.source, target: newId, condition: oldEdge.condition || '' },
+      { id: `e_${Date.now().toString(36)}_2`, source: newId, target: oldEdge.target, condition: condOut }
+    );
+    wfState.selectedNodeId = newId;
+    markWfDirty();
+    renderWorkflowToolbar();
+    renderWorkflowCanvas();
+    renderNodeInspector();
+    switchWfInspectorTab('node');
+    wfToast(`➕ তারের মাঝে "${newNode.title}" যুক্ত হয়েছে!`, 'success');
+    return;
+  }
+
+  addNodeToCanvas(nodeType, opts.canvasX, opts.canvasY, false);
+}
+
+function closeQuickPicker() {
+  wfState.quickPicker = null;
+  const picker = document.getElementById('wf-quick-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+async function runNodeQuickTestFromCard(event, nodeId) {
+  if (event) event.stopPropagation();
+  wfState.selectedNodeId = nodeId;
+  renderWorkflowCanvas();
+  renderNodeInspector();
+  switchWfInspectorTab('node');
+  await testSelectedNode();
+}
+
+// Canvas Viewport Pan, Wheel Zoom, Node Dragging & Port Wiring
+function onViewportMouseDown(event) {
+  if (
+    event.button !== 0 && event.button !== 1
+  ) return;
+  if (
+    event.target.closest('.wf-node-card') ||
+    event.target.closest('.wf-edge-controls') ||
+    event.target.closest('.wf-canvas-hud') ||
+    event.target.closest('.wf-canvas-minimap') ||
+    event.target.closest('.wf-quick-picker')
+  ) {
+    return;
+  }
+  const vp = document.getElementById('wf-canvas-viewport');
+  if (!vp) return;
+  wfState.panState = {
+    startX: event.clientX,
+    startY: event.clientY,
+    scrollLeft: vp.scrollLeft,
+    scrollTop: vp.scrollTop,
+    moved: false
+  };
+  vp.classList.add('wf-panning');
+}
+
+function onCanvasWheel(event) {
+  if (!(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  const delta = event.deltaY < 0 ? 0.08 : -0.08;
+  setCanvasZoom(delta);
+}
+
 function onNodeMouseDown(event, nodeId) {
   if (
     event.target.closest('.wf-port-out') ||
@@ -1390,11 +1908,26 @@ function onNodeMouseDown(event, nodeId) {
   const zoom = wfState.zoom || 1.0;
   const stageRect = stage.getBoundingClientRect();
   wfState.draggingNodeId = nodeId;
+  wfState.dragMoved = false;
+  wfState.dragSnapshotTaken = false;
   wfState.dragOffsetX = (event.clientX - stageRect.left) / zoom - Number(node.x || 0);
   wfState.dragOffsetY = (event.clientY - stageRect.top) / zoom - Number(node.y || 0);
 }
 
 document.addEventListener('mousemove', (event) => {
+  if (wfState.panState) {
+    const vp = document.getElementById('wf-canvas-viewport');
+    if (vp) {
+      const dx = event.clientX - wfState.panState.startX;
+      const dy = event.clientY - wfState.panState.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wfState.panState.moved = true;
+      vp.scrollLeft = wfState.panState.scrollLeft - dx;
+      vp.scrollTop = wfState.panState.scrollTop - dy;
+      renderCanvasMinimap();
+    }
+    return;
+  }
+
   const stage = document.getElementById('wf-canvas-stage');
   if (!stage) return;
   const zoom = wfState.zoom || 1.0;
@@ -1402,19 +1935,26 @@ document.addEventListener('mousemove', (event) => {
   if (wfState.draggingNodeId && wfState.activeWorkflow) {
     const node = (wfState.activeWorkflow.nodes || []).find(n => n.id === wfState.draggingNodeId);
     if (!node) return;
-    const stageRect = stage.getBoundingClientRect();
-    const nx = Math.max(12, Math.round((event.clientX - stageRect.left) / zoom - wfState.dragOffsetX));
-    const ny = Math.max(12, Math.round((event.clientY - stageRect.top) / zoom - wfState.dragOffsetY));
-    node.x = nx;
-    node.y = ny;
-
-    const card = document.getElementById(`wf-card-${node.id}`);
-    if (card) {
-      card.style.left = `${nx}px`;
-      card.style.top = `${ny}px`;
+    if (!wfState.dragSnapshotTaken) {
+      pushUndoSnapshot();
+      wfState.dragSnapshotTaken = true;
     }
-    markWfDirty();
-    drawWorkflowEdges();
+    const nx = snapCoord((event.clientX - stage.getBoundingClientRect().left) / zoom - wfState.dragOffsetX);
+    const ny = snapCoord((event.clientY - stage.getBoundingClientRect().top) / zoom - wfState.dragOffsetY);
+    if (nx !== node.x || ny !== node.y) {
+      wfState.dragMoved = true;
+      node.x = nx;
+      node.y = ny;
+
+      const card = document.getElementById(`wf-card-${node.id}`);
+      if (card) {
+        card.style.left = `${nx}px`;
+        card.style.top = `${ny}px`;
+      }
+      markWfDirty();
+      drawWorkflowEdges();
+      renderCanvasMinimap();
+    }
   } else if (wfState.connectingFrom) {
     const stageRect = stage.getBoundingClientRect();
     wfState.mouseCanvasX = (event.clientX - stageRect.left) / zoom;
@@ -1424,18 +1964,34 @@ document.addEventListener('mousemove', (event) => {
 });
 
 document.addEventListener('mouseup', () => {
-  if (wfState.draggingNodeId) wfState.draggingNodeId = null;
+  if (wfState.panState) {
+    const vp = document.getElementById('wf-canvas-viewport');
+    if (vp) vp.classList.remove('wf-panning');
+    wfState.justPanned = !!wfState.panState.moved;
+    wfState.panState = null;
+    if (wfState.justPanned) setTimeout(() => { wfState.justPanned = false; }, 60);
+  }
+  if (wfState.draggingNodeId) {
+    wfState.draggingNodeId = null;
+    wfState.dragMoved = false;
+    wfState.dragSnapshotTaken = false;
+    renderWorkflowToolbar();
+  }
 });
 
 document.addEventListener('keydown', (e) => {
   const viewWf = document.getElementById('view-workflows');
   if (!viewWf || !viewWf.classList.contains('active')) return;
+  if (wfState.subTab !== 'studio') return;
 
-  if (e.key === 'Escape' && wfState.connectingFrom) {
-    wfState.connectingFrom = null;
-    renderWorkflowCanvas();
-    return;
+  if (e.key === 'Escape') {
+    if (wfState.quickPicker) { closeQuickPicker(); return; }
+    if (wfState.connectingFrom) { wfState.connectingFrom = null; renderWorkflowCanvas(); return; }
+    if (wfState.fullscreenCanvas) { toggleFullscreenCanvas(false); return; }
   }
+
+  const tag = (document.activeElement?.tagName || '').toLowerCase();
+  const isTyping = ['input', 'textarea', 'select'].includes(tag);
 
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
@@ -1443,16 +1999,62 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  const tag = (document.activeElement?.tagName || '').toLowerCase();
-  if ((e.key === 'Delete' || e.key === 'Backspace') && !['input', 'textarea', 'select'].includes(tag)) {
-    if (wfState.selectedNodeId) {
-      deleteNodeById(null, wfState.selectedNodeId);
-    }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runActiveWorkflowNow();
+    return;
+  }
+
+  if (isTyping) return;
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) redoWorkflowChange();
+    else undoWorkflowChange();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    redoWorkflowChange();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    if (wfState.selectedNodeId) duplicateNodeById(null, wfState.selectedNodeId);
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    fitCanvasToView();
+    return;
+  }
+
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && wfState.selectedNodeId && wfState.activeWorkflow) {
+    e.preventDefault();
+    const node = (wfState.activeWorkflow.nodes || []).find(n => n.id === wfState.selectedNodeId);
+    if (!node) return;
+    pushUndoSnapshot();
+    const step = e.shiftKey ? 5 : 20;
+    if (e.key === 'ArrowLeft') node.x = Math.max(12, Number(node.x || 0) - step);
+    if (e.key === 'ArrowRight') node.x = Number(node.x || 0) + step;
+    if (e.key === 'ArrowUp') node.y = Math.max(12, Number(node.y || 0) - step);
+    if (e.key === 'ArrowDown') node.y = Number(node.y || 0) + step;
+    markWfDirty();
+    renderWorkflowCanvas();
+    return;
+  }
+
+  if ((e.key === 'Delete' || e.key === 'Backspace') && wfState.selectedNodeId) {
+    deleteNodeById(null, wfState.selectedNodeId);
   }
 });
 
 function onNodeCardClick(event, nodeId) {
   event.stopPropagation();
+  closeQuickPicker();
   if (wfState.connectingFrom) {
     if (wfState.connectingFrom.nodeId !== nodeId) {
       connectNodes(wfState.connectingFrom.nodeId, nodeId, wfState.connectingFrom.condition);
@@ -1467,11 +2069,13 @@ function onNodeCardClick(event, nodeId) {
   const card = document.getElementById(`wf-card-${nodeId}`);
   if (card) card.classList.add('selected');
   renderNodeInspector();
+  renderCanvasMinimap();
   switchWfInspectorTab('node');
 }
 
 function onOutputPortClick(event, nodeId, condition = '') {
   event.stopPropagation();
+  closeQuickPicker();
   wfState.connectingFrom = { nodeId, condition };
   wfToast('এখন লক্ষ্য নোডের বাম ইনপুট পোর্টে (●) ক্লিক করুন (Esc চাপলে বাতিল)।', 'info');
   renderWorkflowCanvas();
@@ -1493,6 +2097,8 @@ function onInputPortClick(event, targetNodeId) {
 }
 
 function onCanvasBackgroundClick() {
+  if (wfState.justPanned) return;
+  closeQuickPicker();
   if (wfState.connectingFrom) {
     wfState.connectingFrom = null;
     renderWorkflowCanvas();
@@ -1505,6 +2111,7 @@ function connectNodes(sourceId, targetId, condition = '') {
   wf.edges = wf.edges || [];
   const exists = wf.edges.some(e => e.source === sourceId && e.target === targetId && (e.condition || '') === (condition || ''));
   if (!exists) {
+    pushUndoSnapshot();
     wf.edges.push({
       id: `e_${Date.now().toString(36)}_${Math.floor(Math.random() * 100)}`,
       source: sourceId,
@@ -1514,15 +2121,19 @@ function connectNodes(sourceId, targetId, condition = '') {
     markWfDirty();
     wfToast(`🔗 সংযোগ তৈরি হয়েছে (${sourceId} → ${targetId})`, 'success');
   }
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   renderNodeInspector();
 }
 
-function removeEdgeById(edgeId) {
+function removeEdgeById(edgeId, event = null) {
+  if (event) event.stopPropagation();
   const wf = wfState.activeWorkflow;
   if (!wf) return;
+  pushUndoSnapshot();
   wf.edges = (wf.edges || []).filter(e => e.id !== edgeId);
   markWfDirty();
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   renderNodeInspector();
 }
@@ -1531,12 +2142,14 @@ function deleteNodeById(event, nodeId) {
   if (event) event.stopPropagation();
   const wf = wfState.activeWorkflow;
   if (!wf) return;
+  pushUndoSnapshot();
   wf.nodes = (wf.nodes || []).filter(n => n.id !== nodeId);
   wf.edges = (wf.edges || []).filter(e => e.source !== nodeId && e.target !== nodeId);
   if (wfState.selectedNodeId === nodeId) {
     wfState.selectedNodeId = wf.nodes[0] ? wf.nodes[0].id : null;
   }
   markWfDirty();
+  renderWorkflowToolbar();
   renderWorkflowCanvas();
   renderNodeInspector();
 }
@@ -2963,3 +3576,24 @@ window.refreshWorkflowTelegramChats = refreshWorkflowTelegramChats;
 window.submitTelegramChatCommand = submitTelegramChatCommand;
 window.sendWorkflowReportToTelegram = sendWorkflowReportToTelegram;
 window.clearWorkflowTelegramChats = clearWorkflowTelegramChats;
+window.undoWorkflowChange = undoWorkflowChange;
+window.redoWorkflowChange = redoWorkflowChange;
+window.onPaletteSearchInput = onPaletteSearchInput;
+window.setPaletteCategory = setPaletteCategory;
+window.onPaletteDragStart = onPaletteDragStart;
+window.onCanvasDragOver = onCanvasDragOver;
+window.onCanvasDrop = onCanvasDrop;
+window.toggleGridSnap = toggleGridSnap;
+window.toggleStudioPane = toggleStudioPane;
+window.toggleFullscreenCanvas = toggleFullscreenCanvas;
+window.fitCanvasToView = fitCanvasToView;
+window.renderCanvasMinimap = renderCanvasMinimap;
+window.jumpCanvasFromMinimap = jumpCanvasFromMinimap;
+window.onCanvasDoubleClick = onCanvasDoubleClick;
+window.openQuickPickerForEdge = openQuickPickerForEdge;
+window.renderQuickPickerList = renderQuickPickerList;
+window.pickQuickPickerNode = pickQuickPickerNode;
+window.closeQuickPicker = closeQuickPicker;
+window.runNodeQuickTestFromCard = runNodeQuickTestFromCard;
+window.onViewportMouseDown = onViewportMouseDown;
+window.onCanvasWheel = onCanvasWheel;
