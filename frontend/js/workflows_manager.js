@@ -41,6 +41,8 @@ let wfState = {
   paletteCategory: 'all',
   paletteQuery: '',
   fullscreenCanvas: false,
+  nativeFullscreen: false,
+  gridMode: 'dots',
   leftCollapsed: false,
   rightCollapsed: false,
   inspectorWide: false,
@@ -1029,19 +1031,109 @@ function toggleInspectorWide() {
 
 function toggleFullscreenCanvas(forceState = null) {
   wfState.fullscreenCanvas = forceState !== null ? !!forceState : !wfState.fullscreenCanvas;
+  if (!wfState.fullscreenCanvas && document.fullscreenElement && wfState.nativeFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+  applyStudioLayoutClasses();
+  renderWorkflowToolbar();
+  renderCanvasHud();
+  setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); }, 60);
+}
+
+async function toggleNativeFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      if (!wfState.fullscreenCanvas) toggleFullscreenCanvas(true);
+      await document.documentElement.requestFullscreen();
+      wfState.nativeFullscreen = true;
+    } else {
+      await document.exitFullscreen();
+      wfState.nativeFullscreen = false;
+    }
+    renderCanvasHud();
+  } catch (err) {
+    wfToast('ব্রাউজার নেটিভ ফুলস্ক্রিন অনুমোদিত নয়: ' + err.message, 'info');
+  }
+}
+
+function toggleFocusCanvasMode() {
+  const shouldCollapse = !(wfState.leftCollapsed && wfState.rightCollapsed);
+  wfState.leftCollapsed = shouldCollapse;
+  wfState.rightCollapsed = shouldCollapse;
   applyStudioLayoutClasses();
   renderWorkflowToolbar();
   renderCanvasHud();
   setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); }, 50);
 }
 
+function toggleCanvasGridMode() {
+  const order = ['dots', 'blueprint', 'clean'];
+  const idx = order.indexOf(wfState.gridMode || 'dots');
+  wfState.gridMode = order[(idx + 1) % order.length];
+  applyStudioLayoutClasses();
+  renderCanvasHud();
+}
+
+function focusCanvasNodeById(nodeId) {
+  if (!nodeId || !wfState.activeWorkflow) return;
+  const node = (wfState.activeWorkflow.nodes || []).find(n => n.id === nodeId);
+  const vp = document.getElementById('wf-canvas-viewport');
+  if (!node) return;
+  wfState.selectedNodeId = nodeId;
+  renderWorkflowCanvas();
+  renderNodeInspector();
+  if (vp) {
+    const zoom = wfState.zoom || 1;
+    vp.scrollTo({
+      left: Math.max(0, (Number(node.x || 0) + 115) * zoom - vp.clientWidth / 2),
+      top: Math.max(0, (Number(node.y || 0) + 45) * zoom - vp.clientHeight / 2),
+      behavior: 'smooth',
+    });
+  }
+}
+
+function openQuickPickerAtCenter() {
+  const vp = document.getElementById('wf-canvas-viewport');
+  const stage = document.getElementById('wf-canvas-stage');
+  if (!vp || !stage || !wfState.activeWorkflow) return;
+  const zoom = wfState.zoom || 1;
+  const rect = vp.getBoundingClientRect();
+  const cx = snapCoord((vp.scrollLeft + vp.clientWidth / 2) / zoom - 115);
+  const cy = snapCoord((vp.scrollTop + vp.clientHeight / 2) / zoom - 45);
+  openQuickPicker({
+    mode: 'canvas',
+    canvasX: Math.max(20, cx),
+    canvasY: Math.max(20, cy),
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+  });
+}
+
 function applyStudioLayoutClasses() {
   const studio = document.getElementById('wf-subtab-studio');
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.classList.toggle('wf-canvas-fullscreen-active', !!wfState.fullscreenCanvas);
+  }
+  const fsSubBtn = document.getElementById('btn-wf-subtab-fs');
+  if (fsSubBtn) {
+    fsSubBtn.classList.toggle('active', !!wfState.fullscreenCanvas);
+    fsSubBtn.textContent = wfState.fullscreenCanvas ? '✕ Exit Full Screen' : '⛶ Full Screen স্টুডিও';
+  }
+  const focusSubBtn = document.getElementById('btn-wf-subtab-focus');
+  if (focusSubBtn) {
+    focusSubBtn.classList.toggle('active', !!(wfState.leftCollapsed && wfState.rightCollapsed));
+  }
   if (!studio) return;
   studio.classList.toggle('wf-studio-fullscreen', !!wfState.fullscreenCanvas);
   studio.classList.toggle('wf-left-collapsed', !!wfState.leftCollapsed);
   studio.classList.toggle('wf-right-collapsed', !!wfState.rightCollapsed);
   studio.classList.toggle('wf-right-wide', !!wfState.inspectorWide && !wfState.rightCollapsed);
+
+  const vp = document.getElementById('wf-canvas-viewport');
+  if (vp) {
+    vp.classList.toggle('wf-grid-blueprint', wfState.gridMode === 'blueprint');
+    vp.classList.toggle('wf-grid-clean', wfState.gridMode === 'clean');
+  }
 }
 
 function setCanvasZoom(deltaOrReset) {
@@ -1207,7 +1299,8 @@ function renderWorkflowToolbar() {
         <button type="button" class="wf-tb-btn wf-btn-mini" onclick="fitCanvasToView()" title="Fit Workflow to View (F)">⛶</button>
       </div>
       <button type="button" class="wf-tb-btn" onclick="autoLayoutWorkflow()" title="অটো-অ্যালাইন ও ফিট">📐</button>
-      <button type="button" class="wf-tb-btn ${wfState.fullscreenCanvas ? 'active' : ''}" onclick="toggleFullscreenCanvas()" title="ক্যানভাস বড়/ফুলস্ক্রিন করুন">🖥️</button>
+      <button type="button" class="wf-tb-btn ${wfState.leftCollapsed && wfState.rightCollapsed ? 'active' : ''}" onclick="toggleFocusCanvasMode()" title="দুই পাশ লুকিয়ে ক্যানভাস ফোকাস মোড">🎯</button>
+      <button type="button" class="wf-tb-btn ${wfState.fullscreenCanvas ? 'active wf-btn-fs-launch' : ''}" onclick="toggleFullscreenCanvas()" title="ক্যানভাস ফুলস্ক্রিন চালু/বন্ধ (Shift+F / Esc)">${wfState.fullscreenCanvas ? '✕ Exit FS' : '⛶ Full Screen'}</button>
       <button type="button" class="wf-tb-btn" onclick="openWorkflowVersionsModal()" title="ভার্সন হিস্ট্রি ও রোলব্যাক">🕒</button>
       <button type="button" class="wf-tb-btn" onclick="duplicateActiveWorkflow()" title="ক্লোন ওয়ার্কফ্লো">📋</button>
       <button type="button" class="wf-tb-btn" onclick="exportActiveWorkflow()" title="Export JSON">⬇️</button>
@@ -1530,9 +1623,18 @@ function renderWorkflowCanvas() {
       : (wfState.liveProgress && wfState.liveProgress.current_node_id ? [wfState.liveProgress.current_node_id] : [])
   );
 
+  const linkedIds = new Set();
+  if (wfState.selectedNodeId) {
+    (wf.edges || []).forEach(e => {
+      if (e.source === wfState.selectedNodeId) linkedIds.add(e.target);
+      if (e.target === wfState.selectedNodeId) linkedIds.add(e.source);
+    });
+  }
+
   nodesLayer.innerHTML = nodes.map(node => {
     const meta = wfNodeMeta(node.type);
     const isSelected = wfState.selectedNodeId === node.id;
+    const isLinked = !isSelected && linkedIds.has(node.id);
     const isCond = node.type === 'condition';
     const isSwitch = node.type === 'switch_router';
     const isTrig = (node.type || '').startsWith('trigger_');
@@ -1543,6 +1645,7 @@ function renderWorkflowCanvas() {
 
     let runStatusCls = nr ? `wf-status-${(nr.status || '').toLowerCase()}` : '';
     if (isLiveRunning) runStatusCls = 'wf-status-running';
+    if (isLinked) runStatusCls += ' wf-node-linked';
     if (isDisabled) runStatusCls += ' wf-node-disabled';
     if (isPinned) runStatusCls += ' wf-node-pinned';
 
@@ -1690,22 +1793,24 @@ function drawWorkflowEdges() {
     const my = (sy + ty) / 2;
     const condTxt = cond ? cond.replace('route_', 'R').toUpperCase() : '';
 
+    const isConnectedToSel = !!wfState.selectedNodeId && (edge.source === wfState.selectedNodeId || edge.target === wfState.selectedNodeId);
+
     return `
       <g class="wf-edge-group">
         <path class="wf-edge-hit" d="${d}" fill="none" stroke="transparent" stroke-width="16"></path>
-        <path class="wf-edge-path ${isFlowActive ? 'wf-edge-animated' : ''}" d="${d}" fill="none" stroke="${color}" stroke-width="2.4" marker-end="${marker}"></path>
+        <path class="wf-edge-path ${isFlowActive ? 'wf-edge-animated' : ''} ${isConnectedToSel ? 'wf-edge-connected' : ''}" d="${d}" fill="none" stroke="${color}" stroke-width="2.4" marker-end="${marker}"></path>
         <g class="wf-edge-controls" transform="translate(${mx}, ${my})">
           ${condTxt ? `
-            <rect x="-24" y="-24" width="48" height="15" rx="7" fill="#0f172a" stroke="${color}" stroke-width="1.2"></rect>
+            <rect class="wf-edge-pill-bg" x="-24" y="-24" width="48" height="15" rx="7" stroke="${color}" stroke-width="1.2"></rect>
             <text x="0" y="-13" text-anchor="middle" fill="${color}" font-size="8.5" font-weight="800" font-family="Fira Code, monospace">${wfEsc(condTxt)}</text>
           ` : ''}
           <g class="wf-edge-plus-btn" onclick="openQuickPickerForEdge(event, '${wfEsc(edge.id)}')" title="মাঝে নতুন নোড যোগ করুন (+)">
-            <circle cx="-11" cy="0" r="10" fill="#0f172a" stroke="#10b981" stroke-width="1.5"></circle>
-            <text x="-11" y="4" text-anchor="middle" fill="#34d399" font-size="13" font-weight="800">+</text>
+            <circle class="wf-edge-pill-bg" cx="-11" cy="0" r="10" stroke="#10b981" stroke-width="1.5"></circle>
+            <text x="-11" y="4" text-anchor="middle" fill="#10b981" font-size="13" font-weight="800">+</text>
           </g>
           <g class="wf-edge-del-btn" onclick="removeEdgeById('${wfEsc(edge.id)}', event)" title="সংযোগ মুছে ফেলুন">
-            <circle cx="11" cy="0" r="10" fill="#0f172a" stroke="#f43f5e" stroke-width="1.4"></circle>
-            <text x="11" y="3.5" text-anchor="middle" fill="#fda4af" font-size="10.5" font-weight="800">✕</text>
+            <circle class="wf-edge-pill-bg" cx="11" cy="0" r="10" stroke="#f43f5e" stroke-width="1.4"></circle>
+            <text x="11" y="3.5" text-anchor="middle" fill="#f43f5e" font-size="10.5" font-weight="800">✕</text>
           </g>
         </g>
       </g>
@@ -1740,17 +1845,41 @@ function renderCanvasHud() {
   const hud = document.getElementById('wf-canvas-hud');
   if (!hud) return;
   const wf = wfState.activeWorkflow;
-  const nCnt = wf ? (wf.nodes || []).length : 0;
+  const nodes = wf ? (wf.nodes || []) : [];
   const eCnt = wf ? (wf.edges || []).length : 0;
   const zoomPct = Math.round((wfState.zoom || 1) * 100);
+  const gridLbl = wfState.gridMode === 'blueprint' ? '⊞ Grid' : (wfState.gridMode === 'clean' ? '◻ Clean' : '⋮ Dots');
+  const jumpOpts = nodes.map(n =>
+    `<option value="${wfEsc(n.id)}" ${wfState.selectedNodeId === n.id ? 'selected' : ''}>${wfEsc(wfNodeMeta(n.type).icon)} ${wfEsc(n.title || n.id)}</option>`
+  ).join('');
+
   hud.innerHTML = `
-    <span class="wf-hud-stat">${nCnt} Nodes • ${eCnt} Edges</span>
+    <span class="wf-hud-stat">${nodes.length}N • ${eCnt}E</span>
+    ${nodes.length ? `
+      <select class="wf-hud-node-jump" onchange="if(this.value) focusCanvasNodeById(this.value)" title="দ্রুত নোডে ফোকাস করুন">
+        <option value="">🎯 Jump...</option>
+        ${jumpOpts}
+      </select>
+    ` : ''}
+    <button type="button" class="wf-hud-btn active" onclick="openQuickPickerAtCenter()" title="ক্যানভাসে নতুন নোড যোগ করুন">➕ Node</button>
+    <button type="button" class="wf-hud-btn ${wfState.leftCollapsed ? '' : 'active'}" onclick="toggleStudioPane('left')" title="বাম প্যানেল লুকান/দেখান">◧</button>
+    <button type="button" class="wf-hud-btn ${wfState.rightCollapsed ? '' : 'active'}" onclick="toggleStudioPane('right')" title="ইন্সপেক্টর লুকান/দেখান">◨</button>
     <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(-0.1)" title="Zoom Out">-</button>
     <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(0)" title="100% Zoom">${zoomPct}%</button>
     <button type="button" class="wf-hud-btn" onclick="setCanvasZoom(0.1)" title="Zoom In">+</button>
     <button type="button" class="wf-hud-btn" onclick="fitCanvasToView()" title="Fit Workflow (F)">⛶ Fit</button>
     <button type="button" class="wf-hud-btn ${wfState.snapGrid ? 'active' : ''}" onclick="toggleGridSnap()" title="20px Grid Snap">${wfState.snapGrid ? '🧲 Snap' : 'Free'}</button>
+    <button type="button" class="wf-hud-btn" onclick="toggleCanvasGridMode()" title="গ্রিড স্টাইল পরিবর্তন">${gridLbl}</button>
     <button type="button" class="wf-hud-btn" onclick="autoLayoutWorkflow()" title="অটো-অ্যালাইন ও ফিট">📐</button>
+    <button type="button" class="wf-hud-btn" onclick="toggleNativeFullscreen()" title="মনিটর/ব্রাউজার নেটিভ ফুলস্ক্রিন (F11)">🖥️</button>
+    ${wfState.fullscreenCanvas
+      ? `
+        <button type="button" class="wf-hud-btn" onclick="saveActiveWorkflow()" title="সেভ করুন">💾</button>
+        <button type="button" class="wf-hud-btn active" onclick="runActiveWorkflowNow()" title="রান করুন">▶</button>
+        <button type="button" class="wf-hud-btn wf-hud-exit-fs" onclick="toggleFullscreenCanvas(false)" title="ফুলস্ক্রিন বন্ধ করুন (Esc)">✕ Exit FS</button>
+      `
+      : `<button type="button" class="wf-hud-btn active" onclick="toggleFullscreenCanvas(true)" title="ফুলস্ক্রিন ক্যানভাস (Shift+F)">⛶ Full</button>`
+    }
   `;
 }
 
@@ -2099,6 +2228,12 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
     e.preventDefault();
     if (wfState.selectedNodeId) duplicateNodeById(null, wfState.selectedNodeId);
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'f' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    toggleFullscreenCanvas();
     return;
   }
 
@@ -3878,6 +4013,19 @@ window.exportWfHistoryRunsJson = exportWfHistoryRunsJson;
 window.populateWfHistoryWorkflowFilter = populateWfHistoryWorkflowFilter;
 window.toggleInspectorWide = toggleInspectorWide;
 window.wfAutoResizeTextarea = wfAutoResizeTextarea;
+window.toggleNativeFullscreen = toggleNativeFullscreen;
+window.toggleFocusCanvasMode = toggleFocusCanvasMode;
+window.toggleCanvasGridMode = toggleCanvasGridMode;
+window.focusCanvasNodeById = focusCanvasNodeById;
+window.openQuickPickerAtCenter = openQuickPickerAtCenter;
+
+if (typeof document !== 'undefined' && !window.__wfFsSyncBound) {
+  window.__wfFsSyncBound = true;
+  document.addEventListener('fullscreenchange', () => {
+    wfState.nativeFullscreen = !!document.fullscreenElement;
+    renderCanvasHud();
+  });
+}
 
 if (typeof document !== 'undefined' && !window.__wfDynamicTextboxBound) {
   window.__wfDynamicTextboxBound = true;

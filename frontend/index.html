@@ -3128,6 +3128,10 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <button type="button" id="wf-tabbtn-history" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('history')">📜 এক্সিকিউশন হিস্ট্রি ও ট্রেস</button>
             <button type="button" id="wf-tabbtn-templates" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('templates')">📚 টেমপ্লেট লাইব্রেরি</button>
             <button type="button" id="wf-tabbtn-telegram" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('telegram')">✈️ টেলিগ্রাম কানেকশন ও লগ <span id="wf-tab-tg-dot" class="wf-tg-dot-mini disconnected"></span></button>
+            <div class="wf-subtabs-right">
+              <button type="button" id="btn-wf-subtab-focus" class="wf-tb-btn wf-btn-mini" onclick="switchWorkflowsSubTab('studio'); toggleFocusCanvasMode();" title="শুধু ক্যানভাস ফোকাস মোড (দুই পাশ লুকাবে)">🎯 Focus Canvas</button>
+              <button type="button" id="btn-wf-subtab-fs" class="wf-tb-btn wf-btn-fs-launch" onclick="switchWorkflowsSubTab('studio'); toggleFullscreenCanvas(true);" title="ভিজ্যুয়াল n8n স্টুডিও ফুল-স্ক্রিনে খুলুন (Shift+F)">⛶ Full Screen স্টুডিও</button>
+            </div>
           </div>
 
           <!-- SUBTAB 1: Visual Studio -->
@@ -3190,7 +3194,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 <div id="wf-quick-picker" class="wf-quick-picker" style="display:none;" onclick="event.stopPropagation()"></div>
               </div>
               <div class="wf-canvas-hint">
-                💡 ড্র্যাগ-ড্রপ নোড • ক্যানভাস ড্র্যাগ করে প্যান • Ctrl+Wheel জুম • F ফিট • Double-Click দ্রুত নোড • তারের `+`-এ মিড-ইনসার্ট • Ctrl+Z/Y Undo/Redo • Ctrl+D ডুপ্লিকেট • Ctrl+Enter রান
+                💡 ড্র্যাগ-ড্রপ নোড • ক্যানভাস প্যান • Ctrl+Wheel জুম • F ফিট • Shift+F ফুলস্ক্রিন • Double-Click দ্রুত নোড • তারের `+`-এ মিড-ইনসার্ট • Ctrl+Z/Y • Ctrl+D • Ctrl+Enter রান • Esc এক্সিট
               </div>
             </div>
 
