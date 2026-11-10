@@ -7,6 +7,8 @@
 
 let wfState = {
   workflows: [],
+  workflowsList: [],
+  variables: [],
   templates: [],
   nodeCatalog: [],
   tools: [],
@@ -16,6 +18,7 @@ let wfState = {
   activeWorkflow: null,
   activeRun: null,
   liveProgress: null,
+  isRunningUI: false,
   selectedNodeId: null,
   connectingFrom: null,
   draggingNodeId: null,
@@ -93,6 +96,10 @@ function wfNodeMeta(type) {
     save_report: { icon: '📄', label_bn: 'AI রিপোর্ট সেভ', label_en: 'Save Report', color: '#10b981', category: 'output' },
     memory_save: { icon: '💾', label_bn: 'মেমোরি সেভ', label_en: 'Save Memory', color: '#14b8a6', category: 'output' },
     notify_channel: { icon: '📣', label_bn: 'চ্যাট/চ্যানেল নোটিফাই', label_en: 'Notify Digest', color: '#ec4899', category: 'output' },
+    merge_combine: { icon: '🤝', label_bn: 'ব্রাঞ্চ মার্জ (Join)', label_en: 'Merge Branches', color: '#14b8a6', category: 'logic' },
+    switch_router: { icon: '🚦', label_bn: 'সুইচ রাউটার (৩+ শাখা)', label_en: 'Switch Router', color: '#f97316', category: 'logic' },
+    sub_workflow: { icon: '🔗', label_bn: 'সাব-ওয়ার্কফ্লো কল', label_en: 'Sub-Workflow', color: '#8b5cf6', category: 'action' },
+    knowledge_db_query: { icon: '🗄️', label_bn: 'SQLite ও নলেজ সার্চ', label_en: 'DB & RAG Query', color: '#0ea5e9', category: 'action' },
   };
   return fallback[type] || { icon: '⚙️', label_bn: type, label_en: type, color: '#64748b', category: 'action' };
 }
@@ -107,9 +114,10 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
   }
 
   try {
-    const [wfRes, tplRes] = await Promise.all([
+    const [wfRes, tplRes, varsRes] = await Promise.all([
       wfFetch('/api/workflows'),
-      wfState.nodeCatalog.length ? Promise.resolve(null) : wfFetch('/api/workflows/templates')
+      wfFetch('/api/workflows/templates'),
+      wfFetch('/api/workflows/vars/list')
     ]);
 
     const wfData = await wfRes.json();
@@ -120,17 +128,26 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
     wfState.workflows = wfData.workflows || [];
     wfState.recentRuns = wfData.recent_runs || [];
 
-    if (tplRes) {
+    if (tplRes && tplRes.ok) {
       const tplData = await tplRes.json();
       if (tplData && tplData.success) {
+        const hadPalette = wfState.nodeCatalog.length > 0;
         wfState.templates = tplData.templates || [];
         wfState.nodeCatalog = tplData.node_catalog || [];
         wfState.tools = tplData.tools || [];
+        wfState.workflowsList = tplData.workflows_list || [];
         wfState.subagents = tplData.subagents || [];
         wfState.models = tplData.models || [];
-        populateQuickModelSelect();
+        if (!hadPalette) populateQuickModelSelect();
         renderNodePalette();
         renderTemplatesLibrary();
+      }
+    }
+
+    if (varsRes && varsRes.ok) {
+      const vData = await varsRes.json();
+      if (vData && vData.success) {
+        wfState.variables = vData.variables || [];
       }
     }
 
@@ -810,11 +827,16 @@ function renderWorkflowToolbar() {
         <button type="button" class="wf-tb-btn wf-btn-mini" onclick="setCanvasZoom(0.1)" title="Zoom In">+</button>
       </div>
       <button type="button" class="wf-tb-btn" onclick="autoLayoutWorkflow()" title="অটো-লেআউট">📐</button>
+      <button type="button" class="wf-tb-btn" onclick="openWorkflowVersionsModal()" title="ভার্সন হিস্ট্রি ও রোলব্যাক">🕒</button>
       <button type="button" class="wf-tb-btn" onclick="duplicateActiveWorkflow()" title="ক্লোন ওয়ার্কফ্লো">📋</button>
       <button type="button" class="wf-tb-btn" onclick="exportActiveWorkflow()" title="Export JSON">⬇️</button>
       <button type="button" class="wf-tb-btn" onclick="copyWorkflowWebhookUrl()" title="Webhook URL কপি">🔗</button>
+      <button type="button" class="wf-tb-btn" onclick="openWorkflowPayloadModal()" title="কাস্টম JSON পেলোড বা Dry-Run">{ } Test</button>
       <button type="button" id="btn-wf-save" class="wf-tb-btn wf-btn-save ${wfState.dirty ? 'wf-save-dirty' : ''}" onclick="saveActiveWorkflow()">💾 Save</button>
-      <button type="button" id="btn-wf-run-now" class="wf-tb-btn wf-btn-run" onclick="runActiveWorkflowNow()">▶ Run Now</button>
+      ${wfState.isRunningUI
+        ? `<button type="button" id="btn-wf-stop-now" class="wf-tb-btn wf-btn-stop" onclick="stopActiveWorkflow()">🛑 Stop</button>`
+        : `<button type="button" id="btn-wf-run-now" class="wf-tb-btn wf-btn-run" onclick="runActiveWorkflowNow()">▶ Run Now</button>`
+      }
       <button type="button" class="wf-tb-btn wf-btn-del" onclick="deleteActiveWorkflow()" title="ডিলিট">🗑️</button>
     </div>
   `;
@@ -914,7 +936,7 @@ async function saveActiveWorkflow() {
   }
 }
 
-async function runActiveWorkflowNow() {
+async function runActiveWorkflowNow(customPayload = null, dryRun = false) {
   const wf = wfState.activeWorkflow;
   if (!wf) return;
 
@@ -922,13 +944,17 @@ async function runActiveWorkflowNow() {
     await saveActiveWorkflow();
   }
 
-  const btn = document.getElementById('btn-wf-run-now');
-  if (btn) { btn.disabled = true; btn.innerText = '⚡ Running...'; }
+  wfState.isRunningUI = true;
+  renderWorkflowToolbar();
 
-  wfState.liveProgress = { current_node_id: wf.nodes?.[0]?.id || null, node_results: [] };
+  wfState.liveProgress = {
+    current_node_id: wf.nodes?.[0]?.id || null,
+    active_node_ids: wf.nodes?.[0]?.id ? [wf.nodes[0].id] : [],
+    node_results: []
+  };
   renderWorkflowCanvas();
 
-  // Live step progress polling every 650ms so nodes animate step-by-step like n8n!
+  // Live step progress polling every 600ms showing concurrent wave animation
   const pollTimer = setInterval(async () => {
     try {
       const pRes = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/live-status`);
@@ -939,7 +965,7 @@ async function runActiveWorkflowNow() {
           wfState.activeRun = {
             id: pData.progress.run_id,
             status: pData.progress.status,
-            trigger_source: 'manual',
+            trigger_source: dryRun ? 'manual[DRY]' : 'manual',
             duration_ms: 0,
             node_results: pData.progress.node_results || []
           };
@@ -948,24 +974,28 @@ async function runActiveWorkflowNow() {
         }
       }
     } catch (_) {}
-  }, 650);
+  }, 600);
 
   try {
+    const payloadObj = customPayload && typeof customPayload === 'object' ? customPayload : { triggered_by: 'studio_ui' };
     const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/run`, {
       method: 'POST',
-      body: JSON.stringify({ payload: { triggered_by: 'studio_ui' } })
+      body: JSON.stringify({ payload: payloadObj, dry_run: !!dryRun })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Execution error');
 
     clearInterval(pollTimer);
     wfState.liveProgress = null;
+    wfState.isRunningUI = false;
     wfState.activeRun = data;
 
     if (data.status === 'SUCCESS') {
-      wfToast(`✅ ওয়ার্কফ্লো সফল (${data.duration_ms} ms)!`, 'success');
+      wfToast(`${dryRun ? '🧪 Dry-Run' : '✅ ওয়ার্কফ্লো'} সফল (${data.duration_ms} ms)!`, 'success');
     } else if (data.status === 'PARTIAL') {
       wfToast(`⚠️ আংশিক সফল (${data.duration_ms} ms) — Run Trace দেখুন।`, 'warning');
+    } else if (data.status === 'CANCELLED') {
+      wfToast('🛑 ওয়ার্কফ্লো রান ব্যবহারকারী কর্তৃক থামানো হয়েছে।', 'warning');
     } else {
       wfToast(`❌ রান ব্যর্থ: ${data.error_message || data.status}`, 'error');
     }
@@ -978,10 +1008,24 @@ async function runActiveWorkflowNow() {
   } catch (err) {
     wfToast('রান ব্যর্থ: ' + err.message, 'error');
     wfState.liveProgress = null;
+    wfState.isRunningUI = false;
     renderWorkflowCanvas();
   } finally {
     clearInterval(pollTimer);
-    if (btn) { btn.disabled = false; btn.innerText = '▶ Run Now'; }
+    wfState.isRunningUI = false;
+    renderWorkflowToolbar();
+  }
+}
+
+async function stopActiveWorkflow() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/stop`, { method: 'POST' });
+    const data = await res.json();
+    wfToast(data.stopped ? '🛑 ওয়ার্কফ্লো থামানোর সিগন্যাল পাঠানো হয়েছে...' : 'ওয়ার্কফ্লো এখন চলছে না।', 'warning');
+  } catch (err) {
+    wfToast('Stop ত্রুটি: ' + err.message, 'error');
   }
 }
 
@@ -1049,6 +1093,14 @@ function getNodeSummaryLine(node) {
       return `Project: ${c.project_name || 'myagent'} / ${c.key || 'note'}`;
     case 'notify_channel':
       return `To: ${c.target || 'chat_and_channels'}`;
+    case 'merge_combine':
+      return `Join all branches (${c.mode || 'markdown'})`;
+    case 'switch_router':
+      return `R1: ${c.route1_val || '-'} | R2: ${c.route2_val || '-'}`;
+    case 'sub_workflow':
+      return `Call WF: ${c.target_workflow_id || '(select)'}`;
+    case 'knowledge_db_query':
+      return c.query_mode === 'rag' ? `RAG: ${c.rag_query || ''}` : `SQL (${c.db_name || 'ops.db'}): ${(c.sql_query || '').slice(0, 32)}`;
     default:
       return node.type;
   }
@@ -1085,25 +1137,35 @@ function renderWorkflowCanvas() {
   if (sourceRun && Array.isArray(sourceRun.node_results)) {
     sourceRun.node_results.forEach(r => { if (r && r.node_id) runMap[r.node_id] = r; });
   }
-  const currentLiveNodeId = wfState.liveProgress ? wfState.liveProgress.current_node_id : null;
+  const activeWaveSet = new Set(
+    (wfState.liveProgress && Array.isArray(wfState.liveProgress.active_node_ids) && wfState.liveProgress.active_node_ids.length)
+      ? wfState.liveProgress.active_node_ids
+      : (wfState.liveProgress && wfState.liveProgress.current_node_id ? [wfState.liveProgress.current_node_id] : [])
+  );
 
   nodesLayer.innerHTML = nodes.map(node => {
     const meta = wfNodeMeta(node.type);
     const isSelected = wfState.selectedNodeId === node.id;
     const isCond = node.type === 'condition';
+    const isSwitch = node.type === 'switch_router';
     const isTrig = (node.type || '').startsWith('trigger_');
     const isDisabled = !!(node.disabled || node.config?.disabled);
+    const isPinned = !!(node.config?.use_pinned && node.config?.pinned_output);
+    const isLiveRunning = activeWaveSet.has(node.id);
     const nr = runMap[node.id];
 
     let runStatusCls = nr ? `wf-status-${(nr.status || '').toLowerCase()}` : '';
-    if (currentLiveNodeId === node.id) runStatusCls = 'wf-status-running';
+    if (isLiveRunning) runStatusCls = 'wf-status-running';
     if (isDisabled) runStatusCls += ' wf-node-disabled';
+    if (isPinned) runStatusCls += ' wf-node-pinned';
 
-    const statusBadge = currentLiveNodeId === node.id
+    const statusBadge = isLiveRunning
       ? `<span class="wf-node-run-badge running">RUNNING...</span>`
-      : nr
-        ? `<span class="wf-node-run-badge ${(nr.status || '').toLowerCase()}">${wfEsc(nr.status)} ${nr.duration_ms || 0}ms</span>`
-        : `<span class="wf-node-id-badge wf-var-copy" onclick="copyNodeVarRef(event, '${wfEsc(node.id)}')" title="ক্লিক করে {{nodes.${wfEsc(node.id)}.output}} কপি করুন">${wfEsc(node.id)} 📋</span>`;
+      : isPinned
+        ? `<span class="wf-node-run-badge pinned">📌 PINNED</span>`
+        : nr
+          ? `<span class="wf-node-run-badge ${(nr.status || '').toLowerCase()}">${wfEsc(nr.status)} ${nr.duration_ms || 0}ms</span>`
+          : `<span class="wf-node-id-badge wf-var-copy" onclick="copyNodeVarRef(event, '${wfEsc(node.id)}')" title="ক্লিক করে {{nodes.${wfEsc(node.id)}.output}} কপি করুন">${wfEsc(node.id)} 📋</span>`;
 
     const portsOutHtml = isCond
       ? `
@@ -1112,10 +1174,19 @@ function renderWorkflowCanvas() {
         <div class="wf-port-out wf-port-false" data-node="${wfEsc(node.id)}" data-cond="false"
              onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'false')" title="FALSE শাখা কানেক্ট করুন">F</div>
       `
-      : `
-        <div class="wf-port-out" data-node="${wfEsc(node.id)}" data-cond=""
-             onclick="onOutputPortClick(event, '${wfEsc(node.id)}', '')" title="পরবর্তী নোডের ইনপুট পোর্টে সংযুক্ত করুন"></div>
-      `;
+      : isSwitch
+        ? `
+          <div class="wf-port-out wf-port-r1" data-node="${wfEsc(node.id)}" data-cond="route_1"
+               onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'route_1')" title="Route 1 কানেক্ট করুন">R1</div>
+          <div class="wf-port-out wf-port-r2" data-node="${wfEsc(node.id)}" data-cond="route_2"
+               onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'route_2')" title="Route 2 কানেক্ট করুন">R2</div>
+          <div class="wf-port-out wf-port-def" data-node="${wfEsc(node.id)}" data-cond="default"
+               onclick="onOutputPortClick(event, '${wfEsc(node.id)}', 'default')" title="Default শাখা কানেক্ট করুন">D</div>
+        `
+        : `
+          <div class="wf-port-out" data-node="${wfEsc(node.id)}" data-cond=""
+               onclick="onOutputPortClick(event, '${wfEsc(node.id)}', '')" title="পরবর্তী নোডের ইনপুট পোর্টে সংযুক্ত করুন"></div>
+        `;
 
     const portInHtml = isTrig
       ? ''
@@ -1179,6 +1250,9 @@ function drawWorkflowEdges() {
       <marker id="wf-arrow-false" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
         <path d="M0,1 L7,4 L0,7 Z" fill="#f59e0b"></path>
       </marker>
+      <marker id="wf-arrow-r2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,1 L7,4 L0,7 Z" fill="#a855f7"></path>
+      </marker>
     </defs>
   `;
 
@@ -1197,6 +1271,8 @@ function drawWorkflowEdges() {
     let sy = Number(srcNode.y || 0) + h / 2;
     if (srcNode.type === 'condition') {
       sy = Number(srcNode.y || 0) + (cond === 'false' ? h * 0.72 : h * 0.32);
+    } else if (srcNode.type === 'switch_router') {
+      sy = Number(srcNode.y || 0) + (cond === 'route_1' ? h * 0.24 : cond === 'route_2' ? h * 0.52 : h * 0.80);
     }
     const sx = Number(srcNode.x || 0) + w;
     const tx = Number(tgtNode.x || 0);
@@ -1205,12 +1281,24 @@ function drawWorkflowEdges() {
     const dx = Math.max(55, Math.abs(tx - sx) * 0.48);
     const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
 
-    const color = cond === 'true' ? '#10b981' : cond === 'false' ? '#f59e0b' : '#38bdf8';
-    const marker = cond === 'true' ? 'url(#wf-arrow-true)' : cond === 'false' ? 'url(#wf-arrow-false)' : 'url(#wf-arrow-cyan)';
+    const color = (cond === 'true' || cond === 'route_1')
+      ? '#10b981'
+      : cond === 'route_2'
+        ? '#a855f7'
+        : (cond === 'false' || cond === 'default')
+          ? '#f59e0b'
+          : '#38bdf8';
+    const marker = (cond === 'true' || cond === 'route_1')
+      ? 'url(#wf-arrow-true)'
+      : cond === 'route_2'
+        ? 'url(#wf-arrow-r2)'
+        : (cond === 'false' || cond === 'default')
+          ? 'url(#wf-arrow-false)'
+          : 'url(#wf-arrow-cyan)';
 
     const mx = (sx + tx) / 2;
     const my = (sy + ty) / 2;
-    const badgeLabel = cond ? cond.toUpperCase() : '✕';
+    const badgeLabel = cond ? cond.replace('route_', 'R').toUpperCase() : '✕';
 
     return `
       <g class="wf-edge-group" onclick="removeEdgeById('${wfEsc(edge.id)}')" title="সংযোগ মুছে ফেলতে ক্লিক করুন">
@@ -1433,10 +1521,11 @@ function renderNodeInspector() {
   const meta = wfNodeMeta(node.type);
   const c = node.config || {};
   const isTrig = (node.type || '').startsWith('trigger_');
+  const varsListChips = (wfState.variables || []).map(v => `{{vars.${v.key}}}`);
   const varsHtml = `
     <div class="wf-var-chips">
       <span style="font-size:0.7rem; color:var(--text-muted);">ভেরিয়েবল:</span>
-      ${['{{prev.output}}', '{{prev.output|500}}', '{{trigger.date}}', '{{trigger.time}}', '{{trigger.payload}}']
+      ${['{{prev.output}}', '{{prev.output|500}}', '{{trigger.date}}', '{{trigger.payload}}', ...varsListChips]
         .map(v => `<button type="button" class="wf-var-chip" onclick="insertTemplateVar('${wfEsc(v)}')">${wfEsc(v)}</button>`).join('')}
     </div>
   `;
@@ -1701,6 +1790,96 @@ function renderNodeInspector() {
         <input type="text" class="text-input" value="${wfEsc(c.custom_webhook_url || '')}" placeholder="https://..." onchange="updateNodeCfg('custom_webhook_url', this.value)">
       </div>
     `;
+  } else if (node.type === 'merge_combine') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>ব্রাঞ্চ মার্জ ফরম্যাট (Merge Format)</label>
+        <select class="text-input" onchange="updateNodeCfg('mode', this.value)">
+          <option value="markdown_sections" ${(c.mode || 'markdown_sections') === 'markdown_sections' ? 'selected' : ''}>📝 Markdown Sections (সকল ব্রাঞ্চের সমন্বিত রিপোর্ট)</option>
+          <option value="json_array" ${c.mode === 'json_array' ? 'selected' : ''}>🧩 JSON Array</option>
+        </select>
+      </div>
+      <label style="font-size:0.78rem;"><input type="checkbox" ${c.include_empty ? 'checked' : ''} onchange="updateNodeCfg('include_empty', this.checked)"> খালি আউটপুটও অন্তর্ভুক্ত করুন</label>
+    `;
+  } else if (node.type === 'switch_router') {
+    const opsList = [['regex', 'Regex'], ['contains', 'Contains'], ['not_contains', 'Not Contains'], ['equals', 'Equals'], ['greater_than', 'Number >']];
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>টার্গেট ডেটা</label>
+        <input type="text" class="text-input" value="${wfEsc(c.target || '{{prev.output}}')}" onchange="updateNodeCfg('target', this.value)">
+      </div>
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>Route 1 অপারেটর (R1)</label>
+          <select class="text-input" onchange="updateNodeCfg('route1_op', this.value)">
+            ${opsList.map(([k, l]) => `<option value="${k}" ${(c.route1_op || 'regex') === k ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="wf-field-group">
+          <label>Route 1 ম্যাচ ভ্যালু</label>
+          <input type="text" class="text-input" value="${wfEsc(c.route1_val || '')}" onchange="updateNodeCfg('route1_val', this.value)">
+        </div>
+      </div>
+      <div class="wf-field-row">
+        <div class="wf-field-group">
+          <label>Route 2 অপারেটর (R2)</label>
+          <select class="text-input" onchange="updateNodeCfg('route2_op', this.value)">
+            ${opsList.map(([k, l]) => `<option value="${k}" ${(c.route2_op || 'regex') === k ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="wf-field-group">
+          <label>Route 2 ম্যাচ ভ্যালু</label>
+          <input type="text" class="text-input" value="${wfEsc(c.route2_val || '')}" onchange="updateNodeCfg('route2_val', this.value)">
+        </div>
+      </div>
+    `;
+  } else if (node.type === 'sub_workflow') {
+    const otherWfs = (wfState.workflowsList || wfState.workflows || []).filter(w => w.id !== wf.id);
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>টার্গেট সাব-ওয়ার্কফ্লো নির্বাচন</label>
+        <select class="text-input" onchange="updateNodeCfg('target_workflow_id', this.value)">
+          <option value="">-- Select Target Workflow --</option>
+          ${otherWfs.map(w => `<option value="${wfEsc(w.id)}" ${c.target_workflow_id === w.id ? 'selected' : ''}>${wfEsc(w.icon || '⚡')} ${wfEsc(w.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="wf-field-group">
+        <label>ইনপুট JSON পেলোড (<code>{{trigger.payload}}</code>)</label>
+        <textarea class="text-input wf-code-textarea" rows="3" onchange="updateNodeCfg('payload_json', this.value)">${wfEsc(typeof c.payload_json === 'string' ? c.payload_json : JSON.stringify(c.payload_json || {}, null, 2))}</textarea>
+      </div>
+    `;
+  } else if (node.type === 'knowledge_db_query') {
+    const dbs = ['ops.db', 'chat_history.db', 'reports.db', 'project_memory.db', 'security_audit.db'];
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>কোয়েরি মোড</label>
+        <select class="text-input" onchange="updateNodeCfg('query_mode', this.value); renderNodeInspector();">
+          <option value="sqlite" ${(c.query_mode || 'sqlite') === 'sqlite' ? 'selected' : ''}>🗄️ SQLite Read-Only Query</option>
+          <option value="rag" ${c.query_mode === 'rag' ? 'selected' : ''}>🧠 Hybrid Vector RAG Search</option>
+        </select>
+      </div>
+      ${(c.query_mode || 'sqlite') === 'rag' ? `
+        <div class="wf-field-group">
+          <label>RAG সার্চ কুয়েরি</label>
+          <input type="text" class="text-input" value="${wfEsc(c.rag_query || '')}" onchange="updateNodeCfg('rag_query', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>Top K ফলাফল</label>
+          <input type="number" min="1" max="12" class="text-input" value="${Number(c.top_k || 5)}" onchange="updateNodeCfg('top_k', parseInt(this.value || 5, 10))">
+        </div>
+      ` : `
+        <div class="wf-field-group">
+          <label>ডাটাবেস ফাইল</label>
+          <select class="text-input" onchange="updateNodeCfg('db_name', this.value)">
+            ${dbs.map(d => `<option value="${d}" ${(c.db_name || 'ops.db') === d ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="wf-field-group">
+          <label>Read-Only SQL (SELECT / PRAGMA)</label>
+          <textarea class="text-input wf-code-textarea" rows="3" onchange="updateNodeCfg('sql_query', this.value)">${wfEsc(c.sql_query || 'SELECT name, last_status, run_count FROM ops_workflows LIMIT 10;')}</textarea>
+        </div>
+      `}
+    `;
   }
 
   const otherNodes = (wf.nodes || []).filter(n => n.id !== node.id);
@@ -1729,8 +1908,15 @@ function renderNodeInspector() {
           <div style="display:flex; flex-direction:column; gap:4px; padding-top:14px; font-size:0.75rem;">
             <label><input type="checkbox" ${c.continue_on_fail ? 'checked' : ''} onchange="updateNodeCfg('continue_on_fail', this.checked)"> Continue on Fail</label>
             <label><input type="checkbox" ${(node.disabled || c.disabled) ? 'checked' : ''} onchange="toggleNodeDisabled(null, '${wfEsc(node.id)}')"> Mute / Bypass</label>
+            <label><input type="checkbox" ${c.use_pinned ? 'checked' : ''} onchange="updateNodeCfg('use_pinned', this.checked)"> 📌 Use Pinned Data</label>
           </div>
         </div>
+        ${c.use_pinned ? `
+          <div class="wf-field-group" style="margin-top:6px;">
+            <label>📌 Pinned Sample / Mock Output</label>
+            <textarea class="text-input wf-code-textarea" rows="3" onchange="updateNodeCfg('pinned_output', this.value)">${wfEsc(c.pinned_output || '')}</textarea>
+          </div>
+        ` : ''}
       </div>
     ` : ''}
 
@@ -1744,6 +1930,11 @@ function renderNodeInspector() {
           <select id="wf-quick-connect-cond" class="text-input" style="width:92px; padding:5px 6px;">
             <option value="true">TRUE ✓</option>
             <option value="false">FALSE ✕</option>
+          </select>` : node.type === 'switch_router' ? `
+          <select id="wf-quick-connect-cond" class="text-input" style="width:96px; padding:5px 6px;">
+            <option value="route_1">Route 1</option>
+            <option value="route_2">Route 2</option>
+            <option value="default">Default</option>
           </select>` : ''}
         <button type="button" class="btn-sm-action-cyber" onclick="connectFromInspector()">+ যুক্ত করুন</button>
       </div>
@@ -1883,7 +2074,10 @@ function renderRunOutputPanel() {
         <div class="wf-trace-step ${(st.status || '').toLowerCase()}">
           <div class="wf-trace-top">
             <span class="wf-trace-title">${idx + 1}. ${wfEsc(wfNodeMeta(st.type).icon)} ${wfEsc(st.title || st.node_id)}</span>
-            <span class="wf-status-pill ${(st.status || '').toLowerCase()}">${wfEsc(st.status)} (${st.duration_ms || 0}ms)</span>
+            <div style="display:flex; align-items:center; gap:5px;">
+              ${st.status === 'SUCCESS' ? `<button type="button" class="mini-btn-copy" onclick="pinNodeOutputFromRun('${wfEsc(st.node_id)}')" title="এই আউটপুট পিন করে রাখুন যাতে পরের ধাপ দ্রুত টেস্ট করা যায়">📌 Pin</button>` : ''}
+              <span class="wf-status-pill ${(st.status || '').toLowerCase()}">${wfEsc(st.status)} (${st.duration_ms || 0}ms)</span>
+            </div>
           </div>
           ${st.summary ? `<div class="wf-trace-sub">${wfEsc(st.summary)}</div>` : ''}
           <pre class="wf-trace-pre">${wfEsc((st.output || '').slice(0, 1800))}</pre>
@@ -1981,6 +2175,176 @@ async function installWorkflowTemplate(templateId) {
   }
 }
 
+// ------------------------------------------------------------------------------
+// Pin Output, Global Encrypted Secrets Vault, Versioning & Custom Payload Runner
+// ------------------------------------------------------------------------------
+function pinNodeOutputFromRun(nodeId) {
+  const wf = wfState.activeWorkflow;
+  const run = wfState.activeRun;
+  if (!wf || !run) return;
+  const step = (run.node_results || []).find(s => s.node_id === nodeId);
+  const node = (wf.nodes || []).find(n => n.id === nodeId);
+  if (!step || !node) return;
+
+  node.config = node.config || {};
+  node.config.use_pinned = true;
+  node.config.pinned_output = step.output || '';
+  markWfDirty();
+  wfState.selectedNodeId = nodeId;
+  renderWorkflowCanvas();
+  renderNodeInspector();
+  wfToast(`📌 নোড '${node.title}'-এর আউটপুট পিন করা হয়েছে! (Save বাটনে ক্লিক করুন)`, 'success');
+}
+
+async function openWorkflowVarsModal() {
+  const modal = document.getElementById('wf-vars-modal');
+  if (modal) modal.style.display = 'flex';
+  await refreshWorkflowVarsList();
+}
+
+function closeWorkflowVarsModal() {
+  const modal = document.getElementById('wf-vars-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function refreshWorkflowVarsList() {
+  const listEl = document.getElementById('wf-vars-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="wf-empty-hint">লোড হচ্ছে...</div>';
+  try {
+    const res = await wfFetch('/api/workflows/vars/list');
+    const data = await res.json();
+    const vars = data.variables || [];
+    wfState.variables = vars;
+    if (!vars.length) {
+      listEl.innerHTML = '<div class="wf-empty-hint">এখনও কোনো ভেরিয়েবল/সিক্রেট সংরক্ষিত নেই।</div>';
+      return;
+    }
+    listEl.innerHTML = vars.map(v => `
+      <div class="wf-modal-list-row">
+        <div>
+          <code style="color:#34d399; font-weight:700;">{{vars.${wfEsc(v.key)}}}</code>
+          <span style="margin-left:8px; font-family:'Fira Code', monospace; font-size:0.76rem; color:var(--text-secondary);">${wfEsc(v.value_preview)}</span>
+          ${v.description ? `<div style="font-size:0.72rem; color:var(--text-muted);">${wfEsc(v.description)}</div>` : ''}
+        </div>
+        <button type="button" class="wf-node-del-btn" onclick="deleteWorkflowVar('${wfEsc(v.key)}')" title="মুছুন">🗑️</button>
+      </div>
+    `).join('');
+    if (wfState.selectedNodeId) renderNodeInspector();
+  } catch (err) {
+    listEl.innerHTML = `<div style="color:#f43f5e;">${wfEsc(err.message)}</div>`;
+  }
+}
+
+async function submitWorkflowVar(event) {
+  if (event) event.preventDefault();
+  const key = document.getElementById('wf-var-key')?.value?.trim();
+  const value = document.getElementById('wf-var-val')?.value || '';
+  const is_secret = !!document.getElementById('wf-var-secret')?.checked;
+  const description = document.getElementById('wf-var-desc')?.value?.trim() || '';
+  if (!key) return;
+  try {
+    const res = await wfFetch('/api/workflows/vars/save', {
+      method: 'POST',
+      body: JSON.stringify({ key, value, is_secret, description })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Save failed');
+    document.getElementById('wf-var-key').value = '';
+    document.getElementById('wf-var-val').value = '';
+    document.getElementById('wf-var-desc').value = '';
+    wfToast(`🔐 ভেরিয়েবল {{vars.${data.variable.key}}} সংরক্ষিত হয়েছে!`, 'success');
+    await refreshWorkflowVarsList();
+  } catch (err) {
+    wfToast('সংরক্ষণ ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+async function deleteWorkflowVar(key) {
+  try {
+    const res = await wfFetch(`/api/workflows/vars/${encodeURIComponent(key)}`, { method: 'DELETE' });
+    if (res.ok) {
+      wfToast(`ভেরিয়েবল '${key}' মুছে ফেলা হয়েছে।`, 'info');
+      await refreshWorkflowVarsList();
+    }
+  } catch (err) {
+    wfToast('ডিলিট ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+async function openWorkflowVersionsModal() {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  const modal = document.getElementById('wf-versions-modal');
+  const listEl = document.getElementById('wf-versions-list');
+  if (modal) modal.style.display = 'flex';
+  if (listEl) listEl.innerHTML = '<div class="wf-empty-hint">ভার্সন হিস্ট্রি লোড হচ্ছে...</div>';
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/versions`);
+    const data = await res.json();
+    const vers = data.versions || [];
+    if (!vers.length) {
+      listEl.innerHTML = '<div class="wf-empty-hint">এখনও কোনো পূর্ববর্তী ভার্সন নেই (প্রতিবার Save করলে স্বয়ংক্রিয়ভাবে স্ন্যাপশট তৈরি হয়)।</div>';
+      return;
+    }
+    listEl.innerHTML = vers.map(v => `
+      <div class="wf-modal-list-row">
+        <div>
+          <div style="font-weight:700; font-size:0.84rem; color:var(--text-primary);">v${v.version_num} — ${wfEsc(v.name)}</div>
+          <div style="font-size:0.73rem; color:var(--text-muted);">🕒 ${wfEsc(v.saved_at)} • ${v.nodes_count} nodes • ${v.edges_count} edges</div>
+        </div>
+        <button type="button" class="btn-sm-action-cyber" onclick="restoreWorkflowVersion('${wfEsc(v.id)}')">↩️ Restore</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    if (listEl) listEl.innerHTML = `<div style="color:#f43f5e;">${wfEsc(err.message)}</div>`;
+  }
+}
+
+function closeWorkflowVersionsModal() {
+  const modal = document.getElementById('wf-versions-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function restoreWorkflowVersion(versionId) {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  try {
+    const res = await wfFetch(`/api/workflows/${encodeURIComponent(wf.id)}/versions/${encodeURIComponent(versionId)}/restore`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || 'Restore failed');
+    closeWorkflowVersionsModal();
+    wfToast('✅ নির্বাচিত পূর্ববর্তী ভার্সন রিস্টোর করা হয়েছে!', 'success');
+    await loadWorkflowsStudio(wf.id);
+  } catch (err) {
+    wfToast('রিস্টোর ব্যর্থ: ' + err.message, 'error');
+  }
+}
+
+function openWorkflowPayloadModal() {
+  if (!wfState.activeWorkflow) return;
+  const modal = document.getElementById('wf-payload-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeWorkflowPayloadModal() {
+  const modal = document.getElementById('wf-payload-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function executeWorkflowWithCustomPayload(dryRun = false) {
+  const raw = document.getElementById('wf-payload-json-input')?.value || '{}';
+  let parsed = {};
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    wfToast('JSON ফরম্যাট সঠিক নয়: ' + e.message, 'error');
+    return;
+  }
+  closeWorkflowPayloadModal();
+  await runActiveWorkflowNow(parsed, dryRun);
+}
+
 // Global exports
 window.loadWorkflowsStudio = loadWorkflowsStudio;
 window.switchWorkflowsSubTab = switchWorkflowsSubTab;
@@ -2005,6 +2369,7 @@ window.autoLayoutWorkflow = autoLayoutWorkflow;
 window.updateActiveWorkflowMeta = updateActiveWorkflowMeta;
 window.saveActiveWorkflow = saveActiveWorkflow;
 window.runActiveWorkflowNow = runActiveWorkflowNow;
+window.stopActiveWorkflow = stopActiveWorkflow;
 window.deleteActiveWorkflow = deleteActiveWorkflow;
 window.copyWorkflowWebhookUrl = copyWorkflowWebhookUrl;
 window.onNodeMouseDown = onNodeMouseDown;
@@ -2019,6 +2384,17 @@ window.updateNodeCfg = updateNodeCfg;
 window.insertTemplateVar = insertTemplateVar;
 window.connectFromInspector = connectFromInspector;
 window.testSelectedNode = testSelectedNode;
+window.pinNodeOutputFromRun = pinNodeOutputFromRun;
+window.openWorkflowVarsModal = openWorkflowVarsModal;
+window.closeWorkflowVarsModal = closeWorkflowVarsModal;
+window.submitWorkflowVar = submitWorkflowVar;
+window.deleteWorkflowVar = deleteWorkflowVar;
+window.openWorkflowVersionsModal = openWorkflowVersionsModal;
+window.closeWorkflowVersionsModal = closeWorkflowVersionsModal;
+window.restoreWorkflowVersion = restoreWorkflowVersion;
+window.openWorkflowPayloadModal = openWorkflowPayloadModal;
+window.closeWorkflowPayloadModal = closeWorkflowPayloadModal;
+window.executeWorkflowWithCustomPayload = executeWorkflowWithCustomPayload;
 window.refreshRecentWorkflowRuns = refreshRecentWorkflowRuns;
 window.inspectHistoricalRun = inspectHistoricalRun;
 window.installWorkflowTemplate = installWorkflowTemplate;

@@ -2977,9 +2977,10 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
               <p data-i18n="wf_studio_desc">প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট</p>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn-secondary" onclick="switchTab('workflow-docs')" title="দৈনিক অটো টাস্ক তৈরির গাইড ও ডকুমেন্টেশন">📖 ডকুমেন্টেশন ও গাইড</button>
-              <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক ডেইলি বিল্ডার</button>
-              <button type="button" class="btn-secondary" onclick="document.getElementById('wf-import-file').click()" title="Export করা JSON ওয়ার্কফ্লো ইমপোর্ট করুন">⬆️ ইমপোর্ট JSON</button>
+              <button type="button" class="btn-secondary" onclick="switchTab('workflow-docs')" title="দৈনিক অটো টাস্ক তৈরির গাইড ও ডকুমেন্টেশন">📖 ডকুমেন্টেশন</button>
+              <button type="button" class="btn-secondary" onclick="openWorkflowVarsModal()" title="AES-256 এনক্রিপ্টেড গ্লোবাল ভেরিয়েবল ও সিক্রেটস ভল্ট">🔐 Vars Vault</button>
+              <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক বিল্ডার</button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('wf-import-file').click()" title="Export করা JSON ওয়ার্কফ্লো ইমপোর্ট করুন">⬆️ ইমপোর্ট</button>
               <input type="file" id="wf-import-file" accept=".json" style="display:none;" onchange="importWorkflowFromFile(event)">
               <button type="button" class="btn-secondary" onclick="loadWorkflowsStudio()">🔄 রিফ্রেশ</button>
               <button type="button" class="btn-primary" onclick="createBlankWorkflow()">➕ নতুন ওয়ার্কফ্লো</button>
@@ -4183,6 +4184,82 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <button type="submit" class="btn-primary" data-i18n="btn_create">তৈরি করুন</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Workflow Modal 1: Encrypted Global Variables & Secrets Vault -->
+    <div class="modal-overlay" id="wf-vars-modal" style="display:none;">
+      <div class="modal-card" style="max-width:650px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">🔐</span>
+            <h3 style="margin:0; font-size:1.05rem; color:var(--text-primary);">গ্লোবাল ওয়ার্কফ্লো ভেরিয়েবল ও সিক্রেটস ভল্ট ({{vars.*}})</h3>
+          </div>
+          <button type="button" class="modal-close" onclick="closeWorkflowVarsModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:14px;">
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin:0;">
+            API Token, Webhook URL বা পরিবেশ ভেরিয়েবল AES-256 এনক্রিপ্ট করে সংরক্ষণ করুন। যেকোনো নোডে <code>{{vars.KEY_NAME}}</code> লিখলেই মান ইনজেক্ট হবে এবং রান লগে <code>***REDACTED***</code> থাকবে।
+          </p>
+          <form onsubmit="submitWorkflowVar(event)" style="display:grid; grid-template-columns: 1fr 1.2fr auto; gap:8px; align-items:end;">
+            <div class="wf-field-group">
+              <label>Variable Key (e.g. API_KEY)</label>
+              <input type="text" id="wf-var-key" class="text-input" placeholder="SLACK_WEBHOOK" required>
+            </div>
+            <div class="wf-field-group">
+              <label>Value / Secret</label>
+              <input type="text" id="wf-var-val" class="text-input" placeholder="https://hooks..." required>
+            </div>
+            <button type="submit" class="btn-primary" style="height:36px;">+ সংরক্ষণ</button>
+            <div style="grid-column:1 / -1; display:flex; gap:14px; align-items:center;">
+              <label style="font-size:0.78rem; color:var(--text-secondary); cursor:pointer;">
+                <input type="checkbox" id="wf-var-secret" checked> 🔒 সিক্রেট হিসেবে মাস্ক ও লগ-রিড্যাক্ট করুন
+              </label>
+              <input type="text" id="wf-var-desc" class="text-input" placeholder="সংক্ষিপ্ত বিবরণ (ঐচ্ছিক)" style="flex:1; padding:5px 8px; font-size:0.78rem;">
+            </div>
+          </form>
+          <div id="wf-vars-list" style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:7px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Modal 2: Version History & Rollback -->
+    <div class="modal-overlay" id="wf-versions-modal" style="display:none;">
+      <div class="modal-card" style="max-width:600px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">🕒</span>
+            <h3 style="margin:0; font-size:1.05rem; color:var(--text-primary);">ওয়ার্কফ্লো ভার্সন হিস্ট্রি ও রোলব্যাক</h3>
+          </div>
+          <button type="button" class="modal-close" onclick="closeWorkflowVersionsModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+          <p style="font-size:0.8rem; color:var(--text-secondary); margin:0;">
+            প্রতিবার Save করার সময় পূর্বের সংস্করণ স্বয়ংক্রিয়ভাবে সংরক্ষিত হয়। যেকোনো পুরানো ভার্সন ১-ক্লিকে রিস্টোর করুন।
+          </p>
+          <div id="wf-versions-list" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Modal 3: Run With Custom Trigger Payload & Dry-Run -->
+    <div class="modal-overlay" id="wf-payload-modal" style="display:none;">
+      <div class="modal-card" style="max-width:540px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">🚀</span>
+            <h3 style="margin:0; font-size:1.05rem; color:var(--text-primary);">কাস্টম JSON পেলোড দিয়ে রান / Dry-Run</h3>
+          </div>
+          <button type="button" class="modal-close" onclick="closeWorkflowPayloadModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:18px; display:flex; flex-direction:column; gap:12px;">
+          <label style="font-size:0.78rem; color:var(--text-secondary); font-weight:600;">Trigger JSON Payload (<code>{{trigger.payload.*}}</code>)</label>
+          <textarea id="wf-payload-json-input" class="text-input wf-code-textarea" rows="5">{"server": "192.168.9.9", "mode": "audit", "note": "Manual test run"}</textarea>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="btn-secondary" onclick="executeWorkflowWithCustomPayload(true)">🧪 Dry-Run (সেফ টেস্ট)</button>
+            <button type="button" class="btn-primary" onclick="executeWorkflowWithCustomPayload(false)">▶ Run Live</button>
+          </div>
+        </div>
       </div>
     </div>
 

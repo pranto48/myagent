@@ -70,11 +70,13 @@ async def get_workflow_catalog_and_templates(user=Depends(get_optional_current_u
     for m in FEATURED_OPENROUTER_MODELS[:5]:
         models.append({"id": m["id"], "label": f"[OpenRouter] {m['name']}"})
 
+    all_wfs = await WorkflowStore.list_workflows()
     return {
         "success": True,
         "templates": WORKFLOW_TEMPLATES,
         "node_catalog": NODE_CATALOG,
         "tools": tool_names,
+        "workflows_list": [{"id": w["id"], "name": w["name"], "icon": w.get("icon", "⚡")} for w in all_wfs],
         "subagents": [
             {"id": "swarm", "name": "🐝 Full Multi-Agent Swarm Orchestrator", "icon": "🐝"},
             *[
@@ -85,6 +87,45 @@ async def get_workflow_catalog_and_templates(user=Depends(get_optional_current_u
         "models": models,
         "openrouter_configured": OpenRouterService.is_configured()
     }
+
+
+@router.get("/vars/list")
+async def list_workflow_variables(user=Depends(get_optional_current_user)):
+    """Lists all global encrypted secrets & workflow environment variables."""
+    await WorkflowStore.init_tables_and_seed()
+    items = await WorkflowStore.list_secrets()
+    return {"success": True, "variables": items}
+
+
+@router.post("/vars/save")
+async def save_workflow_variable(
+    data: Dict[str, Any] = Body(...),
+    user=Depends(get_optional_current_user)
+):
+    """Creates or updates an AES-256 encrypted secret/variable accessible as {{vars.KEY}}."""
+    await WorkflowStore.init_tables_and_seed()
+    try:
+        saved = await WorkflowStore.upsert_secret(
+            key=data.get("key", ""),
+            value=data.get("value", ""),
+            is_secret=bool(data.get("is_secret", True)),
+            description=data.get("description", "")
+        )
+        return {"success": True, "variable": saved, "message": f"Saved variable {saved['key']}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/vars/{key}")
+async def delete_workflow_variable(
+    key: str,
+    user=Depends(get_optional_current_user)
+):
+    """Deletes a global workflow variable/secret by key."""
+    ok = await WorkflowStore.delete_secret(key)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Variable not found.")
+    return {"success": True, "message": f"Deleted variable '{key}'."}
 
 
 @router.get("/runs/recent")
@@ -213,19 +254,28 @@ async def test_single_workflow_node(
     from datetime import datetime
     from workflows.store import _get_tzinfo
     now_tz = datetime.now(_get_tzinfo("Asia/Dhaka"))
+    vars_map, _ = await WorkflowStore.get_secrets_for_runtime()
     ctx = {
         "workflow": {"id": "test", "name": "Studio Node Test"},
         "trigger": {
             "source": "node_test",
+            "dry_run": False,
             "date": now_tz.strftime("%Y-%m-%d"),
             "time": now_tz.strftime("%H:%M:%S"),
             "datetime": now_tz.strftime("%Y-%m-%d %H:%M:%S"),
+            "iso": now_tz.isoformat(),
             "weekday": now_tz.strftime("%A"),
             "timezone": "Asia/Dhaka",
             "payload": {"sample": sample_input}
         },
+        "vars": vars_map,
+        "secrets": vars_map,
         "nodes": {},
-        "prev": {"output": sample_input, "status": "SUCCESS", "node_id": "sample_prev"}
+        "prev": {"output": sample_input, "status": "SUCCESS", "node_id": "sample_prev", "error": "", "data": {}},
+        "prev_all": [{"node_id": "sample_prev", "title": "Sample Input", "type": "manual", "status": "SUCCESS", "output": sample_input, "data": {}}],
+        "_dry_run": False,
+        "_depth": 0,
+        "_wf_id": ""
     }
     res = await workflow_engine.execute_single_node(node, ctx)
     return {"success": res["status"] != "FAILED", "result": res}
@@ -383,13 +433,16 @@ async def run_workflow_now(
     data: Optional[Dict[str, Any]] = Body(default=None),
     user=Depends(get_optional_current_user)
 ):
-    """Manually executes a workflow DAG immediately and returns per-node telemetry & output."""
+    """Manually executes a workflow DAG immediately (supports payload & dry_run) and returns full trace."""
     try:
-        payload = (data or {}).get("payload", {}) if isinstance(data, dict) else {}
+        body = data if isinstance(data, dict) else {}
+        payload = body.get("payload", {})
+        dry_run = bool(body.get("dry_run", False))
         res = await workflow_engine.execute_workflow(
             workflow_id=workflow_id,
             trigger_source="manual",
-            trigger_payload=payload
+            trigger_payload=payload,
+            dry_run=dry_run
         )
         return res
     except ValueError as e:
@@ -397,6 +450,40 @@ async def run_workflow_now(
     except Exception as e:
         logger.error(f"Manual workflow execution failed for '{workflow_id}': {e}")
         raise HTTPException(status_code=500, detail=f"Execution failed: {str(e)}")
+
+
+@router.post("/{workflow_id}/stop")
+async def stop_workflow_run(
+    workflow_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Signals an active workflow run to cancel cleanly."""
+    stopped = workflow_engine.stop_workflow(workflow_id)
+    return {"success": True, "stopped": stopped, "message": "Cancellation signal sent." if stopped else "Workflow is not currently running."}
+
+
+@router.get("/{workflow_id}/versions")
+async def get_workflow_versions(
+    workflow_id: str,
+    limit: int = Query(15, le=30),
+    user=Depends(get_optional_current_user)
+):
+    """Lists saved revision snapshots of a workflow for 1-click rollback."""
+    versions = await WorkflowStore.list_versions(workflow_id, limit=limit)
+    return {"success": True, "versions": versions}
+
+
+@router.post("/{workflow_id}/versions/{version_id}/restore")
+async def restore_workflow_version(
+    workflow_id: str,
+    version_id: str,
+    user=Depends(get_optional_current_user)
+):
+    """Restores a prior workflow snapshot (and saves current state as a new revision)."""
+    wf = await WorkflowStore.restore_version(workflow_id, version_id)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow version snapshot not found.")
+    return {"success": True, "workflow": wf, "message": "Workflow version restored cleanly."}
 
 
 @router.get("/{workflow_id}/runs")

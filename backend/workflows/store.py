@@ -315,6 +315,60 @@ NODE_CATALOG: List[Dict[str, Any]] = [
             "message": "{{prev.output}}",
             "custom_webhook_url": ""
         }
+    },
+    {
+        "type": "merge_combine",
+        "category": "logic",
+        "icon": "🤝",
+        "label_en": "Merge Branches",
+        "label_bn": "ব্রাঞ্চ মার্জ (Join)",
+        "color": "#14b8a6",
+        "default_config": {
+            "mode": "markdown_sections",
+            "include_empty": False
+        }
+    },
+    {
+        "type": "switch_router",
+        "category": "logic",
+        "icon": "🚦",
+        "label_en": "Multi-Way Switch Router",
+        "label_bn": "সুইচ রাউটার (৩+ শাখা)",
+        "color": "#f97316",
+        "default_config": {
+            "target": "{{prev.output}}",
+            "route1_op": "regex",
+            "route1_val": "(CRITICAL|DOWN|100% LOSS|FATAL)",
+            "route2_op": "regex",
+            "route2_val": "(WARNING|ERROR|SLOW|FAILED)"
+        }
+    },
+    {
+        "type": "sub_workflow",
+        "category": "action",
+        "icon": "🔗",
+        "label_en": "Call Sub-Workflow",
+        "label_bn": "সাব-ওয়ার্কফ্লো কল করুন",
+        "color": "#8b5cf6",
+        "default_config": {
+            "target_workflow_id": "",
+            "payload_json": "{\"upstream\": \"{{prev.output|400}}\"}"
+        }
+    },
+    {
+        "type": "knowledge_db_query",
+        "category": "action",
+        "icon": "🗄️",
+        "label_en": "DB SQL & RAG Query",
+        "label_bn": "SQLite ও নলেজ সার্চ",
+        "color": "#0ea5e9",
+        "default_config": {
+            "query_mode": "sqlite",
+            "db_name": "ops.db",
+            "sql_query": "SELECT id, name, last_status, run_count, last_run FROM ops_workflows ORDER BY updated_at DESC LIMIT 10;",
+            "rag_query": "daily workflow reports & policies",
+            "top_k": 5
+        }
     }
 ]
 
@@ -837,6 +891,128 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
             {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""}
         ]
+    },
+    {
+        "id": "tpl_parallel_merge_ops_center",
+        "name": "⚡ প্যারালাল পিং + SQLite + পোর্ট -> Merge & 3-Way Switch",
+        "description": "ট্রিগার থেকে একসাথে ৩টি প্যারালাল অডিট চালিয়ে Merge নোডে একত্রিত করে এবং Switch Router দিয়ে Critical/Warning/OK অনুযায়ী আলাদা অ্যাকশন নেয়।",
+        "icon": "⚡",
+        "trigger_type": "daily",
+        "schedule_expr": "0 8 * * *",
+        "daily_time": "08:00",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 0,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "সকাল ৮:০০ প্যারালাল ট্রিগার",
+                "x": 40,
+                "y": 175,
+                "config": {"daily_time": "08:00", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "loop_foreach",
+                "title": "🔁 প্যারালাল ১: ফ্লিট পিং",
+                "x": 320,
+                "y": 50,
+                "config": {"items_text": "192.168.9.1\n192.168.9.5\n192.168.9.9\n8.8.8.8", "action_type": "ping"}
+            },
+            {
+                "id": "node_3",
+                "type": "knowledge_db_query",
+                "title": "🗄️ প্যারালাল ২: DB হেলথ কোয়েরি",
+                "x": 320,
+                "y": 180,
+                "config": {
+                    "query_mode": "sqlite",
+                    "db_name": "ops.db",
+                    "sql_query": "SELECT name, last_status, run_count, last_run FROM ops_workflows ORDER BY updated_at DESC LIMIT 6;"
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "tool_call",
+                "title": "🛠️ প্যারালাল ৩: সিস্টেম ইনফো",
+                "x": 320,
+                "y": 310,
+                "config": {"tool_name": "system_info", "args_json": "{}"}
+            },
+            {
+                "id": "node_5",
+                "type": "merge_combine",
+                "title": "🤝 ৩-ব্রাঞ্চ মার্জ",
+                "x": 620,
+                "y": 175,
+                "config": {"mode": "markdown_sections", "include_empty": False}
+            },
+            {
+                "id": "node_6",
+                "type": "switch_router",
+                "title": "🚦 সিভিয়ারিটি সুইচ রাউটার",
+                "x": 900,
+                "y": 175,
+                "config": {
+                    "target": "{{prev.output}}",
+                    "route1_op": "regex",
+                    "route1_val": "(CRITICAL|100% LOSS|FATAL)",
+                    "route2_op": "regex",
+                    "route2_val": "(WARNING|OFFLINE|ERROR|FAILED)"
+                }
+            },
+            {
+                "id": "node_7",
+                "type": "notify_channel",
+                "title": "🚨 Route 1: জরুরি অ্যালার্ট",
+                "x": 1200,
+                "y": 45,
+                "config": {
+                    "target": "chat_and_channels",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "🚨 CRITICAL: Ops Center ({{trigger.date}})",
+                    "message": "{{nodes.node_5.output}}"
+                }
+            },
+            {
+                "id": "node_8",
+                "type": "save_report",
+                "title": "⚠️ Route 2: সতর্কতা রিপোর্ট",
+                "x": 1200,
+                "y": 175,
+                "config": {
+                    "title": "Warning Ops Summary - {{trigger.date}}",
+                    "report_type": "incident_report",
+                    "content": "{{nodes.node_5.output}}",
+                    "index_in_memory": True
+                }
+            },
+            {
+                "id": "node_9",
+                "type": "save_report",
+                "title": "✅ Default: হেলদি রিপোর্ট আর্কাইভ",
+                "x": 1200,
+                "y": 305,
+                "config": {
+                    "title": "Daily Green Ops Digest - {{trigger.date}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_5.output}}",
+                    "index_in_memory": True
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_1", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_1", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_2", "target": "node_5", "condition": ""},
+            {"id": "e5", "source": "node_3", "target": "node_5", "condition": ""},
+            {"id": "e6", "source": "node_4", "target": "node_5", "condition": ""},
+            {"id": "e7", "source": "node_5", "target": "node_6", "condition": ""},
+            {"id": "e8", "source": "node_6", "target": "node_7", "condition": "route_1"},
+            {"id": "e9", "source": "node_6", "target": "node_8", "condition": "route_2"},
+            {"id": "e10", "source": "node_6", "target": "node_9", "condition": "default"}
+        ]
     }
 ]
 
@@ -897,6 +1073,30 @@ class WorkflowStore:
                 )
             """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_wf_runs_wfid ON ops_workflow_runs(workflow_id, started_at DESC)")
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ops_workflow_secrets (
+                    key TEXT PRIMARY KEY,
+                    value_enc TEXT NOT NULL,
+                    is_secret INTEGER DEFAULT 1,
+                    description TEXT DEFAULT '',
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ops_workflow_versions (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT NOT NULL,
+                    version_num INTEGER NOT NULL,
+                    name TEXT,
+                    schedule_expr TEXT DEFAULT '',
+                    daily_time TEXT DEFAULT '09:00',
+                    timezone TEXT DEFAULT 'Asia/Dhaka',
+                    nodes_json TEXT NOT NULL,
+                    edges_json TEXT NOT NULL,
+                    saved_at TEXT NOT NULL
+                )
+            """)
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_wf_versions_wfid ON ops_workflow_versions(workflow_id, version_num DESC)")
             await db.commit()
 
             # Seed prebuilt daily workflows if table is empty
@@ -1110,6 +1310,41 @@ class WorkflowStore:
 
         db = await cls.get_db()
         try:
+            # Auto-snapshot previous graph revision before overwriting
+            try:
+                async with db.execute(
+                    "SELECT COALESCE(MAX(version_num), 0) AS vmax FROM ops_workflow_versions WHERE workflow_id = ?",
+                    (workflow_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                    next_ver = (row["vmax"] if row else 0) + 1
+                await db.execute("""
+                    INSERT INTO ops_workflow_versions (
+                        id, workflow_id, version_num, name, schedule_expr, daily_time, timezone,
+                        nodes_json, edges_json, saved_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    f"wfver_{uuid.uuid4().hex[:10]}",
+                    workflow_id,
+                    next_ver,
+                    existing["name"],
+                    existing.get("schedule_expr", ""),
+                    existing.get("daily_time", "09:00"),
+                    existing.get("timezone", "Asia/Dhaka"),
+                    json.dumps(existing.get("nodes", []), ensure_ascii=False),
+                    json.dumps(existing.get("edges", []), ensure_ascii=False),
+                    now_str
+                ))
+                # Prune older than latest 15 versions per workflow
+                await db.execute("""
+                    DELETE FROM ops_workflow_versions
+                    WHERE workflow_id = ? AND id NOT IN (
+                        SELECT id FROM ops_workflow_versions WHERE workflow_id = ? ORDER BY version_num DESC LIMIT 15
+                    )
+                """, (workflow_id, workflow_id))
+            except Exception as ver_err:
+                logger.warning(f"Version snapshot skipped for '{workflow_id}': {ver_err}")
+
             await db.execute("""
                 UPDATE ops_workflows
                 SET name = ?, description = ?, icon = ?, trigger_type = ?,
@@ -1158,10 +1393,146 @@ class WorkflowStore:
         try:
             cur = await db.execute("DELETE FROM ops_workflows WHERE id = ?", (workflow_id,))
             await db.execute("DELETE FROM ops_workflow_runs WHERE workflow_id = ?", (workflow_id,))
+            await db.execute("DELETE FROM ops_workflow_versions WHERE workflow_id = ?", (workflow_id,))
             await db.commit()
             return cur.rowcount > 0
         finally:
             await db.close()
+
+    @classmethod
+    async def list_versions(cls, workflow_id: str, limit: int = 15) -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute(
+                "SELECT id, workflow_id, version_num, name, schedule_expr, daily_time, timezone, nodes_json, edges_json, saved_at "
+                "FROM ops_workflow_versions WHERE workflow_id = ? ORDER BY version_num DESC LIMIT ?",
+                (workflow_id, limit)
+            ) as cur:
+                rows = await cur.fetchall()
+            out = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["nodes_count"] = len(json.loads(d.get("nodes_json") or "[]"))
+                    d["edges_count"] = len(json.loads(d.get("edges_json") or "[]"))
+                except Exception:
+                    d["nodes_count"] = 0
+                    d["edges_count"] = 0
+                out.append(d)
+            return out
+        finally:
+            await db.close()
+
+    @classmethod
+    async def restore_version(cls, workflow_id: str, version_id: str) -> Optional[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute(
+                "SELECT * FROM ops_workflow_versions WHERE id = ? AND workflow_id = ?",
+                (version_id, workflow_id)
+            ) as cur:
+                ver = await cur.fetchone()
+        finally:
+            await db.close()
+        if not ver:
+            return None
+        try:
+            nodes = json.loads(ver["nodes_json"] or "[]")
+            edges = json.loads(ver["edges_json"] or "[]")
+        except Exception:
+            nodes, edges = [], []
+        return await cls.update_workflow(workflow_id, {
+            "name": ver["name"] or "Restored Workflow",
+            "schedule_expr": ver["schedule_expr"],
+            "daily_time": ver["daily_time"],
+            "timezone": ver["timezone"],
+            "nodes": nodes,
+            "edges": edges
+        })
+
+    @classmethod
+    async def list_secrets(cls) -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            async with db.execute("SELECT key, value_enc, is_secret, description, updated_at FROM ops_workflow_secrets ORDER BY key ASC") as cur:
+                rows = await cur.fetchall()
+            from security.crypto import DataCrypto
+            crypto = DataCrypto()
+            items = []
+            for r in rows:
+                raw_val = crypto.decrypt_text(r["value_enc"])
+                is_sec = bool(r["is_secret"])
+                preview = ("••••" + raw_val[-4:]) if (is_sec and len(raw_val) > 4) else ("••••••" if is_sec else raw_val)
+                items.append({
+                    "key": r["key"],
+                    "value_preview": preview,
+                    "is_secret": is_sec,
+                    "description": r["description"] or "",
+                    "updated_at": r["updated_at"]
+                })
+            return items
+        finally:
+            await db.close()
+
+    @classmethod
+    async def upsert_secret(cls, key: str, value: str, is_secret: bool = True, description: str = "") -> Dict[str, Any]:
+        import re as _re
+        clean_key = _re.sub(r"[^A-Za-z0-9_]", "_", (key or "").strip()).upper()
+        if not clean_key:
+            raise ValueError("Variable/Secret key cannot be empty.")
+        from security.crypto import DataCrypto
+        crypto = DataCrypto()
+        enc_val = crypto.encrypt_text(str(value or ""))
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db = await cls.get_db()
+        try:
+            await db.execute("""
+                INSERT INTO ops_workflow_secrets (key, value_enc, is_secret, description, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value_enc = excluded.value_enc,
+                    is_secret = excluded.is_secret,
+                    description = excluded.description,
+                    updated_at = excluded.updated_at
+            """, (clean_key, enc_val, 1 if is_secret else 0, (description or "").strip(), now_str))
+            await db.commit()
+        finally:
+            await db.close()
+        return {"key": clean_key, "is_secret": is_secret, "updated_at": now_str}
+
+    @classmethod
+    async def delete_secret(cls, key: str) -> bool:
+        db = await cls.get_db()
+        try:
+            cur = await db.execute("DELETE FROM ops_workflow_secrets WHERE key = ?", (key.strip(),))
+            await db.commit()
+            return cur.rowcount > 0
+        finally:
+            await db.close()
+
+    @classmethod
+    async def get_secrets_for_runtime(cls) -> Tuple[Dict[str, str], List[str]]:
+        """Returns decrypted {KEY: val} dict and list of sensitive strings for log redaction."""
+        try:
+            db = await cls.get_db()
+            try:
+                async with db.execute("SELECT key, value_enc, is_secret FROM ops_workflow_secrets") as cur:
+                    rows = await cur.fetchall()
+            finally:
+                await db.close()
+            from security.crypto import DataCrypto
+            crypto = DataCrypto()
+            vars_map: Dict[str, str] = {}
+            redact_vals: List[str] = []
+            for r in rows:
+                val = crypto.decrypt_text(r["value_enc"])
+                vars_map[r["key"]] = val
+                if r["is_secret"] and len(val) >= 6:
+                    redact_vals.append(val)
+            return vars_map, redact_vals
+        except Exception as e:
+            logger.debug(f"Could not load workflow secrets: {e}")
+            return {}, []
 
     @classmethod
     async def install_template(cls, template_id: str) -> Optional[Dict[str, Any]]:
@@ -1439,6 +1810,7 @@ class WorkflowStore:
         wants_ping = any(k in lower for k in ["ping", "network", "lan", "latency", "পিং", "নেটওয়ার্ক", "সার্ভার"])
         wants_ports = any(k in lower for k in ["port", "scan", "পোর্ট", "স্ক্যান", "security", "সিকিউরিটি", "vulnerability", "audit", "dlp"])
         wants_http = any(k in lower for k in ["http", "api", "url", "webhook", "fetch", "endpoint", "এপিআই"])
+        wants_db = any(k in lower for k in ["db", "sql", "sqlite", "database", "query", "ডাটাবেস", "মেমোরি", "নলেজ"])
         wants_python = any(k in lower for k in ["python", "csv", "excel", "metric", "score", "parse", "calculate", "পাইথন", "হিসাব", "স্কোর"])
         wants_memory = any(k in lower for k in ["memory", "remember", "note", "project", "মেমোরি", "নোট", "প্রজেক্ট"])
         wants_condition = any(k in lower for k in ["if ", "else", "alert", "error", "warning", "fail", "down", "যদি", "সতর্ক", "অ্যালার্ট", "সমস্যা"])
@@ -1527,6 +1899,17 @@ class WorkflowStore:
                 }
             })
 
+        if wants_db:
+            collect_nodes.append({
+                "type": "knowledge_db_query",
+                "title": "🗄️ DB ও নলেজ কোয়েরি",
+                "config": {
+                    "query_mode": "sqlite",
+                    "db_name": "ops.db",
+                    "sql_query": "SELECT name, last_status, run_count, last_run FROM ops_workflows ORDER BY updated_at DESC LIMIT 8;"
+                }
+            })
+
         if not collect_nodes:
             # Default telemetry starter tool so AI always has fresh live context
             collect_nodes.append({
@@ -1541,15 +1924,30 @@ class WorkflowStore:
             nodes.append({"id": nid, "type": cnode["type"], "title": cnode["title"], "x": col_x, "y": 150, "config": cnode["config"]})
             edges.append({"id": f"e{len(edges)+1}", "source": "node_1", "target": nid, "condition": ""})
             collector_ids.append(nid)
+            col_x += 300
         else:
-            start_y = 60
+            start_y = 50
             for idx, cnode in enumerate(collect_nodes):
                 nid = f"node_{len(nodes) + 1}"
-                nodes.append({"id": nid, "type": cnode["type"], "title": cnode["title"], "x": col_x, "y": start_y + idx * 170, "config": cnode["config"]})
+                nodes.append({"id": nid, "type": cnode["type"], "title": cnode["title"], "x": col_x, "y": start_y + idx * 145, "config": cnode["config"]})
                 edges.append({"id": f"e{len(edges)+1}", "source": "node_1", "target": nid, "condition": ""})
                 collector_ids.append(nid)
+            col_x += 300
 
-        col_x += 300
+            # Automatically insert Merge Combine node to join all parallel fan-out branches cleanly!
+            merge_id = f"node_{len(nodes) + 1}"
+            nodes.append({
+                "id": merge_id,
+                "type": "merge_combine",
+                "title": "🤝 প্যারালাল ব্রাঞ্চ মার্জ",
+                "x": col_x,
+                "y": 150,
+                "config": {"mode": "markdown_sections", "include_empty": False}
+            })
+            for src_id in collector_ids:
+                edges.append({"id": f"e{len(edges)+1}", "source": src_id, "target": merge_id, "condition": ""})
+            collector_ids = [merge_id]
+            col_x += 290
 
         # 3. Optional Python Data Transform Step
         last_stage_ids = list(collector_ids)

@@ -95,7 +95,11 @@ const WF_DOC_NODES = [
   { type: 'http_request', cat: 'action', icon: '📡', color: '#0284c7', title_bn: 'HTTP / Webhook Request', title_en: 'HTTP Request', desc_bn: 'যেকোনো বাহ্যিক REST API-তে ডাইনামিক JSON বডি ও হেডারসহ GET, POST, PUT, PATCH বা DELETE কল করে।', desc_en: 'Performs GET, POST, PUT, PATCH, or DELETE HTTP calls with dynamic templated headers and JSON payload.', cfg_hint: 'method, url, headers_json, body_json' },
   { type: 'save_report', cat: 'output', icon: '📄', color: '#10b981', title_bn: 'Save Executive Report', title_en: 'Save Executive Report', desc_bn: 'Markdown ফাইল আর্কাইভ করে ও reports.db-তে সংরক্ষণ করে — যাতে সরাসরি AI Reports ট্যাবে পড়া, ডাউনলোড ও সার্চ করা যায়।', desc_en: 'Saves structured Markdown reports both on disk and in reports.db so they immediately appear in the AI Reports UI tab.', cfg_hint: 'title, report_type, content, index_in_memory' },
   { type: 'memory_save', cat: 'output', icon: '💾', color: '#14b8a6', title_bn: 'Save Project Memory', title_en: 'Save Project Memory', desc_bn: 'নির্দিষ্ট প্রজেক্ট নেম ও কী-এর অধীনে ProjectMemoryStore এবং Hybrid Vector RAG স্টোরে স্থায়ীভাবে নোট সংরক্ষণ করে।', desc_en: 'Persists dated daily logs and insights into ProjectMemoryStore + Vector Memory for future chats and MCP clients.', cfg_hint: 'project_name, key, category, content' },
-  { type: 'notify_channel', cat: 'output', icon: '📣', color: '#ec4899', title_bn: 'Notify Chat & Channels', title_en: 'Notify Chat & Channels', desc_bn: 'চ্যাট হিস্ট্রির "📅 Daily Automated Agent Reports" সেশনে পাঠায় এবং সক্রিয় Telegram, Discord, Slack ও কাস্টম ওয়েবহুকে ব্রডকাস্ট করে।', desc_en: 'Posts digest to Chat session "session_daily_automations" and dispatches alerts to configured Telegram/Discord/Slack/Webhook targets.', cfg_hint: 'target, title, message, custom_webhook_url' }
+  { type: 'notify_channel', cat: 'output', icon: '📣', color: '#ec4899', title_bn: 'Notify Chat & Channels', title_en: 'Notify Chat & Channels', desc_bn: 'চ্যাট হিস্ট্রির "📅 Daily Automated Agent Reports" সেশনে পাঠায় এবং সক্রিয় Telegram, Discord, Slack ও কাস্টম ওয়েবহুকে ব্রডকাস্ট করে।', desc_en: 'Posts digest to Chat session "session_daily_automations" and dispatches alerts to configured Telegram/Discord/Slack/Webhook targets.', cfg_hint: 'target, title, message, custom_webhook_url' },
+  { type: 'merge_combine', cat: 'logic', icon: '🤝', color: '#14b8a6', title_bn: 'Merge Parallel Branches', title_en: 'Merge Branches', desc_bn: 'একসাথে চলা একাধিক প্যারালাল শাখার (Fan-Out) ফলাফলকে একত্রিত Markdown বা JSON আকারে পরবর্তী নোডে পাঠায়।', desc_en: 'Joins outputs from multiple concurrent parallel branches (Fan-Out) into a single unified Markdown dossier or JSON array.', cfg_hint: 'mode (markdown_sections | json_array)' },
+  { type: 'switch_router', cat: 'logic', icon: '🚦', color: '#f97316', title_bn: 'Multi-Way Switch Router', title_en: 'Multi-Way Switch Router', desc_bn: 'Route 1, Route 2 ও Default — এই ৩+ পথে ডাইনামিক রাউটিং করে (যেমন CRITICAL -> Urgent Alert, WARNING -> Log, OK -> Archive)।', desc_en: '3-way conditional router evaluating Route 1, Route 2, and Default ports with color-coded branching.', cfg_hint: 'target, route1_op/val, route2_op/val' },
+  { type: 'sub_workflow', cat: 'action', icon: '🔗', color: '#8b5cf6', title_bn: 'Call Sub-Workflow', title_en: 'Call Sub-Workflow', desc_bn: 'অন্য একটি বিদ্যমান ওয়ার্কফ্লোকে সাব-মডিউল হিসেবে রান করে এবং তার চূড়ান্ত আউটপুট গ্রহণ করে (সর্বোচ্চ ৩ স্তর রিকার্শন)।', desc_en: 'Invokes another saved workflow modularly with custom JSON payload and returns its final_output cleanly.', cfg_hint: 'target_workflow_id, payload_json' },
+  { type: 'knowledge_db_query', cat: 'action', icon: '🗄️', color: '#0ea5e9', title_bn: 'SQLite DB & RAG Knowledge Query', title_en: 'DB SQL & RAG Query', desc_bn: 'ops.db, reports.db, project_memory.db ইত্যাদি SQLite ডাটাবেসে নিরাপদ SELECT কোয়েরি অথবা Vector নলেজ সার্চ চালায়।', desc_en: 'Runs read-only SELECT/PRAGMA SQL queries on internal SQLite DBs or semantic RAG searches across vector memory.', cfg_hint: 'query_mode (sqlite|rag), db_name, sql_query' }
 ];
 
 const WF_DOC_VARIABLES = [
@@ -110,7 +114,8 @@ const WF_DOC_VARIABLES = [
   { token: '{{prev.json.status}}', desc_bn: 'পূর্ববর্তী নোডের JSON আউটপুট থেকে নির্দিষ্ট ফিল্ড পড়া', desc_en: 'Parse upstream JSON output by dot path' },
   { token: '{{prev.error}}', desc_bn: 'Continue-on-Fail চালু থাকলে পূর্বের ত্রুটির বার্তা', desc_en: 'Upstream error string when continue_on_fail is enabled' },
   { token: '{{nodes.node_2.output}}', desc_bn: 'নির্দিষ্ট নোডের (যেমন node_2) আউটপুট রেফারেন্স', desc_en: 'Specific node output anywhere downstream' },
-  { token: '{{workflow.name}}', desc_bn: 'বর্তমান ওয়ার্কফ্লোর শিরোনাম', desc_en: 'Current active workflow title' }
+  { token: '{{workflow.name}}', desc_bn: 'বর্তমান ওয়ার্কফ্লোর শিরোনাম', desc_en: 'Current active workflow title' },
+  { token: '{{vars.API_TOKEN}}', desc_bn: '🔐 Global Vault-এ এনক্রিপ্টেড ভেরিয়েবল/সিক্রেট ইনজেক্ট (লগে ***REDACTED*** থাকে)', desc_en: 'Inject AES-256 encrypted secret/var from Global Vault (auto-redacted in logs)' }
 ];
 
 const WF_DOC_FAQS = [
@@ -420,12 +425,12 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
       <section class="wfd-section" id="wfd-sec-nodes">
         <div class="wfd-sec-head" style="flex-wrap:wrap; gap:10px;">
           <div>
-            <h3><span>🧩</span> ${isEn ? '3. Complete 13-Node Engine Reference' : '৩. ১৩টি ওয়ার্কফ্লো নোডের সম্পূর্ণ রেফারেন্স'}</h3>
-            <span class="wfd-sec-sub">${isEn ? 'Triggers, AI agents, loops, Python transforms, HTTP & output actions' : 'ট্রিগার, AI এজেন্ট, ব্যাচ লুপ, পাইথন স্ক্রিপ্ট, কন্ডিশন ও আউটপুট নোডসমূহ'}</span>
+            <h3><span>🧩</span> ${isEn ? '3. Complete 17-Node Parallel Engine Reference' : '৩. ১৭টি ওয়ার্কফ্লো নোডের সম্পূর্ণ রেফারেন্স (প্যারালাল DAG)'}</h3>
+            <span class="wfd-sec-sub">${isEn ? 'Triggers, AI agents, parallel merge, switch router, loops, Python, SQL/RAG, sub-workflows & outputs' : 'ট্রিগার, AI, প্যারালাল মার্জ, সুইচ রাউটার, লুপ, পাইথন, SQLite/RAG ও আউটপুট নোডসমূহ'}</span>
           </div>
           <div class="wfd-cat-filters">
             ${[
-              ['all', isEn ? 'All (13)' : 'সবগুলো (১৩)'],
+              ['all', isEn ? 'All (17)' : 'সবগুলো (১৭)'],
               ['trigger', isEn ? 'Triggers' : 'ট্রিগার'],
               ['ai', isEn ? 'AI & SubAgents' : 'এআই ও সাব-এজেন্ট'],
               ['logic', isEn ? 'Logic & Loop' : 'লজিক ও লুপ'],
@@ -520,8 +525,11 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
               <tr><td><span class="wfd-m-get">GET</span></td><td><code>/api/workflows</code></td><td>${isEn ? 'List all workflows, next run schedule preview, and KPI summary' : 'সব ওয়ার্কফ্লো, আসন্ন ৩টি রানের সময় ও KPI পরিসংখ্যান দেখা'}</td></tr>
               <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/quick-daily</code></td><td>${isEn ? 'Create & schedule a daily autonomous AI workflow from natural text' : 'সাধারণ নির্দেশনা থেকে ৫-নোডের দৈনিক অটো ওয়ার্কফ্লো তৈরি ও অ্যাক্টিভেট'}</td></tr>
               <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/ai-architect</code></td><td>${isEn ? 'Auto-design a branched multi-node DAG (Ping/Port/Python/AI/IF-Else)' : 'জটিল লক্ষ্য থেকে স্বয়ংক্রিয়ভাবে ব্রাঞ্চড মাল্টি-নোড DAG আর্কিটেক্ট করা'}</td></tr>
-              <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/run</code></td><td>${isEn ? 'Trigger immediate execution and receive per-node JSON telemetry trace' : 'তাৎক্ষণিক ওয়ার্কফ্লো রান করে প্রতিটি নোডের আউটপুট ও সময় দেখা'}</td></tr>
-              <tr><td><span class="wfd-m-get">GET</span></td><td><code>/api/workflows/{id}/live-status</code></td><td>${isEn ? 'Poll real-time currently executing node & completed step outputs' : 'চলমান ওয়ার্কফ্লোর লাইভ প্রোগ্রেস ও বর্তমান সক্রিয় নোড পর্যবেক্ষণ'}</td></tr>
+              <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/run</code></td><td>${isEn ? 'Trigger immediate execution (supports payload & dry_run) with full parallel trace' : 'তাৎক্ষণিক ওয়ার্কফ্লো রান (পেলোড ও Dry-Run সমর্থিত) ও প্যারালাল ট্রেস দেখা'}</td></tr>
+              <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/stop</code></td><td>${isEn ? 'Gracefully cancel a currently running workflow execution' : 'চলমান ওয়ার্কফ্লো নিরাপদভাবে মাঝপথে থামানো'}</td></tr>
+              <tr><td><span class="wfd-m-get">GET</span></td><td><code>/api/workflows/{id}/live-status</code></td><td>${isEn ? 'Poll real-time concurrent active node wave & completed step outputs' : 'চলমান ওয়ার্কফ্লোর লাইভ প্যারালাল নোড ও প্রোগ্রেস পর্যবেক্ষণ'}</td></tr>
+              <tr><td><span class="wfd-m-get">GET</span> / <span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/versions</code> & <code>.../restore</code></td><td>${isEn ? 'List saved revision snapshots and restore any previous version cleanly' : 'স্বয়ংক্রিয় ভার্সন হিস্ট্রি দেখা এবং যেকোনো পুরানো ভার্সনে রোলব্যাক করা'}</td></tr>
+              <tr><td><span class="wfd-m-get">GET</span> / <span class="wfd-m-post">POST</span></td><td><code>/api/workflows/vars/list</code> & <code>/vars/save</code></td><td>${isEn ? 'Manage AES-256 encrypted secrets & global variables ({{vars.KEY}})' : 'গ্লোবাল AES-256 এনক্রিপ্টেড ভেরিয়েবল ও সিক্রেট ({{vars.KEY}}) ম্যানেজ করা'}</td></tr>
               <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/node/test</code></td><td>${isEn ? 'Unit-test a single node in Studio Inspector with sample prev output' : 'ক্যানভাস ইন্সপেক্টরে সিঙ্গেল নোড আলাদাভাবে লাইভ টেস্ট করা'}</td></tr>
               <tr><td><span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/duplicate</code></td><td>${isEn ? 'Clone an existing workflow cleanly with new ID & webhook secret' : 'বিদ্যমান ওয়ার্কফ্লোর হুবহু কপি তৈরি করা'}</td></tr>
               <tr><td><span class="wfd-m-get">GET</span> / <span class="wfd-m-post">POST</span></td><td><code>/api/workflows/{id}/export</code> & <code>/import</code></td><td>${isEn ? 'Portable JSON backup, export & team sharing of visual pipelines' : 'ভিজ্যুয়াল ওয়ার্কফ্লো JSON আকারে ব্যাকআপ/এক্সপোর্ট ও ইমপোর্ট করা'}</td></tr>

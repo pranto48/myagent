@@ -137,20 +137,46 @@ def _evaluate_condition(target_val: str, operator: str, expected_val: str) -> bo
     return False
 
 
+def _redact_secrets_in_obj(obj: Any, secrets_list: List[str]) -> Any:
+    """Recursively redacts stored sensitive secrets from logged outputs & JSON telemetry."""
+    if not secrets_list:
+        return obj
+    if isinstance(obj, str):
+        res = obj
+        for sv in secrets_list:
+            if sv and len(sv) >= 6 and sv in res:
+                res = res.replace(sv, "***REDACTED***")
+        return res
+    if isinstance(obj, list):
+        return [_redact_secrets_in_obj(item, secrets_list) for item in obj]
+    if isinstance(obj, dict):
+        return {k: _redact_secrets_in_obj(v, secrets_list) for k, v in obj.items()}
+    return obj
+
+
 class WorkflowEngine:
     """
-    DAG-based Visual Workflow Engine inspired by n8n:
-      - Topological scheduling across trigger -> action/agent -> IF/Else -> output pipelines
-      - Supports conditional branching (`true` / `false` edge labels) & branch skipping
-      - Real autonomous tool calling AI agents, subagents, tools, HTTP webhooks, reports & memories
+    Parallel Wave DAG Workflow Engine inspired by n8n:
+      - Concurrent asyncio.gather execution across independent branches (Fan-Out & Merge Fan-In)
+      - Supports IF/Else (`true`/`false`), Multi-Way Switch Router (`route_1`/`route_2`/`default`), & Modular Sub-Workflows
+      - Global Encrypted Secrets Vault (`{{vars.*}}` / `{{secrets.*}}`) with automatic output redaction
+      - Live multi-node execution telemetry, dry-run simulation, pinned outputs, retries & cancellation
     """
 
     def __init__(self):
         self._active_runs: Set[str] = set()
+        self._cancel_flags: Set[str] = set()
         self._live_progress: Dict[str, Dict[str, Any]] = {}
 
     def is_running(self, workflow_id: str) -> bool:
         return workflow_id in self._active_runs
+
+    def stop_workflow(self, workflow_id: str) -> bool:
+        """Signals a running workflow to cancel cleanly before the next wave or timer interval."""
+        if workflow_id in self._active_runs:
+            self._cancel_flags.add(workflow_id)
+            return True
+        return False
 
     def get_live_status(self, workflow_id: str) -> Dict[str, Any]:
         prog = self._live_progress.get(workflow_id)
@@ -163,9 +189,14 @@ class WorkflowEngine:
         self,
         workflow_id: str,
         trigger_source: str = "manual",
-        trigger_payload: Optional[Dict[str, Any]] = None
+        trigger_payload: Optional[Dict[str, Any]] = None,
+        dry_run: bool = False,
+        depth: int = 0
     ) -> Dict[str, Any]:
-        """Executes an entire workflow DAG end-to-end and logs full step trace into ops_workflow_runs."""
+        """Executes a workflow DAG with concurrent parallel waves, retries, redaction & full telemetry."""
+        if depth > 3:
+            raise ValueError("Sub-workflow recursion depth limit (3) exceeded.")
+
         wf = await WorkflowStore.get_workflow(workflow_id)
         if not wf:
             raise ValueError(f"Workflow '{workflow_id}' not found.")
@@ -179,8 +210,11 @@ class WorkflowEngine:
             }
 
         self._active_runs.add(workflow_id)
+        self._cancel_flags.discard(workflow_id)
         run_id = f"wfrun_{uuid.uuid4().hex[:10]}"
         t0 = time.time()
+
+        vars_map, secret_values_to_redact = await WorkflowStore.get_secrets_for_runtime()
 
         tz = _get_tzinfo(wf.get("timezone", "Asia/Dhaka"))
         now_tz = datetime.now(tz)
@@ -190,6 +224,7 @@ class WorkflowEngine:
             "status": "RUNNING",
             "started_at": started_str,
             "current_node_id": None,
+            "active_node_ids": [],
             "completed_count": 0,
             "total_count": len(wf.get("nodes") or []),
             "node_results": []
@@ -204,7 +239,7 @@ class WorkflowEngine:
                     INSERT INTO ops_workflow_runs (
                         id, workflow_id, workflow_name, trigger_source, status, started_at, node_results_json
                     ) VALUES (?, ?, ?, ?, 'RUNNING', ?, '[]')
-                """, (run_id, workflow_id, wf["name"], trigger_source, started_str))
+                """, (run_id, workflow_id, wf["name"], f"{trigger_source}{'[DRY]' if dry_run else ''}", started_str))
                 await db.commit()
             finally:
                 await db.close()
@@ -224,6 +259,7 @@ class WorkflowEngine:
                 "workflow": {"id": workflow_id, "name": wf["name"]},
                 "trigger": {
                     "source": trigger_source,
+                    "dry_run": dry_run,
                     "date": now_tz.strftime("%Y-%m-%d"),
                     "time": now_tz.strftime("%H:%M:%S"),
                     "datetime": now_tz.strftime("%Y-%m-%d %H:%M:%S"),
@@ -232,8 +268,14 @@ class WorkflowEngine:
                     "timezone": wf.get("timezone", "Asia/Dhaka"),
                     "payload": trigger_payload or {}
                 },
+                "vars": vars_map,
+                "secrets": vars_map,
                 "nodes": {},
-                "prev": {"output": "", "status": "IDLE", "node_id": "", "error": "", "data": {}}
+                "prev": {"output": "", "status": "IDLE", "node_id": "", "error": "", "data": {}},
+                "prev_all": [],
+                "_dry_run": dry_run,
+                "_depth": depth,
+                "_wf_id": workflow_id,
             }
 
             if not nodes:
@@ -251,7 +293,6 @@ class WorkflowEngine:
                         outgoing[src].append(e)
                         incoming[tgt].append(e)
 
-                # Identify root / trigger nodes
                 roots = [
                     n["id"] for n in nodes
                     if n.get("id") and (n.get("type", "").startswith("trigger_") or len(incoming[n["id"]]) == 0)
@@ -259,7 +300,6 @@ class WorkflowEngine:
                 if not roots and nodes[0].get("id"):
                     roots = [nodes[0]["id"]]
 
-                # BFS to collect reachable nodes from roots
                 reachable: Set[str] = set()
                 q_bfs = deque(roots)
                 while q_bfs:
@@ -271,164 +311,224 @@ class WorkflowEngine:
                         if e["target"] not in reachable:
                             q_bfs.append(e["target"])
 
-                # Kahn topological sort on reachable nodes
-                in_deg = {nid: 0 for nid in reachable}
-                for nid in reachable:
-                    for e in incoming[nid]:
-                        if e["source"] in reachable:
-                            in_deg[nid] += 1
-
-                ready = deque(
-                    sorted([nid for nid, deg in in_deg.items() if deg == 0], key=lambda x: node_map[x].get("x", 0))
-                )
-                topo_order: List[str] = []
-                while ready:
-                    curr = ready.popleft()
-                    topo_order.append(curr)
-                    for e in outgoing[curr]:
-                        tgt = e["target"]
-                        if tgt in in_deg:
-                            in_deg[tgt] -= 1
-                            if in_deg[tgt] == 0:
-                                ready.append(tgt)
-
-                # Fallback if cycle left some reachable nodes unvisited
-                for nid in sorted(reachable, key=lambda x: node_map[x].get("x", 0)):
-                    if nid not in topo_order:
-                        topo_order.append(nid)
-
+                resolved: Set[str] = set()
                 active_edges: Set[str] = set()
                 executed_outputs_ordered: List[str] = []
-                failed_count = 0
-                succeeded_count = 0
+                cancelled = False
 
-                for nid in topo_order:
+                def _propagate_outgoing(src_nid: str, src_res: Dict[str, Any]):
+                    src_type = (node_map[src_nid].get("type") or "").strip().lower()
+                    src_cfg = node_map[src_nid].get("config") or {}
+                    continue_fail = bool(src_cfg.get("continue_on_fail", False))
+                    if src_res.get("status") == "FAILED" and not continue_fail:
+                        return
+
+                    if src_type == "condition":
+                        matched = bool(src_res.get("data", {}).get("matched", False))
+                        for e in outgoing[src_nid]:
+                            cond = (e.get("condition") or "").strip().lower()
+                            if (
+                                cond in ("", "always")
+                                or (cond in ("true", "yes", "1", "match") and matched)
+                                or (cond in ("false", "no", "0", "else") and not matched)
+                            ):
+                                active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+                    elif src_type == "switch_router":
+                        selected_route = (src_res.get("data", {}).get("selected_route") or "default").strip().lower()
+                        for e in outgoing[src_nid]:
+                            cond = (e.get("condition") or "").strip().lower()
+                            if cond in ("", "always", selected_route):
+                                active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+                    else:
+                        for e in outgoing[src_nid]:
+                            active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+
+                async def _run_single_wave_node(nid: str) -> Dict[str, Any]:
                     node = node_map[nid]
                     ntype = node.get("type", "")
-                    is_root = nid in roots and len(incoming[nid]) == 0
+                    node_cfg = node.get("config") or {}
 
-                    # Check whether at least one active edge feeds into this node
                     inc_edges_reachable = [e for e in incoming[nid] if e["source"] in reachable]
                     active_inc_edges = [
                         e for e in inc_edges_reachable
                         if f"{e['source']}->{e['target']}:{e.get('condition', '')}" in active_edges
                     ]
 
-                    if not is_root and inc_edges_reachable and not active_inc_edges:
-                        # Untaken branch -> SKIPPED
-                        skip_entry = {
+                    node_ctx = dict(ctx)
+                    prev_list = []
+                    for ae in active_inc_edges:
+                        sid = ae["source"]
+                        if sid in ctx["nodes"]:
+                            se = ctx["nodes"][sid]
+                            prev_list.append({
+                                "node_id": sid,
+                                "title": se.get("title", sid),
+                                "type": se.get("type", ""),
+                                "status": se.get("status", "SUCCESS"),
+                                "output": se.get("output", ""),
+                                "data": se.get("data", {})
+                            })
+                    node_ctx["prev_all"] = prev_list
+                    if prev_list:
+                        last_p = prev_list[-1]
+                        node_ctx["prev"] = {
+                            "node_id": last_p["node_id"],
+                            "output": last_p["output"],
+                            "status": last_p["status"],
+                            "error": last_p["output"] if last_p["status"] == "FAILED" else "",
+                            "data": last_p["data"]
+                        }
+
+                    # 1. Pinned output short-circuit for instant downstream debugging
+                    if bool(node_cfg.get("use_pinned")) and node_cfg.get("pinned_output"):
+                        return {
                             "node_id": nid,
                             "type": ntype,
                             "title": node.get("title", ntype),
-                            "status": "SKIPPED",
+                            "status": "SUCCESS",
                             "duration_ms": 0,
-                            "output": "Skipped (upstream condition branch not active).",
-                            "summary": "Branch not taken",
-                            "data": {}
+                            "output": str(node_cfg.get("pinned_output")),
+                            "summary": "📌 Pinned Output Used",
+                            "data": {"pinned": True}
                         }
-                        ctx["nodes"][nid] = skip_entry
-                        node_results.append(skip_entry)
-                        continue
 
-                    # Resolve prev context from latest active incoming node
-                    if active_inc_edges:
-                        last_src = active_inc_edges[-1]["source"]
-                        if last_src in ctx["nodes"]:
-                            src_entry = ctx["nodes"][last_src]
-                            ctx["prev"] = {
-                                "node_id": last_src,
-                                "output": src_entry.get("output", ""),
-                                "status": src_entry.get("status", "SUCCESS"),
-                                "error": src_entry.get("output", "") if src_entry.get("status") == "FAILED" else "",
-                                "data": src_entry.get("data", {})
-                            }
-
-                    # Node Bypass / Mute Check
-                    node_cfg = node.get("config") or {}
-                    if node.get("disabled") or node_cfg.get("disabled"):
-                        bypass_entry = {
-                            "node_id": nid,
-                            "type": ntype,
-                            "title": node.get("title", ntype),
-                            "status": "SKIPPED",
-                            "duration_ms": 0,
-                            "output": ctx["prev"].get("output", ""),
-                            "summary": "Muted / Bypassed",
-                            "data": {"bypassed": True}
-                        }
-                        ctx["nodes"][nid] = bypass_entry
-                        node_results.append(bypass_entry)
-                        if workflow_id in self._live_progress:
-                            self._live_progress[workflow_id]["node_results"] = list(node_results)
-                            self._live_progress[workflow_id]["completed_count"] = len(node_results)
-                        for e in outgoing[nid]:
-                            active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
-                        continue
-
-                    # Update live telemetry before node executes
-                    if workflow_id in self._live_progress:
-                        self._live_progress[workflow_id]["current_node_id"] = nid
-
-                    # Retry-aware node execution
+                    # 2. Retry-aware execution
                     max_retries = max(0, min(3, int(node_cfg.get("retry_count", 0) or 0)))
                     continue_on_fail = bool(node_cfg.get("continue_on_fail", False))
-                    n_res = await self.execute_single_node(node, ctx)
+                    n_res = await self.execute_single_node(node, node_ctx)
                     for r_attempt in range(max_retries):
-                        if n_res["status"] != "FAILED":
+                        if n_res["status"] != "FAILED" or workflow_id in self._cancel_flags:
                             break
-                        await asyncio.sleep(min(2.0 * (r_attempt + 1), 5.0))
-                        n_res = await self.execute_single_node(node, ctx)
+                        await asyncio.sleep(min(1.5 * (r_attempt + 1), 4.0))
+                        n_res = await self.execute_single_node(node, node_ctx)
                         if n_res["status"] != "FAILED":
                             n_res["summary"] = f"{n_res.get('summary', '')} (retry #{r_attempt + 1})".strip()
 
-                    ctx["nodes"][nid] = n_res
-                    node_results.append(n_res)
+                    if n_res["status"] == "FAILED" and continue_on_fail:
+                        n_res["summary"] = f"{n_res.get('summary', '')} [continue-on-fail]".strip()
+                    return _redact_secrets_in_obj(n_res, secret_values_to_redact)
+
+                while len(resolved) < len(reachable):
+                    if workflow_id in self._cancel_flags:
+                        cancelled = True
+                        break
+
+                    # Find all reachable unresolved nodes whose incoming reachable dependencies finished
+                    ready_ids = sorted([
+                        nid for nid in (reachable - resolved)
+                        if all(e["source"] in resolved for e in incoming[nid] if e["source"] in reachable)
+                    ], key=lambda x: (node_map[x].get("x", 0), node_map[x].get("y", 0)))
+
+                    if not ready_ids:
+                        # Cycle guard fallback
+                        ready_ids = sorted(list(reachable - resolved), key=lambda x: node_map[x].get("x", 0))
+
+                    active_wave_ids: List[str] = []
+
+                    for nid in ready_ids:
+                        node = node_map[nid]
+                        ntype = node.get("type", "")
+                        node_cfg = node.get("config") or {}
+                        is_root = nid in roots and len(incoming[nid]) == 0
+                        inc_edges_reachable = [e for e in incoming[nid] if e["source"] in reachable]
+                        active_inc_edges = [
+                            e for e in inc_edges_reachable
+                            if f"{e['source']}->{e['target']}:{e.get('condition', '')}" in active_edges
+                        ]
+
+                        if not is_root and inc_edges_reachable and not active_inc_edges:
+                            skip_entry = {
+                                "node_id": nid,
+                                "type": ntype,
+                                "title": node.get("title", ntype),
+                                "status": "SKIPPED",
+                                "duration_ms": 0,
+                                "output": "Skipped (upstream condition/switch branch not active).",
+                                "summary": "Branch not taken",
+                                "data": {}
+                            }
+                            ctx["nodes"][nid] = skip_entry
+                            node_results.append(skip_entry)
+                            resolved.add(nid)
+                            continue
+
+                        if node.get("disabled") or node_cfg.get("disabled"):
+                            prev_txt = ctx["nodes"][active_inc_edges[-1]["source"]].get("output", "") if active_inc_edges and active_inc_edges[-1]["source"] in ctx["nodes"] else ""
+                            bypass_entry = {
+                                "node_id": nid,
+                                "type": ntype,
+                                "title": node.get("title", ntype),
+                                "status": "SKIPPED",
+                                "duration_ms": 0,
+                                "output": prev_txt,
+                                "summary": "Muted / Bypassed",
+                                "data": {"bypassed": True}
+                            }
+                            ctx["nodes"][nid] = bypass_entry
+                            node_results.append(bypass_entry)
+                            resolved.add(nid)
+                            for e in outgoing[nid]:
+                                active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
+                            continue
+
+                        active_wave_ids.append(nid)
+
+                    if active_wave_ids:
+                        if workflow_id in self._live_progress:
+                            self._live_progress[workflow_id]["active_node_ids"] = list(active_wave_ids)
+                            self._live_progress[workflow_id]["current_node_id"] = active_wave_ids[0]
+                            self._live_progress[workflow_id]["node_results"] = list(node_results)
+                            self._live_progress[workflow_id]["completed_count"] = len(node_results)
+
+                        wave_results = await asyncio.gather(
+                            *(_run_single_wave_node(nid) for nid in active_wave_ids),
+                            return_exceptions=True
+                        )
+
+                        for nid, w_res in zip(active_wave_ids, wave_results):
+                            if isinstance(w_res, Exception):
+                                w_res = {
+                                    "node_id": nid,
+                                    "type": node_map[nid].get("type", ""),
+                                    "title": node_map[nid].get("title", nid),
+                                    "status": "FAILED",
+                                    "duration_ms": 0,
+                                    "output": f"Parallel execution exception: {str(w_res)}",
+                                    "summary": "Exception",
+                                    "data": {}
+                                }
+                            ctx["nodes"][nid] = w_res
+                            node_results.append(w_res)
+                            resolved.add(nid)
+
+                            if w_res.get("status") != "FAILED" and w_res.get("output") and not node_map[nid].get("type", "").startswith("trigger_"):
+                                executed_outputs_ordered.append(w_res["output"])
+                                final_output = w_res["output"]
+
+                            _propagate_outgoing(nid, w_res)
 
                     if workflow_id in self._live_progress:
                         self._live_progress[workflow_id]["node_results"] = list(node_results)
                         self._live_progress[workflow_id]["completed_count"] = len(node_results)
 
-                    if n_res["status"] == "FAILED":
-                        if continue_on_fail:
-                            n_res["summary"] = f"{n_res.get('summary', '')} [continue-on-fail]".strip()
-                        failed_count += 1
-                    else:
-                        succeeded_count += 1
-                        if n_res.get("output") and not ntype.startswith("trigger_"):
-                            executed_outputs_ordered.append(n_res["output"])
-                            final_output = n_res["output"]
-
-                    # Halt unconfigured downstream branches if non-recoverable failure unless continue_on_fail is checked
-                    should_propagate = (n_res["status"] != "FAILED") or continue_on_fail
-                    if should_propagate:
-                        if ntype == "condition":
-                            matched = bool(n_res.get("data", {}).get("matched", False))
-                            for e in outgoing[nid]:
-                                cond = (e.get("condition") or "").strip().lower()
-                                if (
-                                    cond in ("", "always")
-                                    or (cond in ("true", "yes", "1", "match") and matched)
-                                    or (cond in ("false", "no", "0", "else") and not matched)
-                                ):
-                                    active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
-                        else:
-                            for e in outgoing[nid]:
-                                active_edges.add(f"{e['source']}->{e['target']}:{e.get('condition', '')}")
-
-                non_trigger_success = sum(
-                    1 for r in node_results
-                    if not r.get("type", "").startswith("trigger_") and r.get("status") == "SUCCESS"
-                )
-                non_trigger_fail = sum(
-                    1 for r in node_results
-                    if not r.get("type", "").startswith("trigger_") and r.get("status") == "FAILED"
-                )
-                if non_trigger_fail > 0 and non_trigger_success == 0:
-                    overall_status = "FAILED"
-                elif non_trigger_fail > 0:
-                    overall_status = "PARTIAL"
+                if cancelled:
+                    overall_status = "CANCELLED"
+                    error_message = "Workflow execution stopped by user."
                 else:
-                    overall_status = "SUCCESS"
+                    non_trigger_success = sum(
+                        1 for r in node_results
+                        if not r.get("type", "").startswith("trigger_") and r.get("status") == "SUCCESS"
+                    )
+                    non_trigger_fail = sum(
+                        1 for r in node_results
+                        if not r.get("type", "").startswith("trigger_") and r.get("status") == "FAILED"
+                    )
+                    if non_trigger_fail > 0 and non_trigger_success == 0:
+                        overall_status = "FAILED"
+                    elif non_trigger_fail > 0:
+                        overall_status = "PARTIAL"
+                    else:
+                        overall_status = "SUCCESS"
 
                 if not final_output and executed_outputs_ordered:
                     final_output = executed_outputs_ordered[-1]
@@ -441,9 +541,14 @@ class WorkflowEngine:
             logger.error(f"Workflow '{workflow_id}' execution error: {exec_err}")
         finally:
             self._active_runs.discard(workflow_id)
+            self._cancel_flags.discard(workflow_id)
             if workflow_id in self._live_progress:
                 self._live_progress[workflow_id]["status"] = overall_status
                 self._live_progress[workflow_id]["current_node_id"] = None
+                self._live_progress[workflow_id]["active_node_ids"] = []
+
+        final_output = _redact_secrets_in_obj(final_output, secret_values_to_redact)
+        error_message = _redact_secrets_in_obj(error_message, secret_values_to_redact)
 
         duration_ms = int((time.time() - t0) * 1000)
         finished_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -536,22 +641,33 @@ class WorkflowEngine:
         raw_cfg = node.get("config") or {}
 
         if ctx is None:
+            vars_map, _ = await WorkflowStore.get_secrets_for_runtime()
             now_tz = datetime.now(_get_tzinfo("Asia/Dhaka"))
             ctx = {
                 "workflow": {"id": "test", "name": "Single Node Test"},
                 "trigger": {
                     "source": "node_test",
+                    "dry_run": False,
                     "date": now_tz.strftime("%Y-%m-%d"),
                     "time": now_tz.strftime("%H:%M:%S"),
                     "datetime": now_tz.strftime("%Y-%m-%d %H:%M:%S"),
+                    "iso": now_tz.isoformat(),
                     "weekday": now_tz.strftime("%A"),
                     "timezone": "Asia/Dhaka",
                     "payload": {}
                 },
+                "vars": vars_map,
+                "secrets": vars_map,
                 "nodes": {},
-                "prev": {"output": "", "status": "IDLE", "node_id": ""}
+                "prev": {"output": "", "status": "IDLE", "node_id": "", "error": "", "data": {}},
+                "prev_all": [],
+                "_dry_run": False,
+                "_depth": 0,
+                "_wf_id": ""
             }
 
+        is_dry_run = bool(ctx.get("_dry_run", False))
+        parent_wf_id = ctx.get("_wf_id", "")
         cfg = _resolve_template_value(raw_cfg, ctx)
         status = "SUCCESS"
         output = ""
@@ -844,13 +960,157 @@ class WorkflowEngine:
                 output = "\n".join(lines_md)
                 summary = f"Loop {len(batch_results)} item(s) ({err_items} error)"
 
-            # 4D. Delay / Wait Timer Node
+            # 4D. Delay / Wait Timer Node (cancellable cleanly)
             elif ntype == "delay_wait":
                 sec = min(max(float(cfg.get("seconds", 2) or 2), 0.1), 60.0)
-                await asyncio.sleep(sec)
+                if not is_dry_run:
+                    elapsed_w = 0.0
+                    while elapsed_w < sec:
+                        if parent_wf_id and parent_wf_id in self._cancel_flags:
+                            break
+                        step_w = min(0.25, sec - elapsed_w)
+                        await asyncio.sleep(step_w)
+                        elapsed_w += step_w
                 output = ctx.get("prev", {}).get("output", "") or f"Waited {sec:.1f}s"
                 data = {"waited_seconds": sec}
-                summary = f"Waited {sec:.1f}s"
+                summary = f"Waited {sec:.1f}s" + (" (dry)" if is_dry_run else "")
+
+            # 4E. Merge / Multi-Branch Combine Node
+            elif ntype == "merge_combine":
+                mode = (cfg.get("mode") or "markdown_sections").strip().lower()
+                inc_empty = bool(cfg.get("include_empty", False))
+                prev_all = ctx.get("prev_all") or []
+                if not prev_all and ctx.get("prev", {}).get("output"):
+                    prev_all = [ctx["prev"]]
+
+                valid_items = [
+                    p for p in prev_all
+                    if inc_empty or str(p.get("output") or "").strip()
+                ]
+                if mode == "json_array":
+                    output = json.dumps(
+                        [{"node_id": p.get("node_id"), "title": p.get("title"), "status": p.get("status"), "output": p.get("output")} for p in valid_items],
+                        ensure_ascii=False, indent=2
+                    )
+                else:
+                    sections = []
+                    for p in valid_items:
+                        title_p = p.get("title") or p.get("node_id") or "Branch"
+                        sections.append(f"### [{p.get('node_id', 'branch')}] {title_p} ({p.get('status', 'OK')})\n{p.get('output', '')}")
+                    output = "\n\n---\n\n".join(sections) if sections else "No upstream branch outputs to merge."
+                data = {"merged_count": len(valid_items), "branch_ids": [p.get("node_id") for p in valid_items]}
+                summary = f"Merged {len(valid_items)} branch(es)"
+
+            # 4F. Multi-Way Switch Router Node
+            elif ntype == "switch_router":
+                target_val = cfg.get("target")
+                if not target_val:
+                    target_val = ctx.get("prev", {}).get("output", "")
+                r1_op = cfg.get("route1_op", "regex")
+                r1_val = cfg.get("route1_val", "")
+                r2_op = cfg.get("route2_op", "regex")
+                r2_val = cfg.get("route2_val", "")
+
+                selected_route = "default"
+                if r1_val and _evaluate_condition(target_val, r1_op, r1_val):
+                    selected_route = "route_1"
+                elif r2_val and _evaluate_condition(target_val, r2_op, r2_val):
+                    selected_route = "route_2"
+
+                pass_through = ctx.get("prev", {}).get("output", "")
+                output = pass_through if pass_through else f"Switch selected: {selected_route}"
+                data = {"selected_route": selected_route, "route_1": r1_val, "route_2": r2_val}
+                summary = f"Switch -> {selected_route.upper()}"
+
+            # 4G. Sub-Workflow Call Node (Modular Reusable Pipelines)
+            elif ntype == "sub_workflow":
+                target_wf_id = (cfg.get("target_workflow_id") or "").strip()
+                if not target_wf_id:
+                    raise ValueError("Sub-Workflow node requires selecting a Target Workflow ID.")
+                if target_wf_id == parent_wf_id:
+                    raise ValueError("Workflow cannot invoke itself directly as a sub-workflow.")
+                raw_pl = cfg.get("payload_json", "{}")
+                sub_payload = {}
+                if isinstance(raw_pl, dict):
+                    sub_payload = raw_pl
+                elif isinstance(raw_pl, str) and raw_pl.strip():
+                    try:
+                        sub_payload = json.loads(raw_pl)
+                    except Exception:
+                        sub_payload = {"input": raw_pl}
+
+                depth_next = int(ctx.get("_depth", 0)) + 1
+                sub_res = await self.execute_workflow(
+                    workflow_id=target_wf_id,
+                    trigger_source=f"sub_workflow:{parent_wf_id or 'manual'}",
+                    trigger_payload=sub_payload,
+                    dry_run=is_dry_run,
+                    depth=depth_next
+                )
+                output = sub_res.get("final_output", "") or f"Sub-workflow '{target_wf_id}' status: {sub_res.get('status')}"
+                data = {
+                    "sub_workflow_id": target_wf_id,
+                    "sub_run_id": sub_res.get("run_id"),
+                    "sub_status": sub_res.get("status"),
+                    "duration_ms": sub_res.get("duration_ms")
+                }
+                if sub_res.get("status") == "FAILED":
+                    status = "FAILED"
+                summary = f"SubWF '{sub_res.get('workflow_name', target_wf_id)}' ({sub_res.get('status')})"
+
+            # 4H. SQLite DB & Hybrid Vector RAG Knowledge Query Node
+            elif ntype == "knowledge_db_query":
+                q_mode = (cfg.get("query_mode") or "sqlite").strip().lower()
+                if q_mode == "rag":
+                    rag_q = (cfg.get("rag_query") or ctx.get("prev", {}).get("output") or "").strip()
+                    top_k = max(1, min(12, int(cfg.get("top_k", 5) or 5)))
+                    from memory.vector_store import VectorMemoryStore
+                    hits = VectorMemoryStore().super_fast_search(query=rag_q, top_k=top_k, user_role="admin")
+                    if not hits:
+                        output = f"No vector/knowledge hits found for query: {rag_q}"
+                    else:
+                        lines = [f"- **[{h.get('source', 'Memory')} score={h.get('score', 0):.2f}]** {str(h.get('content', ''))[:400]}" for h in hits]
+                        output = "\n".join(lines)
+                    data = {"mode": "rag", "hits_count": len(hits)}
+                    summary = f"RAG Query ({len(hits)} hits)"
+                else:
+                    allowed_dbs = {"ops.db", "chat_history.db", "reports.db", "project_memory.db", "security_audit.db"}
+                    db_name = os.path.basename((cfg.get("db_name") or "ops.db").strip())
+                    if db_name not in allowed_dbs:
+                        raise ValueError(f"DB '{db_name}' not allowed. Choose from: {', '.join(sorted(allowed_dbs))}")
+                    sql_q = (cfg.get("sql_query") or "SELECT name FROM sqlite_master WHERE type='table';").strip()
+                    sql_head = sql_q.lstrip().split()[0].upper() if sql_q.strip() else ""
+                    if sql_head not in ("SELECT", "PRAGMA", "WITH", "EXPLAIN"):
+                        raise ValueError("Security rule: only read-only SELECT, PRAGMA, or WITH SQLite queries are allowed.")
+
+                    data_dir = _get_reports_db_dir()
+                    db_path = os.path.join(data_dir, db_name)
+                    if not os.path.exists(db_path):
+                        db_path = os.path.join("./data", db_name)
+
+                    def _exec_read_sql():
+                        conn = sqlite3.connect(db_path)
+                        conn.row_factory = sqlite3.Row
+                        cur = conn.execute(sql_q)
+                        rows_raw = cur.fetchmany(30)
+                        cols = [d[0] for d in (cur.description or [])]
+                        rows_list = [dict(zip(cols, r)) for r in rows_raw] if cols else []
+                        conn.close()
+                        return cols, rows_list
+
+                    cols, rows_list = await asyncio.to_thread(_exec_read_sql)
+                    if not rows_list:
+                        output = f"SQL Query returned 0 rows from `{db_name}`."
+                    else:
+                        header_md = "| " + " | ".join(cols) + " |"
+                        sep_md = "|" + "|".join(["---"] * len(cols)) + "|"
+                        body_md = [
+                            "| " + " | ".join(str(row.get(c, ""))[:120].replace("|", "/").replace("\n", " ") for c in cols) + " |"
+                            for row in rows_list
+                        ]
+                        output = f"### SQLite Query (`{db_name}` • {len(rows_list)} row(s))\n" + "\n".join([header_md, sep_md] + body_md)
+                    data = {"mode": "sqlite", "db_name": db_name, "row_count": len(rows_list), "rows": rows_list[:15]}
+                    summary = f"SQL '{db_name}' ({len(rows_list)} rows)"
 
             # 5. IF / Else Conditional Branching Node
             elif ntype == "condition":
@@ -894,23 +1154,28 @@ class WorkflowEngine:
                     except Exception:
                         text_body = raw_body
 
-                async with httpx.AsyncClient(timeout=20.0, verify=False) as client:
-                    if method == "GET":
-                        resp = await client.get(url, headers=headers)
-                    elif method == "DELETE":
-                        resp = await client.delete(url, headers=headers)
-                    else:
-                        if json_body is not None:
-                            resp = await client.request(method, url, headers=headers, json=json_body)
+                if is_dry_run and method != "GET":
+                    output = f"[🧪 DRY-RUN PREVIEW] Skipped external {method} {url}\nBody:\n{str(raw_body)[:800]}"
+                    data = {"dry_run": True, "method": method, "url": url}
+                    summary = f"[DRY-RUN] {method} {url}"
+                else:
+                    async with httpx.AsyncClient(timeout=20.0, verify=False) as client:
+                        if method == "GET":
+                            resp = await client.get(url, headers=headers)
+                        elif method == "DELETE":
+                            resp = await client.delete(url, headers=headers)
                         else:
-                            resp = await client.request(method, url, headers=headers, content=text_body)
+                            if json_body is not None:
+                                resp = await client.request(method, url, headers=headers, json=json_body)
+                            else:
+                                resp = await client.request(method, url, headers=headers, content=text_body)
 
-                resp_text = resp.text[:4000]
-                data = {"status_code": resp.status_code, "url": url, "method": method}
-                output = f"HTTP {resp.status_code} ({method} {url}):\n{resp_text}"
-                summary = f"{method} {url} -> HTTP {resp.status_code}"
-                if resp.status_code >= 400:
-                    status = "FAILED"
+                    resp_text = resp.text[:4000]
+                    data = {"status_code": resp.status_code, "url": url, "method": method}
+                    output = f"HTTP {resp.status_code} ({method} {url}):\n{resp_text}"
+                    summary = f"{method} {url} -> HTTP {resp.status_code}"
+                    if resp.status_code >= 400:
+                        status = "FAILED"
 
             # 7. Project & Vector Memory Save Node
             elif ntype == "memory_save":
@@ -924,34 +1189,39 @@ class WorkflowEngine:
                 if not content:
                     raise ValueError("No content available to save to memory.")
 
-                pm_res = await ProjectMemoryStore.save_memory(
-                    project_name=project_name,
-                    key=key,
-                    content=content,
-                    title=f"Workflow Auto-Memory: {key}",
-                    category=category,
-                    context=context_tag,
-                    tags=[project_name, category, "workflow_auto"]
-                )
+                if is_dry_run:
+                    output = f"[🧪 DRY-RUN PREVIEW] Would save memory [{project_name}/{key}]:\n{content[:600]}"
+                    data = {"dry_run": True, "project_name": project_name, "key": key}
+                    summary = f"[DRY-RUN] Memory {project_name}/{key}"
+                else:
+                    pm_res = await ProjectMemoryStore.save_memory(
+                        project_name=project_name,
+                        key=key,
+                        content=content,
+                        title=f"Workflow Auto-Memory: {key}",
+                        category=category,
+                        context=context_tag,
+                        tags=[project_name, category, "workflow_auto"]
+                    )
 
-                vec_doc_id = None
-                if cfg.get("save_to_vector", True):
-                    try:
-                        from memory.vector_store import VectorMemoryStore
-                        vs = VectorMemoryStore()
-                        v_res = vs.add_note(
-                            title=f"[{project_name}] {key}",
-                            content=content[:4000],
-                            category="workflow_memory",
-                            tags=[project_name, category, "workflow"]
-                        )
-                        vec_doc_id = v_res.get("doc_id")
-                    except Exception as ve:
-                        logger.warning(f"Vector memory save skipped: {ve}")
+                    vec_doc_id = None
+                    if cfg.get("save_to_vector", True):
+                        try:
+                            from memory.vector_store import VectorMemoryStore
+                            vs = VectorMemoryStore()
+                            v_res = vs.add_note(
+                                title=f"[{project_name}] {key}",
+                                content=content[:4000],
+                                category="workflow_memory",
+                                tags=[project_name, category, "workflow"]
+                            )
+                            vec_doc_id = v_res.get("doc_id")
+                        except Exception as ve:
+                            logger.warning(f"Vector memory save skipped: {ve}")
 
-                data = {"project_name": project_name, "key": key, "vector_doc_id": vec_doc_id, "saved": pm_res}
-                output = f"✅ Saved to Project Memory [{project_name}/{key}]" + (f" & Vector Store ({vec_doc_id})" if vec_doc_id else "")
-                summary = f"Saved [{project_name}/{key}]"
+                    data = {"project_name": project_name, "key": key, "vector_doc_id": vec_doc_id, "saved": pm_res}
+                    output = f"✅ Saved to Project Memory [{project_name}/{key}]" + (f" & Vector Store ({vec_doc_id})" if vec_doc_id else "")
+                    summary = f"Saved [{project_name}/{key}]"
 
             # 8. Save Executive Report Node (saves .md file + reports.db for UI Reports tab!)
             elif ntype == "save_report":
@@ -961,63 +1231,68 @@ class WorkflowEngine:
                 if not content:
                     raise ValueError("No content available to archive as report.")
 
-                data_dir = _get_reports_db_dir()
-                reports_dir = os.path.join(data_dir, "reports")
-                os.makedirs(reports_dir, exist_ok=True)
+                if is_dry_run:
+                    output = f"[🧪 DRY-RUN PREVIEW] Would archive report '{rpt_title}':\n{content[:600]}"
+                    data = {"dry_run": True, "title": rpt_title}
+                    summary = "[DRY-RUN] Save Report"
+                else:
+                    data_dir = _get_reports_db_dir()
+                    reports_dir = os.path.join(data_dir, "reports")
+                    os.makedirs(reports_dir, exist_ok=True)
 
-                rpt_id = f"rpt_{uuid.uuid4().hex[:10]}"
-                ts_human = datetime.now().strftime("%d %B %Y, %H:%M")
-                full_md = (
-                    f"# {rpt_title}\n\n"
-                    f"---\n**রিপোর্ট আইডি:** `{rpt_id}` | **তৈরি:** {ts_human} | **উৎস:** Automated Workflow\n---\n\n"
-                    f"{content}\n"
-                )
-                safe_fname = re.sub(r"[^a-zA-Z0-9_\-]", "_", f"{rpt_id}_{rpt_title[:35]}") + ".md"
-                md_path = os.path.join(reports_dir, safe_fname)
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(full_md)
+                    rpt_id = f"rpt_{uuid.uuid4().hex[:10]}"
+                    ts_human = datetime.now().strftime("%d %B %Y, %H:%M")
+                    full_md = (
+                        f"# {rpt_title}\n\n"
+                        f"---\n**রিপোর্ট আইডি:** `{rpt_id}` | **তৈরি:** {ts_human} | **উৎস:** Automated Workflow\n---\n\n"
+                        f"{content}\n"
+                    )
+                    safe_fname = re.sub(r"[^a-zA-Z0-9_\-]", "_", f"{rpt_id}_{rpt_title[:35]}") + ".md"
+                    md_path = os.path.join(reports_dir, safe_fname)
+                    with open(md_path, "w", encoding="utf-8") as f:
+                        f.write(full_md)
 
-                # Also write to reports.db so AI Reports UI displays it seamlessly
-                reports_db_path = os.path.join(data_dir, "reports.db")
-                def _insert_report():
-                    conn = sqlite3.connect(reports_db_path)
-                    conn.execute("""
-                        CREATE TABLE IF NOT EXISTS reports (
-                            id TEXT PRIMARY KEY,
-                            title TEXT NOT NULL,
-                            report_type TEXT NOT NULL,
-                            topic TEXT,
-                            content TEXT NOT NULL,
-                            sources TEXT DEFAULT '[]',
-                            created_by TEXT DEFAULT 'workflow_auto',
-                            created_at TEXT NOT NULL,
-                            word_count INTEGER DEFAULT 0
-                        )
-                    """)
-                    conn.execute("""
-                        INSERT INTO reports (id, title, report_type, topic, content, sources, created_by, created_at, word_count)
-                        VALUES (?, ?, ?, ?, ?, '[]', 'workflow_auto', ?, ?)
-                    """, (rpt_id, rpt_title, rpt_type, ctx["workflow"]["name"], full_md, datetime.now().isoformat(), len(full_md.split())))
-                    conn.commit()
-                    conn.close()
+                    # Also write to reports.db so AI Reports UI displays it seamlessly
+                    reports_db_path = os.path.join(data_dir, "reports.db")
+                    def _insert_report():
+                        conn = sqlite3.connect(reports_db_path)
+                        conn.execute("""
+                            CREATE TABLE IF NOT EXISTS reports (
+                                id TEXT PRIMARY KEY,
+                                title TEXT NOT NULL,
+                                report_type TEXT NOT NULL,
+                                topic TEXT,
+                                content TEXT NOT NULL,
+                                sources TEXT DEFAULT '[]',
+                                created_by TEXT DEFAULT 'workflow_auto',
+                                created_at TEXT NOT NULL,
+                                word_count INTEGER DEFAULT 0
+                            )
+                        """)
+                        conn.execute("""
+                            INSERT INTO reports (id, title, report_type, topic, content, sources, created_by, created_at, word_count)
+                            VALUES (?, ?, ?, ?, ?, '[]', 'workflow_auto', ?, ?)
+                        """, (rpt_id, rpt_title, rpt_type, ctx["workflow"]["name"], full_md, datetime.now().isoformat(), len(full_md.split())))
+                        conn.commit()
+                        conn.close()
 
-                await asyncio.to_thread(_insert_report)
+                    await asyncio.to_thread(_insert_report)
 
-                if cfg.get("index_in_memory", True):
-                    try:
-                        from memory.vector_store import VectorMemoryStore
-                        VectorMemoryStore().add_note(
-                            title=rpt_title,
-                            content=full_md[:3500],
-                            category="generated_report",
-                            tags=["workflow_report", rpt_type]
-                        )
-                    except Exception:
-                        pass
+                    if cfg.get("index_in_memory", True):
+                        try:
+                            from memory.vector_store import VectorMemoryStore
+                            VectorMemoryStore().add_note(
+                                title=rpt_title,
+                                content=full_md[:3500],
+                                category="generated_report",
+                                tags=["workflow_report", rpt_type]
+                            )
+                        except Exception:
+                            pass
 
-                data = {"report_id": rpt_id, "filename": safe_fname, "path": md_path}
-                output = f"✅ Report archived: `{safe_fname}` (Report ID: `{rpt_id}` — visible in AI Reports tab)\n\n{content[:1200]}"
-                summary = f"Report saved ({rpt_id})"
+                    data = {"report_id": rpt_id, "filename": safe_fname, "path": md_path}
+                    output = f"✅ Report archived: `{safe_fname}` (Report ID: `{rpt_id}` — visible in AI Reports tab)\n\n{content[:1200]}"
+                    summary = f"Report saved ({rpt_id})"
 
             # 9. Notify Channel & Chat Digest Node
             elif ntype == "notify_channel":
@@ -1028,86 +1303,91 @@ class WorkflowEngine:
                 custom_wh = (cfg.get("custom_webhook_url") or "").strip()
 
                 full_digest = f"### {msg_title}\n\n{msg_body}"
-                delivered_to: List[str] = []
+                if is_dry_run:
+                    output = f"[🧪 DRY-RUN PREVIEW] Would notify ({target_mode}) titled '{msg_title}':\n{msg_body[:600]}"
+                    data = {"dry_run": True, "target": target_mode}
+                    summary = f"[DRY-RUN] Notify {target_mode}"
+                else:
+                    delivered_to: List[str] = []
 
-                # A. Post to persistent Chat Session if requested
-                if target_mode in ("chat_session", "chat_and_channels", "all"):
-                    try:
-                        from memory.chat_session_store import ChatSessionStore
-                        sess_id = "session_daily_automations"
-                        cs_db = await ChatSessionStore.get_db()
+                    # A. Post to persistent Chat Session if requested
+                    if target_mode in ("chat_session", "chat_and_channels", "all"):
                         try:
-                            async with cs_db.execute("SELECT id FROM sessions WHERE id = ?", (sess_id,)) as cur:
-                                exists = await cur.fetchone()
-                            now_s = time.strftime("%Y-%m-%d %H:%M:%S")
-                            if not exists:
+                            from memory.chat_session_store import ChatSessionStore
+                            sess_id = "session_daily_automations"
+                            cs_db = await ChatSessionStore.get_db()
+                            try:
+                                async with cs_db.execute("SELECT id FROM sessions WHERE id = ?", (sess_id,)) as cur:
+                                    exists = await cur.fetchone()
+                                now_s = time.strftime("%Y-%m-%d %H:%M:%S")
+                                if not exists:
+                                    await cs_db.execute(
+                                        "INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                                        (sess_id, sess_title, now_s, now_s)
+                                    )
                                 await cs_db.execute(
-                                    "INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                                    (sess_id, sess_title, now_s, now_s)
+                                    "INSERT INTO messages (session_id, role, content, sources, created_at) VALUES (?, 'assistant', ?, NULL, ?)",
+                                    (sess_id, full_digest, now_s)
                                 )
-                            await cs_db.execute(
-                                "INSERT INTO messages (session_id, role, content, sources, created_at) VALUES (?, 'assistant', ?, NULL, ?)",
-                                (sess_id, full_digest, now_s)
-                            )
-                            await cs_db.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now_s, sess_id))
-                            await cs_db.commit()
-                            delivered_to.append(f"ChatSession({sess_id})")
-                        finally:
-                            await cs_db.close()
-                    except Exception as cs_err:
-                        logger.warning(f"Chat session digest delivery warning: {cs_err}")
+                                await cs_db.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now_s, sess_id))
+                                await cs_db.commit()
+                                delivered_to.append(f"ChatSession({sess_id})")
+                            finally:
+                                await cs_db.close()
+                        except Exception as cs_err:
+                            logger.warning(f"Chat session digest delivery warning: {cs_err}")
 
-                # B. Dispatch to configured ops_channels (Telegram, Discord, Slack) if requested
-                if target_mode in ("chat_and_channels", "channels", "configured", "all", "telegram", "discord", "slack"):
-                    try:
-                        ops_db = await WorkflowStore.get_db()
+                    # B. Dispatch to configured ops_channels (Telegram, Discord, Slack) if requested
+                    if target_mode in ("chat_and_channels", "channels", "configured", "all", "telegram", "discord", "slack"):
                         try:
-                            async with ops_db.execute("SELECT * FROM ops_channels WHERE is_enabled = 1") as cur:
-                                chans = [dict(r) for r in await cur.fetchall()]
-                        finally:
-                            await ops_db.close()
+                            ops_db = await WorkflowStore.get_db()
+                            try:
+                                async with ops_db.execute("SELECT * FROM ops_channels WHERE is_enabled = 1") as cur:
+                                    chans = [dict(r) for r in await cur.fetchall()]
+                            finally:
+                                await ops_db.close()
 
-                        for ch in chans:
-                            plat = (ch.get("platform") or "").lower()
-                            if target_mode in ("telegram", "discord", "slack") and plat != target_mode:
-                                continue
-                            token = (ch.get("token") or "").strip()
-                            wh_url = (ch.get("webhook_url") or "").strip()
-                            chat_id = (ch.get("chat_id") or "").strip()
+                            for ch in chans:
+                                plat = (ch.get("platform") or "").lower()
+                                if target_mode in ("telegram", "discord", "slack") and plat != target_mode:
+                                    continue
+                                token = (ch.get("token") or "").strip()
+                                wh_url = (ch.get("webhook_url") or "").strip()
+                                chat_id = (ch.get("chat_id") or "").strip()
 
+                                async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
+                                    if plat == "telegram" and token and chat_id:
+                                        tg_url = f"https://api.telegram.org/bot{token}/sendMessage"
+                                        r = await client.post(tg_url, json={"chat_id": chat_id, "text": f"{msg_title}\n\n{msg_body[:3800]}"})
+                                        delivered_to.append(f"Telegram({r.status_code})")
+                                    elif plat == "discord" and wh_url.startswith("http"):
+                                        r = await client.post(wh_url, json={"content": f"**{msg_title}**\n{msg_body[:1900]}"})
+                                        delivered_to.append(f"Discord({r.status_code})")
+                                    elif plat == "slack" and wh_url.startswith("http"):
+                                        r = await client.post(wh_url, json={"text": f"*{msg_title}*\n{msg_body[:3000]}"})
+                                        delivered_to.append(f"Slack({r.status_code})")
+                        except Exception as ch_err:
+                            logger.warning(f"Channel dispatch warning: {ch_err}")
+
+                    # C. Custom Outbound Webhook URL
+                    if custom_wh.startswith("http"):
+                        try:
                             async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
-                                if plat == "telegram" and token and chat_id:
-                                    tg_url = f"https://api.telegram.org/bot{token}/sendMessage"
-                                    r = await client.post(tg_url, json={"chat_id": chat_id, "text": f"{msg_title}\n\n{msg_body[:3800]}"})
-                                    delivered_to.append(f"Telegram({r.status_code})")
-                                elif plat == "discord" and wh_url.startswith("http"):
-                                    r = await client.post(wh_url, json={"content": f"**{msg_title}**\n{msg_body[:1900]}"})
-                                    delivered_to.append(f"Discord({r.status_code})")
-                                elif plat == "slack" and wh_url.startswith("http"):
-                                    r = await client.post(wh_url, json={"text": f"*{msg_title}*\n{msg_body[:3000]}"})
-                                    delivered_to.append(f"Slack({r.status_code})")
-                    except Exception as ch_err:
-                        logger.warning(f"Channel dispatch warning: {ch_err}")
+                                r = await client.post(custom_wh, json={
+                                    "event": "myagent_workflow_notification",
+                                    "workflow_id": ctx["workflow"]["id"],
+                                    "workflow_name": ctx["workflow"]["name"],
+                                    "title": msg_title,
+                                    "message": msg_body,
+                                    "timestamp": ctx["trigger"].get("datetime")
+                                })
+                                delivered_to.append(f"Webhook({r.status_code})")
+                        except Exception as wh_err:
+                            delivered_to.append(f"WebhookError({str(wh_err)[:40]})")
 
-                # C. Custom Outbound Webhook URL
-                if custom_wh.startswith("http"):
-                    try:
-                        async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
-                            r = await client.post(custom_wh, json={
-                                "event": "myagent_workflow_notification",
-                                "workflow_id": ctx["workflow"]["id"],
-                                "workflow_name": ctx["workflow"]["name"],
-                                "title": msg_title,
-                                "message": msg_body,
-                                "timestamp": ctx["trigger"].get("datetime")
-                            })
-                            delivered_to.append(f"Webhook({r.status_code})")
-                    except Exception as wh_err:
-                        delivered_to.append(f"WebhookError({str(wh_err)[:40]})")
-
-                data = {"delivered_to": delivered_to, "title": msg_title}
-                output = f"✅ Delivered to: {', '.join(delivered_to) if delivered_to else 'OpsLogs only'}\n\n{msg_body[:800]}"
-                summary = f"Notified {', '.join(delivered_to) if delivered_to else 'Log'}"
+                    data = {"delivered_to": delivered_to, "title": msg_title}
+                    output = f"✅ Delivered to: {', '.join(delivered_to) if delivered_to else 'OpsLogs only'}\n\n{msg_body[:800]}"
+                    summary = f"Notified {', '.join(delivered_to) if delivered_to else 'Log'}"
 
             else:
                 status = "FAILED"
