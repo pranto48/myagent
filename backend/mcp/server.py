@@ -208,7 +208,9 @@ class MyAgentMCPServer:
                         },
                         "instructions": (
                             "Connected to MyAgent Docker MCP Server on 192.168.9.9. "
-                            "You have access to corporate network diagnostic ping (ping_network_diagnostics), "
+                            "You have access to Per-Project Memory Vault (save_project_memory, get_project_memory, search_project_memory) "
+                            "and Project Architecture Blueprints (save_project_info, get_project_info, list_all_projects), "
+                            "corporate network diagnostic ping (ping_network_diagnostics), "
                             "hybrid memory RAG retrieval and storage (query_company_memory, save_company_memory), "
                             "data analytics (analyze_big_data, smart_data_summarizer), Python calculations "
                             "(python_runner), document readers (PDF, Word, Excel, OCR), and autonomous agents."
@@ -310,6 +312,13 @@ class MyAgentMCPServer:
                                 "arguments": [
                                     {"name": "filepath", "description": "Data file path (e.g. sales.csv)", "required": True}
                                 ]
+                            },
+                            {
+                                "name": "project_context_discovery",
+                                "description": "Fetch project architecture blueprint, credentials, and past memories before starting tasks on a project",
+                                "arguments": [
+                                    {"name": "project_name", "description": "Project name (e.g. myagent, 48_otnarp, ampshop)", "required": True}
+                                ]
                             }
                         ]
                     }
@@ -356,6 +365,24 @@ class MyAgentMCPServer:
                             ]
                         }
                     }
+                elif p_name == "project_context_discovery":
+                    prj = p_args.get("project_name", "myagent")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"Context discovery for project {prj}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": f"Call get_project_info for '{prj}' and search_project_memory for '{prj}' to inspect all architecture details, credentials, and past checkpoints before writing code."
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 else:
                     return {
                         "jsonrpc": "2.0",
@@ -373,24 +400,45 @@ class MyAgentMCPServer:
 
             # 8. List resources
             elif method == "resources/list":
+                resources = [
+                    {
+                        "uri": "myagent://system/diagnostics",
+                        "name": "Docker System Diagnostics",
+                        "description": "Real-time CPU, RAM, disk and container health metrics",
+                        "mimeType": "application/json"
+                    },
+                    {
+                        "uri": "myagent://company/memory/stats",
+                        "name": "Company Hybrid Memory Stats",
+                        "description": "Summary of indexed document chunks and vector store status",
+                        "mimeType": "application/json"
+                    }
+                ]
+                try:
+                    from memory.project_store import ProjectMemoryStore
+                    projs = await ProjectMemoryStore.list_projects()
+                    for p in projs:
+                        p_name = p["name"]
+                        resources.append({
+                            "uri": f"project://{p_name}/info",
+                            "name": f"Project Info: {p.get('display_name') or p_name}",
+                            "description": p.get("description") or f"Architecture & tech stack for {p_name}",
+                            "mimeType": "application/json"
+                        })
+                        resources.append({
+                            "uri": f"project://{p_name}/memories",
+                            "name": f"Project Memory Vault: {p_name} ({p.get('memories_count', 0)} records)",
+                            "description": f"Stored memories, credentials, and architecture notes for {p_name}",
+                            "mimeType": "application/json"
+                        })
+                except Exception as ex:
+                    logger.warning(f"Failed loading project resources: {ex}")
+
                 return {
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "resources": [
-                            {
-                                "uri": "myagent://system/diagnostics",
-                                "name": "Docker System Diagnostics",
-                                "description": "Real-time CPU, RAM, disk and container health metrics",
-                                "mimeType": "application/json"
-                            },
-                            {
-                                "uri": "myagent://company/memory/stats",
-                                "name": "Company Hybrid Memory Stats",
-                                "description": "Summary of indexed document chunks and vector store status",
-                                "mimeType": "application/json"
-                            }
-                        ]
+                        "resources": resources
                     }
                 }
 
@@ -400,9 +448,20 @@ class MyAgentMCPServer:
                 res_text = "{}"
                 if "diagnostics" in uri:
                     res_text = AgentTools.system_info()
-                elif "memory" in uri:
+                elif "company/memory" in uri:
                     from memory.vector_store import VectorStore
                     res_text = json.dumps(VectorStore().get_stats(), indent=2)
+                elif uri.startswith("project://"):
+                    from memory.project_store import ProjectMemoryStore
+                    parts = uri.replace("project://", "").split("/")
+                    p_name = parts[0] if len(parts) > 0 else "myagent"
+                    res_type = parts[1] if len(parts) > 1 else "info"
+                    if res_type == "memories":
+                        mems = await ProjectMemoryStore.search_memories(project_name=p_name, limit=100)
+                        res_text = json.dumps(mems, indent=2, ensure_ascii=False)
+                    else:
+                        info = await ProjectMemoryStore.get_project_info(p_name)
+                        res_text = json.dumps(info or {}, indent=2, ensure_ascii=False)
                 
                 return {
                     "jsonrpc": "2.0",

@@ -9,12 +9,32 @@ from typing import List, Dict, Any, Optional
 from mcp.store import MCPStore
 from mcp.manager import MCPManager
 from mcp.server import MyAgentMCPServer
+from memory.project_store import ProjectMemoryStore
 from agent.tools import AgentTools
 
 router = APIRouter(prefix="/api/mcp", tags=["Model Context Protocol (MCP)"])
 
 class ToggleServerRequest(BaseModel):
     is_enabled: bool
+
+class SaveProjectInfoRequest(BaseModel):
+    name: str
+    display_name: Optional[str] = None
+    description: str
+    tech_stack: Optional[Any] = None
+    architecture_blueprint: Optional[str] = None
+    urls: Optional[Any] = None
+    env_summary: Optional[str] = None
+    status: str = "active"
+
+class SaveProjectMemoryRequest(BaseModel):
+    key: str
+    content: str
+    title: Optional[str] = None
+    category: str = "general"
+    context: str = "production"
+    tags: Optional[List[str]] = None
+    security_level: str = "INTERNAL"
 
 class AddMCPServerRequest(BaseModel):
     name: str
@@ -294,3 +314,92 @@ async def myagent_mcp_messages(
         await MyAgentMCPServer.push_to_session(sid, response)
 
     return response
+
+# ==============================================================================
+# Per-Project Information & Hierarchical Memory Vault Endpoints
+# ==============================================================================
+
+@router.get("/projects")
+async def list_projects():
+    """Lists all registered projects with architecture summaries and memory counts."""
+    return await ProjectMemoryStore.list_projects()
+
+@router.post("/projects")
+async def save_project_info(req: SaveProjectInfoRequest):
+    """Registers or updates a project's architecture blueprint, tech stack, and URLs."""
+    res = await ProjectMemoryStore.save_project_info(
+        name=req.name,
+        display_name=req.display_name,
+        description=req.description,
+        tech_stack=req.tech_stack,
+        architecture_blueprint=req.architecture_blueprint,
+        urls=req.urls,
+        env_summary=req.env_summary,
+        status=req.status
+    )
+    return res
+
+@router.get("/projects/{project_name}")
+async def get_project_details(project_name: str):
+    """Returns architecture blueprint, tech stack, and metadata for a specific project."""
+    res = await ProjectMemoryStore.get_project_info(project_name)
+    if not res:
+        raise HTTPException(status_code=404, detail=f"Project '{project_name}' not found.")
+    return res
+
+@router.delete("/projects/{project_name}")
+async def delete_project(project_name: str):
+    """Deletes a project and all its associated memories."""
+    success = await ProjectMemoryStore.delete_project(project_name)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Project '{project_name}' not found.")
+    return {"success": True, "message": f"Project '{project_name}' deleted."}
+
+@router.get("/projects/{project_name}/memories")
+async def list_project_memories(
+    project_name: str,
+    category: Optional[str] = None,
+    context: Optional[str] = None,
+    query: Optional[str] = None
+):
+    """Lists and filters memories saved under a specific project."""
+    return await ProjectMemoryStore.search_memories(
+        project_name=project_name,
+        category=category,
+        context=context,
+        query=query
+    )
+
+@router.post("/projects/{project_name}/memories")
+async def save_project_memory(project_name: str, req: SaveProjectMemoryRequest):
+    """
+    Saves or updates a memory item for a specific project with hierarchical indexing:
+    Project -> Category -> Context -> Key.
+    """
+    res = await ProjectMemoryStore.save_memory(
+        project_name=project_name,
+        key=req.key,
+        content=req.content,
+        title=req.title,
+        category=req.category,
+        context=req.context,
+        tags=req.tags,
+        security_level=req.security_level
+    )
+    return res
+
+@router.get("/projects/{project_name}/memories/{key}")
+async def get_project_memory_item(project_name: str, key: str):
+    """Retrieves a single project memory item by project name and exact key."""
+    mem = await ProjectMemoryStore.get_memory(project_name, key)
+    if not mem:
+        raise HTTPException(status_code=404, detail=f"Memory '{key}' not found in project '{project_name}'.")
+    return mem
+
+@router.delete("/projects/{project_name}/memories/{key}")
+async def delete_project_memory_item(project_name: str, key: str):
+    """Deletes a single project memory item."""
+    success = await ProjectMemoryStore.delete_memory(project_name, key)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Memory '{key}' not found in project '{project_name}'.")
+    return {"success": True, "message": f"Memory '{key}' deleted from project '{project_name}'."}

@@ -1309,8 +1309,96 @@
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('tools/list')">📋 2. List All Tools</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('ping_host')">🟢 3. Call ping_network_diagnostics (192.168.9.1)</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('query_memory')">🧠 4. Call query_company_memory</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('get_project')">🏢 5. Call get_project_info (myagent)</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('save_project_mem')">💾 6. Call save_project_memory (test)</button>
               </div>
               <pre id="myagent-mcp-test-output" style="background:#090d16; border:1px solid var(--border-subtle); border-radius:6px; padding:12px; height:140px; overflow-y:auto; font-size:0.78rem; color:#38bdf8; margin:0; font-family:monospace;">পরীক্ষার জন্য উপরের যেকোনো টেস্ট বাটনে ক্লিক করুন...</pre>
+            </div>
+          </div>
+
+          <!-- Section 0.5: Per-Project Information & Hierarchical Memory Vault -->
+          <div class="card-panel" id="project-memory-vault-panel" style="margin-bottom: 24px;">
+            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="display:flex; align-items:center; gap:8px;" data-i18n="mcp_proj_vault_title">
+                  🏢 প্রজেক্ট ইনফরমেশন ও পার-প্রজেক্ট মেমোরি ভল্ট (Project Info & Memory Vault)
+                </h3>
+                <p style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;" data-i18n="mcp_proj_vault_desc">
+                  প্রতিটি প্রজেক্টের আর্কিটেকচার ব্লুপ্রিন্ট, টেক স্ট্যাক এবং হায়ারার্কিক্যাল মেমোরি (Project &rarr; Category &rarr; Context &rarr; Key) পরিচালনা করুন। MCP ক্লায়েন্টরা সরাসরি এগুলো অ্যাক্সেস করতে পারে।
+                </p>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn-primary" onclick="openAddProjectModal()">+ নতুন প্রজেক্ট</button>
+                <button class="btn-secondary" onclick="openAddProjectMemoryModal()">+ মেমোরি সেভ করুন</button>
+              </div>
+            </div>
+
+            <!-- Project Selector Pills -->
+            <div style="margin-top:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">প্রজেক্ট নির্বাচন:</span>
+              <div id="project-pills-container" style="display:flex; gap:6px; flex-wrap:wrap;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Selected Project Details Card -->
+            <div id="selected-project-card" style="margin-top:16px; background:rgba(255,255,255,0.02); border:1px solid var(--border-subtle); border-radius:10px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                <div>
+                  <h4 id="proj-card-title" style="margin:0; font-size:1.05rem; color:var(--cyan-glow);">MyAgent — Enterprise Autonomous AI Platform</h4>
+                  <p id="proj-card-desc" style="margin:6px 0 0 0; font-size:0.84rem; color:var(--text-muted);">লোড হচ্ছে...</p>
+                </div>
+                <div id="proj-card-meta" style="display:flex; gap:6px; align-items:center;">
+                  <span id="proj-card-status" class="badge-tag" style="background:rgba(16,185,129,0.2); color:#6ee7b7;">active</span>
+                  <span id="proj-card-count" class="badge-tag">0টি মেমোরি</span>
+                  <button class="btn-sm-action" onclick="openEditCurrentProjectModal()" style="padding:2px 8px; font-size:0.75rem;">✏️ এডিট</button>
+                </div>
+              </div>
+
+              <!-- Tech Stack and URLs -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-top:14px;">
+                <div style="background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                  <strong style="font-size:0.78rem; color:#94a3b8; text-transform:uppercase;">💻 টেক স্ট্যাক ও পোর্টস:</strong>
+                  <div id="proj-card-tech" style="font-size:0.78rem; color:#e2e8f0; margin-top:4px; font-family:monospace; line-height:1.5;"></div>
+                </div>
+                <div style="background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                  <strong style="font-size:0.78rem; color:#94a3b8; text-transform:uppercase;">🌐 লিঙ্ক ও এনভায়রনমেন্ট:</strong>
+                  <div id="proj-card-urls" style="font-size:0.78rem; color:#38bdf8; margin-top:4px; font-family:monospace; line-height:1.5;"></div>
+                </div>
+              </div>
+
+              <details style="margin-top:12px; font-size:0.8rem;">
+                <summary style="cursor:pointer; color:var(--purple-neon); font-weight:600;">📐 আর্কিটেকচার ব্লুপ্রিন্ট (Architecture Blueprint) দেখুন</summary>
+                <pre id="proj-card-blueprint" style="background:rgba(0,0,0,0.5); padding:12px; border-radius:6px; color:#cbd5e1; margin-top:6px; font-family:monospace; white-space:pre-wrap; max-height:200px; overflow-y:auto; line-height:1.5;"></pre>
+              </details>
+            </div>
+
+            <!-- Project Memories Vault List -->
+            <div style="margin-top:20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <strong style="font-size:0.9rem; color:white;">💾 এই প্রজেক্টের সংরক্ষিত মেমোরিসমূহ</strong>
+                  <span id="proj-mem-filter-badge" class="badge-tag" style="background:rgba(6,182,212,0.15); color:var(--cyan-glow);">সকল</span>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <select id="proj-mem-cat-filter" class="text-input" style="padding:4px 8px; font-size:0.78rem; width:140px;" onchange="filterProjectMemories()">
+                    <option value="">সকল ক্যাটাগরি</option>
+                    <option value="auth">auth</option>
+                    <option value="database">database</option>
+                    <option value="deployment">deployment</option>
+                    <option value="credentials">credentials</option>
+                    <option value="architecture">architecture</option>
+                    <option value="api">api</option>
+                    <option value="notes">notes</option>
+                    <option value="general">general</option>
+                  </select>
+                  <input type="text" id="proj-mem-search" class="text-input" placeholder="কী বা বিষয় দিয়ে ফিল্টার..." style="padding:4px 8px; font-size:0.78rem; width:160px;" oninput="filterProjectMemories()">
+                </div>
+              </div>
+
+              <div id="project-memories-list" style="display:flex; flex-direction:column; gap:8px;">
+                <div style="padding:16px; text-align:center; color:var(--text-muted); font-size:0.85rem;">প্রজেক্ট মেমোরি লোড হচ্ছে...</div>
+              </div>
             </div>
           </div>
 
@@ -3101,6 +3189,119 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
         <div id="mcp-tools-modal-body" style="overflow-y:auto; flex:1; margin-top:10px;" data-i18n="loading_ellipsis">
           লোড হচ্ছে...
         </div>
+      </div>
+    </div>
+
+    <!-- Add/Edit Project Info Modal -->
+    <div class="modal-backdrop" id="add-project-modal" style="display:none;">
+      <div class="modal-window" style="max-width: 580px;">
+        <div class="modal-header">
+          <h3 id="add-project-modal-title">🏢 নতুন প্রজেক্ট ইনফরমেশন যুক্ত করুন</h3>
+          <button class="close-modal-btn" type="button" onclick="closeAddProjectModal()">&times;</button>
+        </div>
+        <form id="add-project-form" onsubmit="submitSaveProjectInfo(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label>প্রজেক্ট কী / নাম (যেমন: 48_otnarp, ampshop)</label>
+              <input type="text" id="proj-input-name" class="text-input" placeholder="myagent" required>
+            </div>
+            <div class="form-group">
+              <label>ডিসপ্লে নাম</label>
+              <input type="text" id="proj-input-display" class="text-input" placeholder="MyAgent Enterprise">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>সংক্ষিপ্ত বিবরণ (Description)</label>
+            <input type="text" id="proj-input-desc" class="text-input" placeholder="প্রজেক্টের মূল কাজ ও উদ্দেশ্য" required>
+          </div>
+          <div class="form-group">
+            <label>টেক স্ট্যাক (Tech Stack / Ports / DB)</label>
+            <input type="text" id="proj-input-tech" class="text-input" placeholder="FastAPI, React, PostgreSQL, Docker Port 3399">
+          </div>
+          <div class="form-group">
+            <label>লিংকসমূহ (Live URL / GitHub Repo)</label>
+            <input type="text" id="proj-input-urls" class="text-input" placeholder="http://192.168.9.9:3399">
+          </div>
+          <div class="form-group">
+            <label>আর্কিটেকচার ব্লুপ্রিন্ট (Architecture Blueprint)</label>
+            <textarea id="proj-input-blueprint" class="text-input" rows="4" placeholder="প্রজেক্টের সিস্টেম ডিজাইন, ফোল্ডার কাঠামো বা ডেটা ফ্লো..."></textarea>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px;">
+            <button type="button" class="btn-secondary" onclick="closeAddProjectModal()">বাতিল</button>
+            <button type="submit" class="btn-primary">💾 প্রজেক্ট সেভ করুন</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add/Edit Project Memory Modal -->
+    <div class="modal-backdrop" id="add-project-memory-modal" style="display:none;">
+      <div class="modal-window" style="max-width: 580px;">
+        <div class="modal-header">
+          <h3>💾 পার-প্রজেক্ট মেমোরি সেভ করুন</h3>
+          <button class="close-modal-btn" type="button" onclick="closeAddProjectMemoryModal()">&times;</button>
+        </div>
+        <form id="add-project-memory-form" onsubmit="submitSaveProjectMemory(event)" style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label>প্রজেক্ট (Project)</label>
+              <input type="text" id="pm-input-project" class="text-input" placeholder="myagent" required>
+            </div>
+            <div class="form-group">
+              <label>ইউনিক কী (Specific Key)</label>
+              <input type="text" id="pm-input-key" class="text-input" placeholder="admin_login_creds" required>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label>ক্যাটাগরি (Category)</label>
+              <select id="pm-input-category" class="text-input">
+                <option value="architecture">architecture</option>
+                <option value="auth">auth</option>
+                <option value="database">database</option>
+                <option value="deployment">deployment</option>
+                <option value="credentials">credentials</option>
+                <option value="api">api</option>
+                <option value="notes">notes</option>
+                <option value="general">general</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>কনটেক্সট (Context)</label>
+              <select id="pm-input-context" class="text-input">
+                <option value="production">production</option>
+                <option value="local">local</option>
+                <option value="staging">staging</option>
+                <option value="admin">admin</option>
+                <option value="test">test</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>সিকিউরিটি লেভেল</label>
+              <select id="pm-input-security" class="text-input">
+                <option value="INTERNAL">INTERNAL</option>
+                <option value="PUBLIC">PUBLIC</option>
+                <option value="CONFIDENTIAL">CONFIDENTIAL</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>টাইটেল (Title)</label>
+            <input type="text" id="pm-input-title" class="text-input" placeholder="সংক্ষিপ্ত শিরোনাম">
+          </div>
+          <div class="form-group">
+            <label>মেমোরি বিবরণ (Content)</label>
+            <textarea id="pm-input-content" class="text-input" rows="4" placeholder="গুরুত্বপূর্ণ তথ্য, কনফিগারেশন বা কমান্ড যা এআই এজেন্টকে মনে রাখতে হবে..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label>ট্যাগসমূহ (কমা দিয়ে আলাদা করুন)</label>
+            <input type="text" id="pm-input-tags" class="text-input" placeholder="docker, port, nginx">
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px;">
+            <button type="button" class="btn-secondary" onclick="closeAddProjectMemoryModal()">বাতিল</button>
+            <button type="submit" class="btn-primary">💾 মেমোরি সেভ করুন</button>
+          </div>
+        </form>
       </div>
     </div>
 

@@ -784,6 +784,105 @@ class AgentTools:
         except Exception as e:
             return f"Ping diagnostics error: {str(e)}"
 
+    @staticmethod
+    async def save_project_info(
+        project_name: str,
+        description: str,
+        display_name: Optional[str] = None,
+        tech_stack: Optional[str] = None,
+        architecture_blueprint: Optional[str] = None,
+        urls: Optional[str] = None
+    ) -> str:
+        """Creates or updates high-level project information, tech stack, and architecture blueprint."""
+        from memory.project_store import ProjectMemoryStore
+        res = await ProjectMemoryStore.save_project_info(
+            name=project_name,
+            display_name=display_name,
+            description=description,
+            tech_stack=tech_stack,
+            architecture_blueprint=architecture_blueprint,
+            urls=urls
+        )
+        return json.dumps({
+            "success": True,
+            "message": f"Project information for '{project_name}' successfully saved.",
+            "project": res
+        }, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    async def get_project_info(project_name: str) -> str:
+        """Retrieves project overview, tech stack, architecture blueprint, and memory count."""
+        from memory.project_store import ProjectMemoryStore
+        data = await ProjectMemoryStore.get_project_info(project_name)
+        if not data:
+            return f"No project registered with name '{project_name}'. You can register it using save_project_info."
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    async def list_all_projects() -> str:
+        """Lists all registered projects with memory counts and last updated status."""
+        from memory.project_store import ProjectMemoryStore
+        projects = await ProjectMemoryStore.list_projects()
+        return json.dumps({
+            "total_projects": len(projects),
+            "projects": projects
+        }, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    async def save_project_memory(
+        project_name: str,
+        key: str,
+        content: str,
+        title: Optional[str] = None,
+        category: str = "general",
+        context: str = "production",
+        tags: Optional[List[str]] = None,
+        security_level: str = "INTERNAL"
+    ) -> str:
+        """Saves a hierarchical per-project memory item indexed by project -> category -> context -> key."""
+        from memory.project_store import ProjectMemoryStore
+        res = await ProjectMemoryStore.save_memory(
+            project_name=project_name,
+            key=key,
+            content=content,
+            title=title,
+            category=category,
+            context=context,
+            tags=tags,
+            security_level=security_level
+        )
+        return json.dumps(res, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    async def get_project_memory(project_name: str, key: str) -> str:
+        """Direct fast retrieval (<1ms) of a saved memory by project name and exact key."""
+        from memory.project_store import ProjectMemoryStore
+        mem = await ProjectMemoryStore.get_memory(project_name, key)
+        if not mem:
+            return f"No memory found for project '{project_name}' with key '{key}'."
+        return json.dumps(mem, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    async def search_project_memory(
+        project_name: Optional[str] = None,
+        category: Optional[str] = None,
+        context: Optional[str] = None,
+        query: Optional[str] = None
+    ) -> str:
+        """Searches across project memories by project name, category, context, or keyword."""
+        from memory.project_store import ProjectMemoryStore
+        mems = await ProjectMemoryStore.search_memories(
+            project_name=project_name,
+            category=category,
+            context=context,
+            query=query,
+            limit=30
+        )
+        return json.dumps({
+            "count": len(mems),
+            "memories": mems
+        }, ensure_ascii=False, indent=2)
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
@@ -897,6 +996,42 @@ class AgentTools:
                     port=int(args["port"]) if args.get("port") else None,
                     count=int(args.get("count", 3))
                 )
+            elif tool_name == "save_project_info":
+                return await cls.save_project_info(
+                    project_name=args.get("project_name", "myagent"),
+                    description=args.get("description", ""),
+                    display_name=args.get("display_name"),
+                    tech_stack=args.get("tech_stack"),
+                    architecture_blueprint=args.get("architecture_blueprint"),
+                    urls=args.get("urls")
+                )
+            elif tool_name == "get_project_info":
+                return await cls.get_project_info(project_name=args.get("project_name", "myagent"))
+            elif tool_name == "list_all_projects":
+                return await cls.list_all_projects()
+            elif tool_name == "save_project_memory":
+                return await cls.save_project_memory(
+                    project_name=args.get("project_name", "myagent"),
+                    key=args.get("key", "note"),
+                    content=args.get("content", ""),
+                    title=args.get("title"),
+                    category=args.get("category", "general"),
+                    context=args.get("context", "production"),
+                    tags=args.get("tags"),
+                    security_level=args.get("security_level", "INTERNAL")
+                )
+            elif tool_name == "get_project_memory":
+                return await cls.get_project_memory(
+                    project_name=args.get("project_name", "myagent"),
+                    key=args.get("key", "")
+                )
+            elif tool_name == "search_project_memory":
+                return await cls.search_project_memory(
+                    project_name=args.get("project_name"),
+                    category=args.get("category"),
+                    context=args.get("context"),
+                    query=args.get("query")
+                )
 
             else:
                 # Check dynamic MCP manager
@@ -924,6 +1059,106 @@ class AgentTools:
                             "count": {"type": "integer", "description": "Number of ping packets to send (default 3)"}
                         },
                         "required": ["target"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_project_info",
+                    "description": "Stores or updates project metadata, description, tech stack, and architecture blueprint.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_name": {"type": "string", "description": "Unique project identifier (e.g. 48_otnarp, ampshop, myagent, arifmahmud.com)"},
+                            "description": {"type": "string", "description": "High-level summary of the project's purpose and functionality"},
+                            "display_name": {"type": "string", "description": "Human-readable project title"},
+                            "tech_stack": {"type": "string", "description": "Technologies used (frontend, backend, database, docker, ports)"},
+                            "architecture_blueprint": {"type": "string", "description": "Architectural structure, components, data flows, and build steps"},
+                            "urls": {"type": "string", "description": "Live URLs, repository links, or API docs"}
+                        },
+                        "required": ["project_name", "description"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_project_info",
+                    "description": "Retrieves comprehensive architectural overview, tech stack, and memory statistics for a specific project.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_name": {"type": "string", "description": "Target project identifier (e.g. 48_otnarp, ampshop, myagent)"}
+                        },
+                        "required": ["project_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_all_projects",
+                    "description": "Lists all registered projects in the system along with their description and total memory counts.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_project_memory",
+                    "description": "Persists key architectural facts, credentials, API endpoints, or database schemas tagged hierarchically by Project -> Category -> Context -> Key.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_name": {"type": "string", "description": "Project identifier (e.g. 48_otnarp, ampshop, myagent)"},
+                            "key": {"type": "string", "description": "Logical specific key (e.g. admin_credentials, firebase_config, redis_port, db_schema)"},
+                            "content": {"type": "string", "description": "Detailed text content of the fact, configuration, or credentials to remember"},
+                            "title": {"type": "string", "description": "Brief descriptive title"},
+                            "category": {"type": "string", "enum": ["auth", "database", "deployment", "credentials", "architecture", "api", "notes", "general"], "description": "Tag Level 2: Core category"},
+                            "context": {"type": "string", "enum": ["production", "local", "staging", "admin", "test"], "description": "Tag Level 3: Environment or role context"},
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Search tags"
+                            },
+                            "security_level": {"type": "string", "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"], "description": "Security classification"}
+                        },
+                        "required": ["project_name", "key", "content"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_project_memory",
+                    "description": "Ultra-fast direct retrieval of a specific project memory fact by exact project name and key.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_name": {"type": "string", "description": "Project identifier"},
+                            "key": {"type": "string", "description": "Exact key name to retrieve"}
+                        },
+                        "required": ["project_name", "key"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_project_memory",
+                    "description": "Searches and filters saved memories across projects by project name, category, context, or keywords.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_name": {"type": "string", "description": "Optional project filter"},
+                            "category": {"type": "string", "description": "Optional category filter (e.g. auth, database, deployment, credentials)"},
+                            "context": {"type": "string", "description": "Optional context filter (e.g. production, local)"},
+                            "query": {"type": "string", "description": "Keyword search across memory keys, titles, content, and tags"}
+                        }
                     }
                 }
             },

@@ -10,10 +10,14 @@ let allMcpServers = [];
 let allDiscoveredTools = [];
 let myAgentMcpStatus = null;
 let activeMcpConfigTab = 'antigravity';
+let allProjects = [];
+let activeProjectName = 'myagent';
+let activeProjectMemories = [];
 
 async function loadMcpDashboard() {
   await Promise.all([
     loadMyAgentMcpServerStatus(),
+    loadProjectMemoryVault(),
     loadMcpServers(),
     loadAllToolsRegistry()
   ]);
@@ -285,6 +289,32 @@ async function runMyAgentMcpTest(testType) {
         arguments: { query: "Company guidelines and policies", top_k: 2 }
       }
     };
+  } else if (testType === 'get_project') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "get_project_info",
+        arguments: { project_name: activeProjectName || "myagent" }
+      }
+    };
+  } else if (testType === 'save_project_mem') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "save_project_memory",
+        arguments: {
+          project_name: activeProjectName || "myagent",
+          key: "mcp_quick_test",
+          category: "architecture",
+          context: "production",
+          content: "Sample architectural checkpoint saved via MyAgent MCP Server testing console."
+        }
+      }
+    };
   }
 
   try {
@@ -296,9 +326,350 @@ async function runMyAgentMcpTest(testType) {
     const data = await res.json();
     out.innerText = JSON.stringify(data, null, 2);
     showToast('MCP টেস্ট সফল হয়েছে!', 'success');
+    if (testType === 'save_project_mem') {
+      loadActiveProjectMemories();
+    }
   } catch (err) {
     out.innerText = `MCP টেস্ট ত্রুটি: ${err.message}`;
     showToast(`টেস্ট ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+// ==============================================================================
+// Per-Project Information & Hierarchical Memory Vault Management
+// ==============================================================================
+
+async function loadProjectMemoryVault() {
+  try {
+    const res = await fetch('/api/mcp/projects', {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) return;
+    allProjects = await res.json();
+
+    if (allProjects.length > 0) {
+      if (!allProjects.some(p => p.name === activeProjectName)) {
+        activeProjectName = allProjects[0].name;
+      }
+    }
+
+    renderProjectPills();
+    const activeProj = allProjects.find(p => p.name === activeProjectName);
+    if (activeProj) {
+      renderProjectDetails(activeProj);
+      await loadActiveProjectMemories();
+    }
+  } catch (err) {
+    console.error('Error loading project memory vault:', err);
+  }
+}
+
+function renderProjectPills() {
+  const container = document.getElementById('project-pills-container');
+  if (!container) return;
+
+  container.innerHTML = allProjects.map(p => {
+    const isActive = p.name === activeProjectName;
+    return `
+      <button class="mcp-tab-btn ${isActive ? 'active' : ''}" 
+              onclick="selectProject('${escapeHtml(p.name)}')"
+              style="display:inline-flex; align-items:center; gap:6px;">
+        <span>📁 ${escapeHtml(p.name)}</span>
+        <span style="font-size:0.7rem; opacity:0.8; background:rgba(255,255,255,0.1); border-radius:10px; padding:1px 6px;">
+          ${p.memories_count || 0}
+        </span>
+      </button>
+    `;
+  }).join('');
+}
+
+async function selectProject(name) {
+  activeProjectName = name;
+  renderProjectPills();
+  const proj = allProjects.find(p => p.name === name);
+  if (proj) {
+    renderProjectDetails(proj);
+    await loadActiveProjectMemories();
+  }
+}
+
+function renderProjectDetails(proj) {
+  const title = document.getElementById('proj-card-title');
+  const desc = document.getElementById('proj-card-desc');
+  const status = document.getElementById('proj-card-status');
+  const count = document.getElementById('proj-card-count');
+  const tech = document.getElementById('proj-card-tech');
+  const urls = document.getElementById('proj-card-urls');
+  const blueprint = document.getElementById('proj-card-blueprint');
+
+  if (title) title.innerText = proj.display_name || proj.name;
+  if (desc) desc.innerText = proj.description || 'কোনো বিবরণ নেই';
+  if (status) status.innerText = proj.status || 'active';
+  if (count) count.innerText = `${proj.memories_count || 0}টি মেমোরি`;
+
+  if (tech) {
+    if (typeof proj.tech_stack === 'object') {
+      tech.innerText = Object.entries(proj.tech_stack).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+    } else {
+      tech.innerText = proj.tech_stack || 'N/A';
+    }
+  }
+
+  if (urls) {
+    if (typeof proj.urls === 'object') {
+      urls.innerText = Object.entries(proj.urls).map(([k, v]) => `${k}: ${v}`).join('\n');
+    } else {
+      urls.innerText = proj.urls || 'N/A';
+    }
+  }
+
+  if (blueprint) {
+    blueprint.innerText = proj.architecture_blueprint || 'কোনো আর্কিটেকচার ব্লুপ্রিন্ট সংরক্ষিত নেই।';
+  }
+}
+
+async function loadActiveProjectMemories() {
+  const listContainer = document.getElementById('project-memories-list');
+  if (!listContainer || !activeProjectName) return;
+
+  try {
+    const res = await fetch(`/api/mcp/projects/${encodeURIComponent(activeProjectName)}/memories`, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    activeProjectMemories = await res.json();
+    renderProjectMemoriesList(activeProjectMemories);
+  } catch (err) {
+    listContainer.innerHTML = `<div style="padding:14px; color:var(--rose-red); text-align:center;">মেমোরি লোড করতে ত্রুটি: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderProjectMemoriesList(mems) {
+  const listContainer = document.getElementById('project-memories-list');
+  if (!listContainer) return;
+
+  if (!mems || mems.length === 0) {
+    listContainer.innerHTML = `
+      <div style="padding:24px; text-align:center; background:rgba(255,255,255,0.01); border:1px dashed var(--border-subtle); border-radius:8px; color:var(--text-muted); font-size:0.85rem;">
+        এই প্রজেক্টে এখনও কোনো মেমোরি সেভ করা হয়নি।
+        <div style="margin-top:8px;">
+          <button class="btn-sm-action" onclick="openAddProjectMemoryModal()">+ প্রথম মেমোরি সেভ করুন</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  listContainer.innerHTML = mems.map(m => {
+    const tagsArr = Array.isArray(m.tags) ? m.tags : [];
+    return `
+      <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-subtle); border-radius:8px; padding:12px 14px; transition:border-color 0.2s ease;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <code style="font-weight:700; color:var(--cyan-glow); font-size:0.88rem; background:rgba(6,182,212,0.1); padding:2px 8px; border-radius:4px;">
+              ${escapeHtml(m.key)}
+            </code>
+            <span class="badge-tag" style="background:rgba(168,85,247,0.15); color:var(--purple-neon); font-size:0.72rem;">
+              ${escapeHtml(m.category)}
+            </span>
+            <span class="badge-tag" style="background:rgba(255,255,255,0.05); color:var(--text-muted); font-size:0.72rem;">
+              ${escapeHtml(m.context)}
+            </span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--text-muted);">${m.updated_at || ''}</span>
+            <button class="btn-sm-action" style="padding:2px 6px; font-size:0.72rem; color:var(--rose-red); border-color:rgba(244,63,94,0.3);" 
+                    onclick="deleteProjectMemoryItem('${escapeHtml(m.project_name)}', '${escapeHtml(m.key)}')">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top:6px; font-size:0.83rem; color:#f1f5f9; font-weight:600;">
+          ${escapeHtml(m.title || m.key)}
+        </div>
+
+        <pre style="margin-top:6px; background:rgba(0,0,0,0.4); border-radius:6px; padding:8px 10px; font-family:monospace; font-size:0.78rem; color:#cbd5e1; white-space:pre-wrap; max-height:120px; overflow-y:auto; line-height:1.4;">${escapeHtml(m.content)}</pre>
+
+        ${tagsArr.length > 0 ? `
+          <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:8px;">
+            ${tagsArr.map(t => `<span style="font-size:0.7rem; background:rgba(255,255,255,0.04); color:var(--text-muted); padding:1px 6px; border-radius:4px;">#${escapeHtml(t)}</span>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function filterProjectMemories() {
+  const cat = document.getElementById('proj-mem-cat-filter')?.value.toLowerCase();
+  const search = document.getElementById('proj-mem-search')?.value.toLowerCase().trim();
+  const badge = document.getElementById('proj-mem-filter-badge');
+
+  let filtered = activeProjectMemories;
+  if (cat) {
+    filtered = filtered.filter(m => (m.category || '').toLowerCase() === cat);
+  }
+  if (search) {
+    filtered = filtered.filter(m => 
+      (m.key || '').toLowerCase().includes(search) ||
+      (m.title || '').toLowerCase().includes(search) ||
+      (m.content || '').toLowerCase().includes(search) ||
+      (Array.isArray(m.tags) && m.tags.some(t => t.toLowerCase().includes(search)))
+    );
+  }
+
+  if (badge) {
+    badge.innerText = `${filtered.length}টি মেমোরি`;
+  }
+  renderProjectMemoriesList(filtered);
+}
+
+// Add/Edit Project Modal Handlers
+function openAddProjectModal() {
+  document.getElementById('add-project-form').reset();
+  document.getElementById('add-project-modal-title').innerText = '🏢 নতুন প্রজেক্ট ইনফরমেশন যুক্ত করুন';
+  document.getElementById('add-project-modal').style.display = 'flex';
+}
+
+function openEditCurrentProjectModal() {
+  const proj = allProjects.find(p => p.name === activeProjectName);
+  if (!proj) return;
+
+  document.getElementById('add-project-modal-title').innerText = `🏢 প্রজেক্ট এডিট: ${proj.name}`;
+  document.getElementById('proj-input-name').value = proj.name;
+  document.getElementById('proj-input-name').disabled = true;
+  document.getElementById('proj-input-display').value = proj.display_name || '';
+  document.getElementById('proj-input-desc').value = proj.description || '';
+  document.getElementById('proj-input-tech').value = typeof proj.tech_stack === 'object' ? JSON.stringify(proj.tech_stack) : (proj.tech_stack || '');
+  document.getElementById('proj-input-urls').value = typeof proj.urls === 'object' ? JSON.stringify(proj.urls) : (proj.urls || '');
+  document.getElementById('proj-input-blueprint').value = proj.architecture_blueprint || '';
+
+  document.getElementById('add-project-modal').style.display = 'flex';
+}
+
+function closeAddProjectModal() {
+  document.getElementById('proj-input-name').disabled = false;
+  document.getElementById('add-project-modal').style.display = 'none';
+}
+
+async function submitSaveProjectInfo(e) {
+  e.preventDefault();
+  const name = document.getElementById('proj-input-name').value.trim();
+  const displayName = document.getElementById('proj-input-display').value.trim();
+  const desc = document.getElementById('proj-input-desc').value.trim();
+  const tech = document.getElementById('proj-input-tech').value.trim();
+  const urls = document.getElementById('proj-input-urls').value.trim();
+  const blueprint = document.getElementById('proj-input-blueprint').value.trim();
+
+  if (!name || !desc) {
+    showToast('প্রজেক্ট নাম ও বিবরণ আবশ্যক!', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/mcp/projects', {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        display_name: displayName || name,
+        description: desc,
+        tech_stack: tech,
+        urls: urls,
+        architecture_blueprint: blueprint
+      })
+    });
+
+    if (res.ok) {
+      showToast(`প্রজেক্ট '${name}' সফলভাবে সংরক্ষিত হয়েছে!`, 'success');
+      closeAddProjectModal();
+      activeProjectName = name;
+      await loadProjectMemoryVault();
+    } else {
+      const err = await res.json();
+      showToast(`ত্রুটি: ${err.detail || 'সেভ ব্যর্থ'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+// Add/Edit Project Memory Modal Handlers
+function openAddProjectMemoryModal() {
+  document.getElementById('add-project-memory-form').reset();
+  const projInput = document.getElementById('pm-input-project');
+  if (projInput) projInput.value = activeProjectName || 'myagent';
+  document.getElementById('add-project-memory-modal').style.display = 'flex';
+}
+
+function closeAddProjectMemoryModal() {
+  document.getElementById('add-project-memory-modal').style.display = 'none';
+}
+
+async function submitSaveProjectMemory(e) {
+  e.preventDefault();
+  const projName = document.getElementById('pm-input-project').value.trim();
+  const key = document.getElementById('pm-input-key').value.trim();
+  const category = document.getElementById('pm-input-category').value;
+  const context = document.getElementById('pm-input-context').value;
+  const security = document.getElementById('pm-input-security').value;
+  const title = document.getElementById('pm-input-title').value.trim();
+  const content = document.getElementById('pm-input-content').value.trim();
+  const tagsRaw = document.getElementById('pm-input-tags').value.trim();
+
+  const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  if (!projName || !key || !content) {
+    showToast('প্রজেক্ট, কী এবং কনটেন্ট আবশ্যক!', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/mcp/projects/${encodeURIComponent(projName)}/memories`, {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key,
+        content,
+        title: title || key,
+        category,
+        context,
+        tags,
+        security_level: security
+      })
+    });
+
+    if (res.ok) {
+      showToast(`মেমোরি '${key}' সফলভাবে সংরক্ষিত হয়েছে!`, 'success');
+      closeAddProjectMemoryModal();
+      activeProjectName = projName;
+      await loadProjectMemoryVault();
+    } else {
+      const err = await res.json();
+      showToast(`ত্রুটি: ${err.detail || 'সেভ ব্যর্থ'}`, 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+async function deleteProjectMemoryItem(projName, key) {
+  if (!confirm(`আপনি কি নিশ্চিত যে প্রজেক্ট '${projName}' থেকে মেমোরি '${key}' মুছে ফেলতে চান?`)) return;
+
+  try {
+    const res = await fetch(`/api/mcp/projects/${encodeURIComponent(projName)}/memories/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (res.ok) {
+      showToast(`মেমোরি '${key}' সফলভাবে মুছে ফেলা হয়েছে!`, 'success');
+      await loadProjectMemoryVault();
+    } else {
+      showToast('মুছতে ব্যর্থ হয়েছে।', 'error');
+    }
+  } catch (err) {
+    showToast(`ত্রুটি: ${err.message}`, 'error');
   }
 }
 

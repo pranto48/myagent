@@ -13,6 +13,7 @@ from memory.vector_store import VectorMemoryStore
 from memory.chat_session_store import ChatSessionStore
 from memory.user_store import UserStore
 from mcp.store import MCPStore
+from memory.project_store import ProjectMemoryStore
 from security.audit import SecurityAuditStore
 from routers import (
     chat_router,
@@ -60,6 +61,8 @@ async def lifespan(app: FastAPI):
         await u_db.close()
         m_db = await MCPStore.get_db()
         await m_db.close()
+        pm_db = await ProjectMemoryStore.get_db()
+        await pm_db.close()
         await SecurityAuditStore().init_db()
         await init_ops_db()
         logger.info(f"Persistent databases, Autonomous Agent engine, and security audit trail initialized at {settings.SESSION_DB_PATH}")
