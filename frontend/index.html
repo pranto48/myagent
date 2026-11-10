@@ -2976,7 +2976,11 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
               <h3><span>⚡</span> <span data-i18n="wf_studio_title">n8n-স্টাইল অটোনোমাস ওয়ার্কফ্লো ও দৈনিক টাস্ক স্টুডিও</span></h3>
               <p data-i18n="wf_studio_desc">প্রতিদিনের এআই এজেন্ট কাজ অটোমেট করুন — ড্র্যাগ-ড্রপ নোড গ্রাফ, IF/Else লজিক, টুল এক্সিকিউশন, রিপোর্ট ও চ্যাট ডাইজেস্ট</p>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button type="button" id="wf-tg-status-pill" class="wf-tg-status-pill disconnected" onclick="switchWorkflowsSubTab('telegram')" title="Telegram Bot কানেকশন স্ট্যাটাস ও ডেলিভারি লগ দেখুন">
+                <span class="wf-tg-dot"></span>
+                <span id="wf-tg-pill-text">✈️ Telegram: Disconnected</span>
+              </button>
               <button type="button" class="btn-secondary" onclick="switchTab('workflow-docs')" title="দৈনিক অটো টাস্ক তৈরির গাইড ও ডকুমেন্টেশন">📖 ডকুমেন্টেশন</button>
               <button type="button" class="btn-secondary" onclick="openWorkflowVarsModal()" title="AES-256 এনক্রিপ্টেড গ্লোবাল ভেরিয়েবল ও সিক্রেটস ভল্ট">🔐 Vars Vault</button>
               <button type="button" class="btn-secondary" onclick="toggleQuickDailyBuilder()">⏰ কুইক বিল্ডার</button>
@@ -3086,6 +3090,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <button type="button" id="wf-tabbtn-studio" class="wf-subtab-btn active" onclick="switchWorkflowsSubTab('studio')">🎨 ভিজ্যুয়াল n8n স্টুডিও (Canvas)</button>
             <button type="button" id="wf-tabbtn-history" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('history')">📜 এক্সিকিউশন হিস্ট্রি ও ট্রেস</button>
             <button type="button" id="wf-tabbtn-templates" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('templates')">📚 টেমপ্লেট লাইব্রেরি</button>
+            <button type="button" id="wf-tabbtn-telegram" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('telegram')">✈️ টেলিগ্রাম কানেকশন ও লগ <span id="wf-tab-tg-dot" class="wf-tg-dot-mini disconnected"></span></button>
           </div>
 
           <!-- SUBTAB 1: Visual Studio -->
@@ -3159,6 +3164,120 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
           <!-- SUBTAB 3: Templates Library -->
           <div id="wf-subtab-templates" style="display:none;">
             <div id="wf-templates-grid" class="wf-templates-grid"></div>
+          </div>
+
+          <!-- SUBTAB 4: Telegram Connection System, Connected Status & Log View -->
+          <div id="wf-subtab-telegram" style="display:none;">
+            <div id="wf-tg-status-banner" class="wf-tg-status-banner disconnected">
+              <div class="wf-tg-banner-left">
+                <div class="wf-tg-state-row">
+                  <span id="wf-tg-big-badge" class="wf-tg-big-badge disconnected">● DISCONNECTED</span>
+                  <strong id="wf-tg-bot-identity" style="font-size:1rem;">Telegram Bot সংযুক্ত নয়</strong>
+                </div>
+                <div id="wf-tg-status-meta" class="wf-tg-meta-line">
+                  নিচের ফর্মে @BotFather টোকেন ও Chat ID দিয়ে কানেক্ট করুন।
+                </div>
+              </div>
+              <div class="wf-tg-banner-actions">
+                <button type="button" class="btn-sm-action-cyber" onclick="refreshWorkflowTelegramStatus(true)" title="api.telegram.org/getMe দিয়ে লাইভ যাচাই">🔄 Live Check (getMe)</button>
+                <button type="button" class="btn-sm-action-cyber" onclick="testWorkflowTelegramMessage()" title="সংযুক্ত টেলিগ্রাম চ্যাটে টেস্ট মেসেজ পাঠান">📨 Send Test</button>
+              </div>
+            </div>
+
+            <div class="wf-tg-grid">
+              <!-- Left Column: Telegram Connection Setup & Auto-Detect -->
+              <div class="ops-card wf-tg-card">
+                <div class="wf-tg-card-header">
+                  <h4>⚙️ টেলিগ্রাম বট কনফিগারেশন (AES-256 Encrypted)</h4>
+                </div>
+                <div class="wf-tg-setup-guide">
+                  <span>১) টেলিগ্রামে <code>@BotFather</code>-এ গিয়ে <code>/newbot</code> দিয়ে <strong>Bot Token</strong> নিন।</span>
+                  <span>২) আপনার নতুন বটটি ওপেন করে <code>/start</code> পাঠান, এরপর <strong>Auto-Detect Chat ID</strong> ক্লিক করুন।</span>
+                </div>
+
+                <form onsubmit="connectWorkflowTelegram(event)" class="wf-tg-form">
+                  <div class="wf-field-group">
+                    <label>Telegram Bot Token</label>
+                    <div style="display:flex; gap:6px;">
+                      <input type="password" id="wf-tg-token-input" class="text-input" placeholder="1234567890:ABCdefGHIjklMNOpqrSTUvwxyz" autocomplete="off">
+                      <button type="button" id="wf-tg-token-vis-btn" class="btn-secondary" style="padding:0 10px;" onclick="toggleTelegramTokenVisibility()" title="টোকেন দেখুন/লুকান">👁️</button>
+                    </div>
+                    <small id="wf-tg-token-hint" style="color:var(--text-muted); font-size:0.72rem;">আগে থেকে সেভ করা টোকেন অপরিবর্তিত রাখতে এটি খালি রাখুন।</small>
+                  </div>
+
+                  <div class="wf-field-group">
+                    <label>Default Target Chat ID (User / Group ID)</label>
+                    <div style="display:flex; gap:6px;">
+                      <input type="text" id="wf-tg-chatid-input" class="text-input" placeholder="যেমন: 123456789 অথবা -1001234567890">
+                      <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="detectWorkflowTelegramChats()">🔍 Auto-Detect</button>
+                    </div>
+                  </div>
+
+                  <div id="wf-tg-detected-chats" class="wf-tg-detected-list" style="display:none;"></div>
+
+                  <div style="display:flex; flex-direction:column; gap:6px; margin:6px 0;">
+                    <label style="font-size:0.8rem; cursor:pointer;">
+                      <input type="checkbox" id="wf-tg-enabled-chk" checked> ⚡ ওয়ার্কফ্লোতে Telegram ডেলিভারি চালু রাখুন (Active)
+                    </label>
+                    <label style="font-size:0.8rem; cursor:pointer;">
+                      <input type="checkbox" id="wf-tg-verify-chk" checked> 🛡️ কানেক্ট করার সময় Telegram API-এ লাইভ ভেরিফাই (getMe) করুন
+                    </label>
+                  </div>
+
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+                    <button type="submit" id="btn-wf-tg-connect" class="btn-primary">🔗 Connect &amp; Verify Bot</button>
+                    <button type="button" id="btn-wf-tg-disconnect" class="btn-sm-danger" onclick="disconnectWorkflowTelegram()">🔌 Disconnect</button>
+                  </div>
+                </form>
+
+                <hr style="border:none; border-top:1px solid var(--border-subtle); margin:14px 0;">
+
+                <div class="wf-field-group">
+                  <label>টেস্ট মেসেজ প্রিভিউ ও দ্রুত ডিসপ্যাচ</label>
+                  <div style="display:flex; gap:6px;">
+                    <input type="text" id="wf-tg-test-msg" class="text-input" placeholder="ঐচ্ছিক: কাস্টম টেস্ট মেসেজ লিখুন...">
+                    <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="testWorkflowTelegramMessage()">📨 Test Send</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Telegram Delivery & Connection Logs View -->
+              <div class="ops-card wf-tg-card" style="padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                <div style="padding:12px 16px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:700; font-size:0.92rem;">📜 টেলিগ্রাম কানেকশন ও ডেলিভারি লগ</span>
+                    <span id="wf-tg-log-counts" style="font-size:0.74rem; color:var(--text-muted);"></span>
+                  </div>
+                  <div style="display:flex; gap:6px; align-items:center;">
+                    <select id="wf-tg-log-filter" class="text-input" style="width:auto; padding:4px 8px; font-size:0.76rem;" onchange="refreshWorkflowTelegramLogs()">
+                      <option value="ALL">সব স্ট্যাটাস (All)</option>
+                      <option value="SUCCESS">✅ Connected / Sent</option>
+                      <option value="FAILED">❌ Failed / Error</option>
+                      <option value="DISCONNECTED">🔌 Disconnected</option>
+                    </select>
+                    <button type="button" class="btn-sm-action-cyber" onclick="refreshWorkflowTelegramLogs()">🔄 রিফ্রেশ</button>
+                    <button type="button" class="btn-sm-danger" onclick="clearWorkflowTelegramLogs()" title="লগ মুছুন">🗑️</button>
+                  </div>
+                </div>
+                <div style="overflow:auto; max-height:460px; flex:1;">
+                  <table class="wf-tg-log-table">
+                    <thead>
+                      <tr>
+                        <th>সময়</th>
+                        <th>ইভেন্ট</th>
+                        <th>উৎস / ওয়ার্কফ্লো</th>
+                        <th>Chat ID</th>
+                        <th>বিস্তারিত ও মেসেজ</th>
+                        <th>স্ট্যাটাস</th>
+                      </tr>
+                    </thead>
+                    <tbody id="wf-tg-logs-tbody">
+                      <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

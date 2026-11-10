@@ -1301,19 +1301,25 @@ class WorkflowEngine:
 
             # 9. Notify Channel & Chat Digest Node
             elif ntype == "notify_channel":
+                from workflows.telegram_service import telegram_send_message
+
                 target_mode = (cfg.get("target") or "chat_and_channels").strip().lower()
                 sess_title = (cfg.get("session_title") or "📅 Daily Automated Agent Reports").strip()
                 msg_title = (cfg.get("title") or ctx["workflow"]["name"]).strip()
                 msg_body = (cfg.get("message") or ctx.get("prev", {}).get("output") or "").strip()
                 custom_wh = (cfg.get("custom_webhook_url") or "").strip()
+                tg_chat_override = (cfg.get("telegram_chat_id") or "").strip()
+                tg_parse_mode = (cfg.get("parse_mode") or "").strip()
 
                 full_digest = f"### {msg_title}\n\n{msg_body}"
                 if is_dry_run:
-                    output = f"[🧪 DRY-RUN PREVIEW] Would notify ({target_mode}) titled '{msg_title}':\n{msg_body[:600]}"
-                    data = {"dry_run": True, "target": target_mode}
+                    extra_cid = f" (chat_id={tg_chat_override})" if tg_chat_override else ""
+                    output = f"[🧪 DRY-RUN PREVIEW] Would notify ({target_mode}{extra_cid}) titled '{msg_title}':\n{msg_body[:600]}"
+                    data = {"dry_run": True, "target": target_mode, "telegram_chat_override": tg_chat_override}
                     summary = f"[DRY-RUN] Notify {target_mode}"
                 else:
                     delivered_to: List[str] = []
+                    channel_errors: List[str] = []
 
                     # A. Post to persistent Chat Session if requested
                     if target_mode in ("chat_session", "chat_and_channels", "all"):
@@ -1341,38 +1347,76 @@ class WorkflowEngine:
                                 await cs_db.close()
                         except Exception as cs_err:
                             logger.warning(f"Chat session digest delivery warning: {cs_err}")
+                            channel_errors.append(f"ChatSession: {cs_err}")
 
-                    # B. Dispatch to configured ops_channels (Telegram, Discord, Slack) if requested
+                    # B. Dispatch to Telegram (Workflow Telegram Connection) + other ops_channels
                     if target_mode in ("chat_and_channels", "channels", "configured", "all", "telegram", "discord", "slack"):
-                        try:
-                            ops_db = await WorkflowStore.get_db()
+                        if target_mode in ("chat_and_channels", "channels", "configured", "all", "telegram"):
                             try:
-                                async with ops_db.execute("SELECT * FROM ops_channels WHERE is_enabled = 1") as cur:
-                                    chans = [dict(r) for r in await cur.fetchall()]
-                            finally:
-                                await ops_db.close()
+                                tg_cfg = await WorkflowStore.get_telegram_config(include_plaintext_token=True)
+                                tg_tok = tg_cfg.get("_bot_token") or ""
+                                tg_cid = tg_chat_override or tg_cfg.get("chat_id") or ""
+                                tg_should_send = bool(tg_tok and tg_cid and (tg_cfg.get("is_enabled") or target_mode == "telegram"))
+                                if tg_should_send:
+                                    tg_res = await telegram_send_message(
+                                        token=tg_tok,
+                                        chat_id=tg_cid,
+                                        text=f"{msg_title}\n\n{msg_body[:3700]}",
+                                        parse_mode=tg_parse_mode,
+                                        event_type="workflow_notify",
+                                        workflow_id=ctx["workflow"]["id"],
+                                        workflow_name=ctx["workflow"]["name"],
+                                        node_id=nid,
+                                        bot_username=tg_cfg.get("bot_username") or "",
+                                    )
+                                    if tg_res.get("ok"):
+                                        mid = tg_res.get("telegram_message_id")
+                                        delivered_to.append(f"Telegram(ok{', msg=' + mid if mid else ''})")
+                                    else:
+                                        channel_errors.append(f"Telegram: {tg_res.get('error')}")
+                                elif target_mode == "telegram":
+                                    err_msg = "Telegram bot is not connected or missing Bot Token / Chat ID."
+                                    await WorkflowStore.record_telegram_log(
+                                        event_type="workflow_notify",
+                                        status="FAILED",
+                                        workflow_id=ctx["workflow"]["id"],
+                                        workflow_name=ctx["workflow"]["name"],
+                                        node_id=nid,
+                                        bot_username=tg_cfg.get("bot_username") or "",
+                                        chat_id=tg_cid,
+                                        message_preview=msg_title,
+                                        error_detail=err_msg,
+                                    )
+                                    channel_errors.append(err_msg)
+                            except Exception as tg_err:
+                                logger.warning(f"Telegram dispatch warning: {tg_err}")
+                                channel_errors.append(f"Telegram: {tg_err}")
 
-                            for ch in chans:
-                                plat = (ch.get("platform") or "").lower()
-                                if target_mode in ("telegram", "discord", "slack") and plat != target_mode:
-                                    continue
-                                token = (ch.get("token") or "").strip()
-                                wh_url = (ch.get("webhook_url") or "").strip()
-                                chat_id = (ch.get("chat_id") or "").strip()
+                        # Dispatch non-Telegram ops_channels (Discord, Slack, etc.)
+                        if target_mode != "telegram":
+                            try:
+                                ops_db = await WorkflowStore.get_db()
+                                try:
+                                    async with ops_db.execute("SELECT * FROM ops_channels WHERE is_enabled = 1 AND platform != 'telegram'") as cur:
+                                        chans = [dict(r) for r in await cur.fetchall()]
+                                finally:
+                                    await ops_db.close()
 
-                                async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
-                                    if plat == "telegram" and token and chat_id:
-                                        tg_url = f"https://api.telegram.org/bot{token}/sendMessage"
-                                        r = await client.post(tg_url, json={"chat_id": chat_id, "text": f"{msg_title}\n\n{msg_body[:3800]}"})
-                                        delivered_to.append(f"Telegram({r.status_code})")
-                                    elif plat == "discord" and wh_url.startswith("http"):
-                                        r = await client.post(wh_url, json={"content": f"**{msg_title}**\n{msg_body[:1900]}"})
-                                        delivered_to.append(f"Discord({r.status_code})")
-                                    elif plat == "slack" and wh_url.startswith("http"):
-                                        r = await client.post(wh_url, json={"text": f"*{msg_title}*\n{msg_body[:3000]}"})
-                                        delivered_to.append(f"Slack({r.status_code})")
-                        except Exception as ch_err:
-                            logger.warning(f"Channel dispatch warning: {ch_err}")
+                                for ch in chans:
+                                    plat = (ch.get("platform") or "").lower()
+                                    if target_mode in ("discord", "slack") and plat != target_mode:
+                                        continue
+                                    wh_url = (ch.get("webhook_url") or "").strip()
+                                    async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
+                                        if plat == "discord" and wh_url.startswith("http"):
+                                            r = await client.post(wh_url, json={"content": f"**{msg_title}**\n{msg_body[:1900]}"})
+                                            delivered_to.append(f"Discord({r.status_code})")
+                                        elif plat == "slack" and wh_url.startswith("http"):
+                                            r = await client.post(wh_url, json={"text": f"*{msg_title}*\n{msg_body[:3000]}"})
+                                            delivered_to.append(f"Slack({r.status_code})")
+                            except Exception as ch_err:
+                                logger.warning(f"Channel dispatch warning: {ch_err}")
+                                channel_errors.append(f"Channels: {ch_err}")
 
                     # C. Custom Outbound Webhook URL
                     if custom_wh.startswith("http"):
@@ -1388,11 +1432,18 @@ class WorkflowEngine:
                                 })
                                 delivered_to.append(f"Webhook({r.status_code})")
                         except Exception as wh_err:
-                            delivered_to.append(f"WebhookError({str(wh_err)[:40]})")
+                            channel_errors.append(f"Webhook: {str(wh_err)[:60]}")
 
-                    data = {"delivered_to": delivered_to, "title": msg_title}
-                    output = f"✅ Delivered to: {', '.join(delivered_to) if delivered_to else 'OpsLogs only'}\n\n{msg_body[:800]}"
-                    summary = f"Notified {', '.join(delivered_to) if delivered_to else 'Log'}"
+                    if target_mode == "telegram" and channel_errors and not delivered_to:
+                        status = "FAILED"
+                        data = {"delivered_to": [], "errors": channel_errors, "title": msg_title}
+                        output = f"❌ Telegram delivery failed: {'; '.join(channel_errors)}"
+                        summary = f"Telegram failed: {channel_errors[0][:50]}"
+                    else:
+                        data = {"delivered_to": delivered_to, "errors": channel_errors, "title": msg_title}
+                        err_note = f"\n⚠️ Errors: {'; '.join(channel_errors)}" if channel_errors else ""
+                        output = f"✅ Delivered to: {', '.join(delivered_to) if delivered_to else 'OpsLogs only'}{err_note}\n\n{msg_body[:800]}"
+                        summary = f"Notified {', '.join(delivered_to) if delivered_to else 'Log'}"
 
             else:
                 status = "FAILED"

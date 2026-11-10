@@ -1234,6 +1234,20 @@ async def update_channel(channel_id: str, data: Dict[str, Any] = Body(...), user
         """, (token, webhook_url, chat_id, is_enabled, status, channel_id))
         await db.commit()
 
+        # Sync chan_telegram into Workflow Telegram Config cleanly
+        if channel_id == "chan_telegram":
+            try:
+                from workflows.store import WorkflowStore
+                await WorkflowStore.save_telegram_config(
+                    bot_token=token if token else None,
+                    chat_id=chat_id,
+                    is_enabled=bool(is_enabled),
+                    status=status,
+                    clear_token=(not token),
+                )
+            except Exception:
+                pass
+
         await record_ops_log("INFO", "Channels", f"Updated channel '{channel_id}' configuration.")
         return {"success": True, "status": status}
     finally:
@@ -1244,11 +1258,37 @@ async def test_channel(channel_id: str, user=Depends(get_current_user)):
     """Sends a ping test notification to a messaging channel."""
     db = await get_ops_db()
     try:
-        async with db.execute("SELECT name, platform FROM ops_channels WHERE id = ?", (channel_id,)) as cursor:
+        async with db.execute("SELECT name, platform, token, chat_id FROM ops_channels WHERE id = ?", (channel_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Channel not found")
             name = row["name"]
+            plat = row["platform"]
+            tok = (row["token"] or "").strip()
+            cid = (row["chat_id"] or "").strip()
+
+        if plat == "telegram":
+            from workflows.telegram_service import telegram_send_message
+            tg_res = await telegram_send_message(
+                token=tok,
+                chat_id=cid,
+                text="⚡ MyAgent Ops Center — Telegram Channel Test Ping OK!",
+                event_type="test_send",
+                workflow_name="Ops Center Channel Test",
+            )
+            now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+            await record_ops_log(
+                "SUCCESS" if tg_res["ok"] else "WARNING",
+                "Channels",
+                f"Telegram channel test {'succeeded' if tg_res['ok'] else 'failed'}: {tg_res.get('error') or 'SENT'}",
+                tg_res,
+            )
+            return {
+                "success": tg_res["ok"],
+                "message": "Telegram test message delivered!" if tg_res["ok"] else f"Telegram test failed: {tg_res.get('error')}",
+                "tested_at": now_str,
+                "delivery": tg_res,
+            }
 
         now_str = time.strftime("%Y-%m-%d %H:%M:%S")
         await db.execute("UPDATE ops_channels SET last_tested = ?, status = 'Connected' WHERE id = ?", (now_str, channel_id))

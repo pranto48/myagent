@@ -313,7 +313,9 @@ NODE_CATALOG: List[Dict[str, Any]] = [
             "session_title": "📅 Daily Automated Agent Reports",
             "title": "⚡ {{workflow.name}} ({{trigger.date}})",
             "message": "{{prev.output}}",
-            "custom_webhook_url": ""
+            "custom_webhook_url": "",
+            "telegram_chat_id": "",
+            "parse_mode": ""
         }
     },
     {
@@ -1097,6 +1099,7 @@ class WorkflowStore:
                 )
             """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_wf_versions_wfid ON ops_workflow_versions(workflow_id, version_num DESC)")
+            await cls._ensure_telegram_tables(db)
             await db.commit()
 
             # Seed prebuilt daily workflows if table is empty
@@ -1533,6 +1536,312 @@ class WorkflowStore:
         except Exception as e:
             logger.debug(f"Could not load workflow secrets: {e}")
             return {}, []
+
+    # ==========================================================================
+    # Telegram Connection Config, Status Sync & Delivery Log Store
+    # ==========================================================================
+    @classmethod
+    async def _ensure_telegram_tables(cls, db):
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ops_channels (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                icon TEXT DEFAULT '📡',
+                token TEXT,
+                webhook_url TEXT,
+                chat_id TEXT,
+                is_enabled INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'Disconnected',
+                last_tested TEXT
+            )
+        """)
+        await db.execute("""
+            INSERT OR IGNORE INTO ops_channels (id, name, platform, icon, token, webhook_url, chat_id, is_enabled, status, last_tested)
+            VALUES ('chan_telegram', 'Telegram Corporate Bot', 'telegram', '✈️', '', 'https://api.telegram.org/bot', '', 0, 'Disconnected', NULL)
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ops_telegram_config (
+                id TEXT PRIMARY KEY,
+                bot_token_enc TEXT DEFAULT '',
+                chat_id TEXT DEFAULT '',
+                bot_id TEXT DEFAULT '',
+                bot_username TEXT DEFAULT '',
+                bot_first_name TEXT DEFAULT '',
+                is_enabled INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'Disconnected',
+                last_verified_at TEXT DEFAULT '',
+                last_tested_at TEXT DEFAULT '',
+                last_error TEXT DEFAULT '',
+                updated_at TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ops_telegram_logs (
+                id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                workflow_id TEXT DEFAULT '',
+                workflow_name TEXT DEFAULT '',
+                node_id TEXT DEFAULT '',
+                bot_username TEXT DEFAULT '',
+                chat_id TEXT DEFAULT '',
+                message_preview TEXT DEFAULT '',
+                status TEXT NOT NULL,
+                http_status INTEGER DEFAULT 0,
+                telegram_message_id TEXT DEFAULT '',
+                error_detail TEXT DEFAULT '',
+                latency_ms INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_tg_logs_created ON ops_telegram_logs(created_at DESC)")
+
+    @staticmethod
+    def mask_telegram_token(token: str) -> str:
+        tok = (token or "").strip()
+        if not tok:
+            return ""
+        if ":" in tok:
+            prefix, rest = tok.split(":", 1)
+            tail = rest[-4:] if len(rest) >= 4 else "••••"
+            return f"{prefix[:6]}:••••{tail}"
+        return f"••••{tok[-4:]}" if len(tok) > 4 else "••••"
+
+    @classmethod
+    async def get_telegram_config(cls, include_plaintext_token: bool = False) -> Dict[str, Any]:
+        from security.crypto import DataCrypto
+        crypto = DataCrypto()
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            async with db.execute("SELECT * FROM ops_telegram_config WHERE id = 'default'") as cur:
+                row = await cur.fetchone()
+            async with db.execute("SELECT * FROM ops_channels WHERE id = 'chan_telegram'") as cur2:
+                chan_row = await cur2.fetchone()
+
+            now_s = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if not row:
+                # Hydrate cleanly if user previously saved token/chat_id inside ops_channels
+                chan_tok = (chan_row["token"] if chan_row else "") or ""
+                chan_cid = (chan_row["chat_id"] if chan_row else "") or ""
+                chan_en = int(chan_row["is_enabled"]) if chan_row else 0
+                chan_st = (chan_row["status"] if chan_row else "Disconnected") or "Disconnected"
+                chan_tested = (chan_row["last_tested"] if chan_row else "") or ""
+                tok_enc = crypto.encrypt_text(chan_tok) if chan_tok else ""
+                await db.execute("""
+                    INSERT INTO ops_telegram_config
+                    (id, bot_token_enc, chat_id, bot_id, bot_username, bot_first_name, is_enabled, status, last_verified_at, last_tested_at, last_error, updated_at)
+                    VALUES ('default', ?, ?, '', '', '', ?, ?, '', ?, '', ?)
+                """, (tok_enc, chan_cid, chan_en, chan_st, chan_tested, now_s))
+                await db.commit()
+                async with db.execute("SELECT * FROM ops_telegram_config WHERE id = 'default'") as cur3:
+                    row = await cur3.fetchone()
+
+            raw = dict(row)
+            plain_tok = crypto.decrypt_text(raw.get("bot_token_enc") or "")
+            if not plain_tok and chan_row and (chan_row["token"] or "").strip():
+                plain_tok = chan_row["token"].strip()
+
+            chat_id = (raw.get("chat_id") or "").strip() or ((chan_row["chat_id"] or "").strip() if chan_row else "")
+            is_enabled = bool(raw.get("is_enabled"))
+            status = (raw.get("status") or "Disconnected").strip()
+            if not plain_tok:
+                status = "Disconnected"
+                is_enabled = False
+            connected = bool(is_enabled and status == "Connected" and plain_tok)
+
+            async with db.execute("""
+                SELECT
+                    COUNT(*) as total_logs,
+                    SUM(CASE WHEN status IN ('SENT', 'SUCCESS') THEN 1 ELSE 0 END) as sent_count,
+                    SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_count,
+                    MAX(created_at) as last_log_at
+                FROM ops_telegram_logs
+            """) as scur:
+                srow = await scur.fetchone()
+
+            res = {
+                "connected": connected,
+                "status": status,
+                "is_enabled": is_enabled,
+                "has_token": bool(plain_tok),
+                "token_preview": cls.mask_telegram_token(plain_tok),
+                "chat_id": chat_id,
+                "bot_id": raw.get("bot_id") or "",
+                "bot_username": raw.get("bot_username") or "",
+                "bot_first_name": raw.get("bot_first_name") or "",
+                "last_verified_at": raw.get("last_verified_at") or "",
+                "last_tested_at": raw.get("last_tested_at") or "",
+                "last_error": raw.get("last_error") or "",
+                "updated_at": raw.get("updated_at") or "",
+                "total_logs": int(srow["total_logs"] or 0) if srow else 0,
+                "sent_count": int(srow["sent_count"] or 0) if srow else 0,
+                "failed_count": int(srow["failed_count"] or 0) if srow else 0,
+                "last_log_at": (srow["last_log_at"] or "") if srow else "",
+            }
+            if include_plaintext_token:
+                res["_bot_token"] = plain_tok
+            return res
+        finally:
+            await db.close()
+
+    @classmethod
+    async def save_telegram_config(
+        cls,
+        bot_token: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        is_enabled: Optional[bool] = None,
+        status: Optional[str] = None,
+        bot_id: Optional[str] = None,
+        bot_username: Optional[str] = None,
+        bot_first_name: Optional[str] = None,
+        last_verified_at: Optional[str] = None,
+        last_tested_at: Optional[str] = None,
+        last_error: Optional[str] = None,
+        clear_token: bool = False,
+    ) -> Dict[str, Any]:
+        from security.crypto import DataCrypto
+        crypto = DataCrypto()
+        current = await cls.get_telegram_config(include_plaintext_token=True)
+
+        if clear_token:
+            final_token = ""
+        elif bot_token is not None and bot_token.strip():
+            final_token = bot_token.strip()
+        else:
+            final_token = current.get("_bot_token", "")
+
+        final_chat_id = current["chat_id"] if chat_id is None else chat_id.strip()
+        final_enabled = current["is_enabled"] if is_enabled is None else bool(is_enabled)
+        final_status = current["status"] if status is None else status.strip()
+        if clear_token or not final_token:
+            final_enabled = False
+            final_status = "Disconnected"
+
+        final_bot_id = current["bot_id"] if bot_id is None else str(bot_id).strip()
+        final_bot_user = current["bot_username"] if bot_username is None else str(bot_username).strip()
+        final_bot_name = current["bot_first_name"] if bot_first_name is None else str(bot_first_name).strip()
+        final_verified = current["last_verified_at"] if last_verified_at is None else str(last_verified_at)
+        final_tested = current["last_tested_at"] if last_tested_at is None else str(last_tested_at)
+        final_err = current["last_error"] if last_error is None else str(last_error)
+
+        now_s = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tok_enc = crypto.encrypt_text(final_token) if final_token else ""
+
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            await db.execute("""
+                UPDATE ops_telegram_config
+                SET bot_token_enc = ?, chat_id = ?, bot_id = ?, bot_username = ?, bot_first_name = ?,
+                    is_enabled = ?, status = ?, last_verified_at = ?, last_tested_at = ?, last_error = ?, updated_at = ?
+                WHERE id = 'default'
+            """, (
+                tok_enc, final_chat_id, final_bot_id, final_bot_user, final_bot_name,
+                1 if final_enabled else 0, final_status, final_verified, final_tested, final_err, now_s
+            ))
+            await db.execute("""
+                UPDATE ops_channels
+                SET token = ?, chat_id = ?, is_enabled = ?, status = ?,
+                    last_tested = COALESCE(NULLIF(?, ''), last_tested)
+                WHERE id = 'chan_telegram'
+            """, (final_token, final_chat_id, 1 if final_enabled else 0, final_status, final_tested))
+            await db.commit()
+        finally:
+            await db.close()
+
+        return await cls.get_telegram_config(include_plaintext_token=False)
+
+    @classmethod
+    async def record_telegram_log(
+        cls,
+        event_type: str,
+        status: str,
+        workflow_id: str = "",
+        workflow_name: str = "",
+        node_id: str = "",
+        bot_username: str = "",
+        chat_id: str = "",
+        message_preview: str = "",
+        http_status: int = 0,
+        telegram_message_id: str = "",
+        error_detail: str = "",
+        latency_ms: int = 0,
+    ) -> Dict[str, Any]:
+        log_id = f"tglog_{uuid.uuid4().hex[:10]}"
+        now_s = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            await db.execute("""
+                INSERT INTO ops_telegram_logs
+                (id, event_type, workflow_id, workflow_name, node_id, bot_username, chat_id,
+                 message_preview, status, http_status, telegram_message_id, error_detail, latency_ms, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                log_id,
+                (event_type or "event").strip(),
+                (workflow_id or "").strip(),
+                (workflow_name or "").strip(),
+                (node_id or "").strip(),
+                (bot_username or "").strip(),
+                (chat_id or "").strip(),
+                (message_preview or "")[:400],
+                (status or "INFO").strip(),
+                int(http_status or 0),
+                str(telegram_message_id or ""),
+                (error_detail or "")[:500],
+                int(latency_ms or 0),
+                now_s
+            ))
+            # Retain latest 250 logs
+            await db.execute("""
+                DELETE FROM ops_telegram_logs WHERE id NOT IN (
+                    SELECT id FROM ops_telegram_logs ORDER BY created_at DESC, rowid DESC LIMIT 250
+                )
+            """)
+            await db.commit()
+        finally:
+            await db.close()
+        return {"id": log_id, "created_at": now_s, "status": status}
+
+    @classmethod
+    async def list_telegram_logs(cls, limit: int = 80, status_filter: str = "", event_filter: str = "") -> List[Dict[str, Any]]:
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            clauses = []
+            params: List[Any] = []
+            if status_filter and status_filter.upper() != "ALL":
+                sf = status_filter.upper()
+                if sf == "SUCCESS":
+                    clauses.append("status IN ('SENT', 'SUCCESS', 'CONNECTED')")
+                elif sf == "FAILED":
+                    clauses.append("status IN ('FAILED', 'ERROR')")
+                else:
+                    clauses.append("status = ?")
+                    params.append(sf)
+            if event_filter:
+                clauses.append("event_type = ?")
+                params.append(event_filter)
+            where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+            params.append(int(limit))
+            async with db.execute(f"SELECT * FROM ops_telegram_logs {where_sql} ORDER BY created_at DESC, rowid DESC LIMIT ?", tuple(params)) as cur:
+                rows = await cur.fetchall()
+                return [dict(r) for r in rows]
+        finally:
+            await db.close()
+
+    @classmethod
+    async def clear_telegram_logs(cls) -> int:
+        db = await cls.get_db()
+        try:
+            await cls._ensure_telegram_tables(db)
+            cur = await db.execute("DELETE FROM ops_telegram_logs")
+            await db.commit()
+            return cur.rowcount or 0
+        finally:
+            await db.close()
 
     @classmethod
     async def install_template(cls, template_id: str) -> Optional[Dict[str, Any]]:
