@@ -43,6 +43,7 @@ let wfState = {
   fullscreenCanvas: false,
   leftCollapsed: false,
   rightCollapsed: false,
+  inspectorWide: false,
   lastFocusedFieldId: null,
   subTab: 'studio',
   inspectorTab: 'node',
@@ -285,10 +286,63 @@ function switchWfInspectorTab(tabName) {
   });
 }
 
+function wfAutoResizeTextarea(el) {
+  if (!el || el.tagName !== 'TEXTAREA') return;
+  el.style.height = 'auto';
+  const targetH = Math.max(62, Math.min(280, el.scrollHeight + 4));
+  el.style.height = `${targetH}px`;
+}
+
+function wfUpdateTextboxLiveStatus(el) {
+  if (!el) return;
+  if (el.id === 'wf-quick-instruction') {
+    const cntEl = document.getElementById('wf-quick-inst-count');
+    if (cntEl) {
+      const len = (el.value || '').length;
+      cntEl.textContent = `${len} chars`;
+    }
+    return;
+  }
+  const parent = el.closest('.wf-field-group');
+  if (!parent) return;
+  let metaEl = parent.querySelector('.wf-live-meta');
+  if (!metaEl) {
+    metaEl = document.createElement('div');
+    metaEl.className = 'wf-textbox-meta wf-live-meta';
+    parent.appendChild(metaEl);
+  }
+  const val = el.value || '';
+  const varsMatches = val.match(/\{\{[^}]+\}\}/g) || [];
+  let jsonHtml = '';
+  const isJsonBox = el.id === 'wf-cfg-args' || el.id === 'wf-cfg-mcpargs' || el.id === 'wf-cfg-httpbody' || (parent.querySelector('label')?.textContent || '').toLowerCase().includes('json');
+  if (isJsonBox && val.trim()) {
+    try {
+      JSON.parse(val.replace(/\{\{[^}]+\}\}/g, '"__var__"'));
+      jsonHtml = '<span class="wf-meta-badge-ok">✓ JSON Valid</span>';
+    } catch (_) {
+      jsonHtml = '<span class="wf-meta-badge-err">⚠ Check JSON</span>';
+    }
+  }
+  metaEl.innerHTML = `<span>${val.length} chars${varsMatches.length ? ` • ${varsMatches.length} {{var}}` : ''}</span>${jsonHtml}`;
+}
+
+function wfAutoResizeAllTextareas(root = null) {
+  const scope = root || document.getElementById('view-workflows');
+  if (!scope) return;
+  scope.querySelectorAll('textarea').forEach(ta => {
+    wfAutoResizeTextarea(ta);
+    wfUpdateTextboxLiveStatus(ta);
+  });
+}
+
 function toggleQuickDailyBuilder() {
   const body = document.getElementById('wf-quick-builder-body');
+  const hint = document.getElementById('wf-quick-toggle-hint');
   if (!body) return;
-  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  if (hint) hint.textContent = hidden ? 'Collapse ▴' : 'Expand ▾';
+  if (hidden) setTimeout(() => wfAutoResizeAllTextareas(body), 20);
 }
 
 function applyQuickDailyPreset(presetKey) {
@@ -330,7 +384,10 @@ function applyQuickDailyPreset(presetKey) {
   }
 
   const body = document.getElementById('wf-quick-builder-body');
+  const hint = document.getElementById('wf-quick-toggle-hint');
   if (body && body.style.display === 'none') body.style.display = 'block';
+  if (hint) hint.textContent = 'Collapse ▴';
+  setTimeout(() => wfAutoResizeAllTextareas(document.getElementById('wf-quick-daily-card')), 20);
 }
 
 async function submitQuickDailyTask(event) {
@@ -962,6 +1019,14 @@ function toggleStudioPane(which) {
   setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); }, 40);
 }
 
+function toggleInspectorWide() {
+  wfState.inspectorWide = !wfState.inspectorWide;
+  if (wfState.inspectorWide && wfState.rightCollapsed) wfState.rightCollapsed = false;
+  applyStudioLayoutClasses();
+  renderWorkflowToolbar();
+  setTimeout(() => { drawWorkflowEdges(); renderCanvasMinimap(); wfAutoResizeAllTextareas(document.getElementById('wf-inspector-node')); }, 50);
+}
+
 function toggleFullscreenCanvas(forceState = null) {
   wfState.fullscreenCanvas = forceState !== null ? !!forceState : !wfState.fullscreenCanvas;
   applyStudioLayoutClasses();
@@ -976,6 +1041,7 @@ function applyStudioLayoutClasses() {
   studio.classList.toggle('wf-studio-fullscreen', !!wfState.fullscreenCanvas);
   studio.classList.toggle('wf-left-collapsed', !!wfState.leftCollapsed);
   studio.classList.toggle('wf-right-collapsed', !!wfState.rightCollapsed);
+  studio.classList.toggle('wf-right-wide', !!wfState.inspectorWide && !wfState.rightCollapsed);
 }
 
 function setCanvasZoom(deltaOrReset) {
@@ -1153,6 +1219,7 @@ function renderWorkflowToolbar() {
         : `<button type="button" id="btn-wf-run-now" class="wf-tb-btn wf-btn-run" onclick="runActiveWorkflowNow()">▶ Run Now</button>`
       }
       <button type="button" class="wf-tb-btn wf-btn-del" onclick="deleteActiveWorkflow()" title="ডিলিট">🗑️</button>
+      <button type="button" class="wf-tb-btn wf-btn-mini ${wfState.inspectorWide ? 'active' : ''}" onclick="toggleInspectorWide()" title="ডান ইন্সপেক্টর চওড়া/স্বাভাবিক করুন">⇄</button>
       <button type="button" class="wf-tb-btn wf-btn-mini ${wfState.rightCollapsed ? 'active' : ''}" onclick="toggleStudioPane('right')" title="ডান ইন্সপেক্টর লুকান/দেখান">◨</button>
     </div>
   `;
@@ -2700,6 +2767,7 @@ function renderNodeInspector() {
       <pre id="wf-node-test-output" class="wf-node-test-pre" style="display:none;"></pre>
     </div>
   `;
+  setTimeout(() => wfAutoResizeAllTextareas(el), 10);
 }
 
 function updateSelectedNodeTitle(val) {
@@ -3808,3 +3876,17 @@ window.applyMcpSampleArgs = applyMcpSampleArgs;
 window.onWfHistoryFilterInput = onWfHistoryFilterInput;
 window.exportWfHistoryRunsJson = exportWfHistoryRunsJson;
 window.populateWfHistoryWorkflowFilter = populateWfHistoryWorkflowFilter;
+window.toggleInspectorWide = toggleInspectorWide;
+window.wfAutoResizeTextarea = wfAutoResizeTextarea;
+
+if (typeof document !== 'undefined' && !window.__wfDynamicTextboxBound) {
+  window.__wfDynamicTextboxBound = true;
+  document.addEventListener('input', (ev) => {
+    const tgt = ev.target;
+    if (!tgt || !tgt.closest || !tgt.closest('#view-workflows')) return;
+    if (tgt.tagName === 'TEXTAREA') {
+      wfAutoResizeTextarea(tgt);
+      wfUpdateTextboxLiveStatus(tgt);
+    }
+  });
+}

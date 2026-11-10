@@ -3050,7 +3050,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 <span class="wf-quick-badge">1-CLICK DAILY AGENT</span>
                 <h4 style="margin:0; font-size:0.98rem;">🤖 প্রতিদিন স্বয়ংক্রিয়ভাবে করানোর জন্য এআই এজেন্টকে একটি দৈনিক কাজ দিন</h4>
               </div>
-              <span style="font-size:0.8rem; color:var(--text-muted);">Expand / Collapse ▾</span>
+              <span id="wf-quick-toggle-hint" style="font-size:0.8rem; color:var(--text-muted);">Collapse ▴</span>
             </div>
             <form id="wf-quick-builder-body" onsubmit="submitQuickDailyTask(event)" style="margin-top:12px;">
               <div class="wf-quick-presets">
@@ -3095,6 +3095,10 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
               <div class="wf-field-group" style="margin-top:10px;">
                 <label>প্রতিদিন নির্দিষ্ট সময়ে এজেন্ট কী কাজ করবে? (Natural Language Instructions)</label>
                 <textarea id="wf-quick-instruction" class="text-input" rows="2" placeholder="বিস্তারিত লিখুন — যেমন: প্রতিদিন সার্ভার হেলথ ও পিং চেক করে সমস্যা থাকলে সতর্ক করো, অথবা প্রজেক্ট ডেটাবেস রিভিউ করে আজকের কাজের তালিকা বানাও..."></textarea>
+                <div class="wf-textbox-meta" id="wf-quick-inst-meta">
+                  <span>✨ ডাইনামিক টেক্সটবক্স — লিখার সাথে অটো বড় হবে</span>
+                  <span id="wf-quick-inst-count">0 chars</span>
+                </div>
               </div>
 
               <div class="wf-quick-footer">

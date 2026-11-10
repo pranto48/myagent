@@ -4035,15 +4035,17 @@ body.light-theme .upload-progress-pill,
 
 /* ─── Global Futuristic Variables & Enhanced Glow Tokens ─── */
 :root {
+  color-scheme: dark;
   --bg-main: #060913;
   --bg-sidebar: #090e1f;
   --bg-card: rgba(14, 22, 45, 0.78);
   --bg-card-hover: rgba(22, 35, 70, 0.88);
-  --bg-input: rgba(9, 14, 30, 0.9);
+  --bg-input: #0d1526;
+  --bg-input-focus: #111c33;
   --bg-glass: rgba(13, 20, 42, 0.7);
   
   --border-subtle: rgba(255, 255, 255, 0.09);
-  --border-cyber: rgba(6, 182, 212, 0.3);
+  --border-cyber: rgba(56, 189, 248, 0.3);
   --border-focus: #06b6d4;
   
   --accent-primary: #6366f1;
@@ -4063,6 +4065,7 @@ body.light-theme .upload-progress-pill,
   --text-primary: #ffffff;
   --text-secondary: #cbd5e1;
   --text-muted: #8496b0;
+  --text-placeholder: #64748b;
   --text-highlight: #38bdf8;
   
   --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.35);
@@ -4072,11 +4075,13 @@ body.light-theme .upload-progress-pill,
 }
 
 [data-theme="light"], body.light-theme {
+  color-scheme: light;
   --bg-main: #f0f4f9;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
   --bg-card-hover: #f8fafc;
   --bg-input: #ffffff;
+  --bg-input-focus: #ffffff;
   --bg-glass: rgba(255, 255, 255, 0.88);
   
   --border-subtle: #e2e8f0;
@@ -4086,6 +4091,7 @@ body.light-theme .upload-progress-pill,
   --text-primary: #0f172a;
   --text-secondary: #334155;
   --text-muted: #64748b;
+  --text-placeholder: #94a3b8;
   --text-highlight: #0284c7;
   
   --shadow-card: 0 8px 24px -2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(226, 232, 240, 0.85);
@@ -4281,7 +4287,7 @@ textarea.text-input {
 }
 
 .text-input::placeholder {
-  color: rgba(148, 163, 184, 0.55);
+  color: var(--text-placeholder, rgba(148, 163, 184, 0.6));
 }
 
 .text-input:hover {
@@ -4290,14 +4296,20 @@ textarea.text-input {
 
 .text-input:focus {
   border-color: var(--cyan-bright) !important;
-  background: rgba(11, 18, 38, 0.96) !important;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2), 0 0 20px rgba(6, 182, 212, 0.28), inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  background: var(--bg-input-focus, #0f172a) !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18), inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
 }
 
 select.text-input option {
-  background: #080d1e;
-  color: #ffffff;
+  background: #0d1526;
+  color: #f8fafc;
   padding: 8px 12px;
+}
+
+[data-theme="light"] select.text-input option,
+body.light-theme select.text-input option {
+  background: #ffffff;
+  color: #0f172a;
 }
 
 /* ─── Master Card Panels across All Views ─── */
@@ -8514,9 +8526,11 @@ body.light-theme .reasoning-body,
 /* 3-Pane Studio Workspace */
 .wf-workspace-grid {
   display: grid;
-  grid-template-columns: 270px 1fr 345px;
+  grid-template-columns: 265px 1fr 375px;
   gap: 12px;
-  min-height: 620px;
+  height: clamp(610px, 74vh, 960px);
+  min-height: 610px;
+  transition: grid-template-columns 0.2s ease;
 }
 
 .wf-left-pane,
@@ -9047,12 +9061,13 @@ body.light-theme .reasoning-body,
 }
 
 .wf-inspector-body {
-  padding: 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
   overflow-y: auto;
-  max-height: 575px;
+  flex: 1;
+  min-height: 0;
 }
 
 .wf-insp-head {
@@ -10741,4 +10756,185 @@ body.light-theme .hist-preview-pre,
 body.light-theme .hist-detail-pre {
   background: rgba(241, 245, 249, 0.9);
   color: #1e293b;
+}
+
+/* ==============================================================================
+ * Clean Textbox Colors, Light/Dark Readability & Dynamic Studio View (.wf-*)
+ * ============================================================================== */
+.wf-studio-container .text-input,
+.wf-studio-container select.text-input,
+.wf-studio-container textarea.text-input,
+.wf-studio-container .wf-tb-name-input {
+  background: #0d1526 !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  border-radius: 8px !important;
+  padding: 7px 11px !important;
+  font-size: 0.82rem !important;
+  line-height: 1.45 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease !important;
+}
+
+.wf-studio-container textarea.text-input {
+  min-height: 62px;
+  max-height: 280px;
+  resize: vertical;
+  overflow-y: auto;
+}
+
+.wf-studio-container textarea.wf-code-textarea,
+.wf-studio-container input[readonly].text-input {
+  background: #08101f !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(56, 189, 248, 0.28) !important;
+  font-family: 'Fira Code', monospace !important;
+  font-size: 0.77rem !important;
+}
+
+.wf-studio-container .text-input::placeholder {
+  color: #64748b !important;
+}
+
+.wf-studio-container .text-input:hover,
+.wf-studio-container .wf-tb-name-input:hover {
+  border-color: rgba(56, 189, 248, 0.55) !important;
+}
+
+.wf-studio-container .text-input:focus,
+.wf-studio-container .wf-tb-name-input:focus {
+  background: #111c33 !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
+  outline: none !important;
+}
+
+/* Light Theme Clean High-Contrast Textboxes & Studio Panes */
+[data-theme="light"] .wf-studio-container .text-input,
+body.light-theme .wf-studio-container .text-input,
+[data-theme="light"] .wf-studio-container select.text-input,
+body.light-theme .wf-studio-container select.text-input,
+[data-theme="light"] .wf-studio-container textarea.text-input,
+body.light-theme .wf-studio-container textarea.text-input,
+[data-theme="light"] .wf-studio-container .wf-tb-name-input,
+body.light-theme .wf-studio-container .wf-tb-name-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .wf-studio-container textarea.wf-code-textarea,
+body.light-theme .wf-studio-container textarea.wf-code-textarea,
+[data-theme="light"] .wf-studio-container input[readonly].text-input,
+body.light-theme .wf-studio-container input[readonly].text-input {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .wf-studio-container .text-input::placeholder,
+body.light-theme .wf-studio-container .text-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .wf-studio-container .text-input:hover,
+body.light-theme .wf-studio-container .text-input:hover,
+[data-theme="light"] .wf-studio-container .wf-tb-name-input:hover,
+body.light-theme .wf-studio-container .wf-tb-name-input:hover {
+  border-color: #0284c7 !important;
+}
+
+[data-theme="light"] .wf-studio-container .text-input:focus,
+body.light-theme .wf-studio-container .text-input:focus,
+[data-theme="light"] .wf-studio-container .wf-tb-name-input:focus,
+body.light-theme .wf-studio-container .wf-tb-name-input:focus {
+  background: #ffffff !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.14) !important;
+}
+
+[data-theme="light"] .wf-studio-container .wf-left-pane,
+body.light-theme .wf-studio-container .wf-left-pane,
+[data-theme="light"] .wf-studio-container .wf-center-pane,
+body.light-theme .wf-studio-container .wf-center-pane,
+[data-theme="light"] .wf-studio-container .wf-right-pane,
+body.light-theme .wf-studio-container .wf-right-pane {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+[data-theme="light"] .wf-studio-container .wf-pane-header,
+body.light-theme .wf-studio-container .wf-pane-header,
+[data-theme="light"] .wf-studio-container .wf-canvas-toolbar,
+body.light-theme .wf-studio-container .wf-canvas-toolbar,
+[data-theme="light"] .wf-studio-container .wf-insp-box,
+body.light-theme .wf-studio-container .wf-insp-box,
+[data-theme="light"] .wf-studio-container .wf-palette-chip,
+body.light-theme .wf-studio-container .wf-palette-chip {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .wf-studio-container .wf-quick-card,
+body.light-theme .wf-studio-container .wf-quick-card {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.06), rgba(16, 185, 129, 0.06));
+  border-color: #bae6fd;
+}
+
+[data-theme="light"] .wf-studio-container .wf-preset-pill,
+body.light-theme .wf-studio-container .wf-preset-pill,
+[data-theme="light"] .wf-studio-container .wf-tb-btn,
+body.light-theme .wf-studio-container .wf-tb-btn,
+[data-theme="light"] .wf-studio-container .wf-subtab-btn,
+body.light-theme .wf-studio-container .wf-subtab-btn {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .wf-studio-container .wf-trace-pre,
+body.light-theme .wf-studio-container .wf-trace-pre,
+[data-theme="light"] .wf-studio-container .wf-node-test-pre,
+body.light-theme .wf-studio-container .wf-node-test-pre {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* Wide Inspector & Clean Textbox Status Meta */
+.wf-workspace-grid.wf-right-wide {
+  grid-template-columns: 265px 1fr 485px;
+}
+.wf-workspace-grid.wf-left-collapsed.wf-right-wide {
+  grid-template-columns: 0px 1fr 485px;
+}
+
+.wf-textbox-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.69rem;
+  color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+  margin-top: 2px;
+}
+.wf-meta-badge-ok {
+  color: #34d399;
+  font-weight: 700;
+}
+.wf-meta-badge-err {
+  color: #fb7185;
+  font-weight: 700;
+}
+[data-theme="light"] .wf-meta-badge-ok,
+body.light-theme .wf-meta-badge-ok {
+  color: #059669;
+}
+[data-theme="light"] .wf-meta-badge-err,
+body.light-theme .wf-meta-badge-err {
+  color: #e11d48;
 }
