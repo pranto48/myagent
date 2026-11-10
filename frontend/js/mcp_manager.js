@@ -9,7 +9,7 @@
 let allMcpServers = [];
 let allDiscoveredTools = [];
 let myAgentMcpStatus = null;
-let activeMcpConfigTab = 'claude';
+let activeMcpConfigTab = 'antigravity';
 
 async function loadMcpDashboard() {
   await Promise.all([
@@ -100,7 +100,7 @@ async function toggleMyAgentMcpServer() {
 
 function switchMcpConfigTab(tabName) {
   activeMcpConfigTab = tabName;
-  ['claude', 'cursor', 'antigravity', 'stdio'].forEach(t => {
+  ['antigravity', 'claude', 'cursor', 'chatgpt', 'openclaw', 'stdio'].forEach(t => {
     const btn = document.getElementById(`mcp-btn-tab-${t}`);
     if (btn) {
       if (t === tabName) btn.classList.add('active');
@@ -119,7 +119,7 @@ function updateMcpConfigCodePreview() {
   const sseUrl = `http://${currentHost}/api/mcp/server/sse`;
   const rpcUrl = `http://${currentHost}/api/mcp/server/rpc`;
 
-  if (activeMcpConfigTab === 'claude') {
+  if (activeMcpConfigTab === 'antigravity') {
     const config = {
       "mcpServers": {
         "myagent_docker": {
@@ -129,7 +129,19 @@ function updateMcpConfigCodePreview() {
     };
     preview.innerText = JSON.stringify(config, null, 2);
     if (hint) {
-      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> <code>%APPDATA%\\Claude\\claude_desktop_config.json</code> (Windows) অথবা <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS)`;
+      hint.innerHTML = `💡 <strong>Google Antigravity IDE:</strong> সেটিংসে <code>~/.gemini/antigravity/mcp_servers.json</code> ফাইলে অথবা IDE Settings > MCP Servers-এ এই SSE URL কনফিগারেশনটি পেস্ট করুন।`;
+    }
+  } else if (activeMcpConfigTab === 'claude') {
+    const config = {
+      "mcpServers": {
+        "myagent_docker": {
+          "url": sseUrl
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>Claude Desktop:</strong> <code>%APPDATA%\\Claude\\claude_desktop_config.json</code> (Windows) অথবা <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS) ফাইলে সেভ করুন।`;
     }
   } else if (activeMcpConfigTab === 'cursor') {
     const config = {
@@ -141,19 +153,45 @@ function updateMcpConfigCodePreview() {
     };
     preview.innerText = JSON.stringify(config, null, 2);
     if (hint) {
-      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> আপনার প্রজেক্ট রুটে <code>.cursor/mcp.json</code> অথবা Cursor Settings > Features > MCP > Add New MCP Server.`;
+      hint.innerHTML = `💡 <strong>Cursor IDE:</strong> আপনার প্রজেক্ট রুটে <code>.cursor/mcp.json</code> ফাইলে অথবা Cursor Settings > Features > MCP > Add New MCP Server।`;
     }
-  } else if (activeMcpConfigTab === 'antigravity') {
+  } else if (activeMcpConfigTab === 'chatgpt') {
     const config = {
       "mcpServers": {
         "myagent_docker": {
           "url": sseUrl
         }
+      },
+      "chatgpt_desktop": {
+        "type": "sse",
+        "url": sseUrl
+      },
+      "custom_gpt_action": {
+        "openapi_schema_url": `http://${currentHost}/openapi.json`,
+        "instructions": "In ChatGPT Custom GPTs > Actions > Import Schema from URL and enter http://192.168.9.9:3399/openapi.json"
       }
     };
     preview.innerText = JSON.stringify(config, null, 2);
     if (hint) {
-      hint.innerHTML = `💡 <strong>ফাইল লোকেশন:</strong> Google Antigravity IDE Settings / <code>~/.gemini/antigravity/mcp_servers.json</code> (SSE Transport).`;
+      hint.innerHTML = `💡 <strong>ChatGPT / OpenAI:</strong> ChatGPT Desktop MCP সাপোর্টে উপরের JSON ব্যবহার করুন, অথবা Custom GPTs Actions-এ <code>http://${currentHost}/openapi.json</code> ইমপোর্ট করে সরাসরি এজেন্টের সকল টুল ব্যবহার করুন।`;
+    }
+  } else if (activeMcpConfigTab === 'openclaw') {
+    const config = {
+      "mcpServers": {
+        "myagent_docker": {
+          "url": sseUrl,
+          "disabled": false,
+          "autoApprove": [
+            "ping_network_diagnostics",
+            "query_company_memory",
+            "python_runner"
+          ]
+        }
+      }
+    };
+    preview.innerText = JSON.stringify(config, null, 2);
+    if (hint) {
+      hint.innerHTML = `💡 <strong>OpenClaw / Cline / Roo Code / LibreChat:</strong> এক্সটেনশন সেটিংসে <code>mcp_settings.json</code> ফাইলে এই কনফিগারেশনটি পেস্ট করুন।`;
     }
   } else if (activeMcpConfigTab === 'stdio') {
     const config = {
