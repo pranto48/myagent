@@ -17,6 +17,7 @@ let activeProjectMemories = [];
 async function loadMcpDashboard() {
   await Promise.all([
     loadMyAgentMcpServerStatus(),
+    loadSealedDeviceVault(),
     loadProjectMemoryVault(),
     loadMcpServers(),
     loadAllToolsRegistry()
@@ -413,6 +414,16 @@ async function runMyAgentMcpTest(testType) {
       params: {
         name: "system_logs_inspector",
         arguments: { log_source: "all", level: "ALL", tail_lines: 20 }
+      }
+    };
+  } else if (testType === 'sealed_vault_list') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "list_sealed_device_inventory",
+        arguments: {}
       }
     };
   }
@@ -1096,6 +1107,9 @@ const SANDBOX_DEFAULT_ARGS = {
   network_traceroute_or_path: { target: "192.168.9.1", max_hops: 8 },
   it_security_utility: { action: "generate_password", length: 20 },
   cron_schedule_and_maintenance_planner: { expression: "0 3 * * 1-5", count: 5 },
+  save_sealed_device_credential: { device_name: "Office Router", host: "192.168.9.1", username: "admin", password: "CHANGE_ME", protocol: "http" },
+  list_sealed_device_inventory: {},
+  verify_sealed_device_status: { device_or_host: "192.168.9.1" },
   system_info: {},
   get_workflows_status_report: {},
   sqlite_schema_inspector: { db_name: "chat_history.db" },
@@ -1224,3 +1238,166 @@ async function runToolSandboxTest() {
 document.addEventListener('DOMContentLoaded', () => {
   loadMcpDashboard();
 });
+
+// ==============================================================================
+// Zero-AI-Leak Router & Device Credential Vault (Human Admin UI)
+// ==============================================================================
+
+let _sdvRevealTimer = null;
+
+function onSealedProtoChange() {
+  const proto = document.getElementById('sdv-protocol')?.value || 'http';
+  const portInput = document.getElementById('sdv-port');
+  if (!portInput) return;
+  const defaults = { http: 80, https: 443, ssh: 22, winbox: 8291, routeros_rest: 443, routeros_api: 8728, rdp: 3389 };
+  if (defaults[proto]) portInput.value = defaults[proto];
+}
+
+async function loadSealedDeviceVault(query = '') {
+  const listEl = document.getElementById('sealed-devices-list');
+  if (!listEl) return;
+  try {
+    const q = (query || '').trim();
+    const url = q ? `/api/mcp/vault/devices?query=${encodeURIComponent(q)}` : '/api/mcp/vault/devices';
+    const res = await fetch(url, {
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const devices = data.devices || [];
+
+    if (devices.length === 0) {
+      listEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--text-muted); font-size:0.82rem; background:rgba(0,0,0,0.2); border-radius:6px;">এখনো কোনো রাউটার বা ডিভাইস ক্রেডেনশিয়াল সিল করা হয়নি। উপরের ফর্ম থেকে সেভ করুন।</div>`;
+      return;
+    }
+
+    listEl.innerHTML = devices.map(d => {
+      const st = d.last_verify_status || 'UNVERIFIED';
+      const stColor = st.includes('OK') || st.includes('OPEN') ? '#6ee7b7' : (st === 'UNVERIFIED' ? '#94a3b8' : '#fbbf24');
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 12px; border-radius:8px; background:rgba(15,23,42,0.75); border:1px solid rgba(255,255,255,0.08);">
+          <div style="min-width:220px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <strong style="color:#f8fafc; font-size:0.88rem;">🔒 ${escapeHtml(d.device_name)}</strong>
+              <span class="badge-tag" style="font-size:0.7rem;">${escapeHtml(d.device_type)} / ${escapeHtml(d.protocol).toUpperCase()}:${d.port}</span>
+              <span class="badge-tag" style="font-size:0.7rem; color:${stColor};">${escapeHtml(st)}</span>
+            </div>
+            <div style="font-size:0.78rem; color:#94a3b8; font-family:monospace; margin-top:4px;">
+              Host: <span style="color:#38bdf8;">${escapeHtml(d.host)}</span> |
+              User: <span style="color:#cbd5e1;">${escapeHtml(d.username_masked)}</span> |
+              Pass: <span style="color:#fbbf24;">${escapeHtml(d.password_masked)}</span>
+              ${d.notes ? ` | ${escapeHtml(d.notes)}` : ''}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn-sm-action" onclick="verifySealedDevice('${escapeHtml(d.id)}')" title="AI-কে পাসওয়ার্ড না দিয়ে ব্লাইন্ড কানেক্টিভিটি টেস্ট">⚡ টেস্ট</button>
+            <button class="btn-sm-action" style="color:#fbbf24; border-color:rgba(245,158,11,0.35);" onclick="revealSealedDeviceForHuman('${escapeHtml(d.id)}')" title="শুধুমাত্র হিউম্যান এডমিন ভিউ (১৫ সেকেন্ড পর অটো-হাইড)">👁️ দেখুন (Admin)</button>
+            <button class="btn-sm-action" style="color:var(--rose-red); border-color:rgba(244,63,94,0.3);" onclick="deleteSealedDevice('${escapeHtml(d.id)}')">🗑️ ডিলিট</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading sealed vault:', err);
+  }
+}
+
+async function submitSealedDeviceForm(e) {
+  e.preventDefault();
+  const payload = {
+    device_name: document.getElementById('sdv-name').value.trim(),
+    device_type: document.getElementById('sdv-type').value,
+    host: document.getElementById('sdv-host').value.trim(),
+    protocol: document.getElementById('sdv-protocol').value,
+    port: parseInt(document.getElementById('sdv-port').value || '80', 10),
+    username: document.getElementById('sdv-user').value.trim(),
+    password: document.getElementById('sdv-pass').value,
+    enable_secret: document.getElementById('sdv-secret').value || '',
+    notes: document.getElementById('sdv-notes').value.trim()
+  };
+
+  try {
+    const headers = typeof getAuthHeaders === 'function' ? { ...getAuthHeaders(), 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    const res = await fetch('/api/mcp/vault/devices', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Save failed');
+    document.getElementById('sealed-device-form').reset();
+    onSealedProtoChange();
+    showToast(`🔒 '${data.device.device_name}' AES-256-GCM ভল্টে সিল হয়েছে (AI Access Denied)!`, 'success');
+    await loadSealedDeviceVault();
+  } catch (err) {
+    showToast(`সেভ ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+async function verifySealedDevice(vaultId) {
+  showToast('ব্লাইন্ড কানেক্টিভিটি ও অথ টেস্ট চলছে...', 'info');
+  try {
+    const res = await fetch(`/api/mcp/vault/devices/${encodeURIComponent(vaultId)}/verify`, {
+      method: 'POST',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    const data = await res.json();
+    showToast(`${data.device_name || vaultId}: ${data.verify_status} (${data.latency_ms}ms) — ${data.detail}`, data.reachable ? 'success' : 'warning');
+    await loadSealedDeviceVault();
+  } catch (err) {
+    showToast(`টেস্ট ত্রুটি: ${err.message}`, 'error');
+  }
+}
+
+async function revealSealedDeviceForHuman(vaultId) {
+  const banner = document.getElementById('sdv-reveal-banner');
+  try {
+    const baseHeaders = typeof getAuthHeaders === 'function' ? getAuthHeaders() : {};
+    const res = await fetch(`/api/mcp/vault/devices/${encodeURIComponent(vaultId)}/reveal`, {
+      method: 'POST',
+      headers: { ...baseHeaders, 'X-Human-Admin-Reveal': 'true' }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    if (banner) {
+      window._lastHumanRevealedPassword = data.password || '';
+      banner.style.display = 'block';
+      banner.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <strong>🔓 Human-Admin Only (${escapeHtml(data.device_name)} — ${escapeHtml(data.host)}:${data.port}):</strong><br>
+            Username: <code style="color:#38bdf8;">${escapeHtml(data.username)}</code> |
+            Password: <code style="color:#fbbf24;">${escapeHtml(data.password)}</code>
+            ${data.enable_secret ? ` | Secret: <code style="color:#f472b6;">${escapeHtml(data.enable_secret)}</code>` : ''}
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-sm-action" onclick="copyToClipboardText(window._lastHumanRevealedPassword || '', 'পাসওয়ার্ড কপি হয়েছে!')">📋 পাসওয়ার্ড কপি</button>
+            <button class="btn-sm-action" onclick="window._lastHumanRevealedPassword=''; document.getElementById('sdv-reveal-banner').style.display='none'">✖ হাইড</button>
+          </div>
+        </div>
+        <div style="font-size:0.72rem; color:#94a3b8; margin-top:4px;">🛡️ নিরাপত্তার জন্য ১৫ সেকেন্ড পর অটো-হাইড হবে এবং সিকিউরিটি অডিট লগে রেকর্ড করা হয়েছে।</div>
+      `;
+      if (_sdvRevealTimer) clearTimeout(_sdvRevealTimer);
+      _sdvRevealTimer = setTimeout(() => { window._lastHumanRevealedPassword = ''; banner.style.display = 'none'; }, 15000);
+    }
+  } catch (err) {
+    showToast(`এডমিন অ্যাক্সেস প্রয়োজন (লগইন চেক করুন): ${err.message}`, 'error');
+  }
+}
+
+async function deleteSealedDevice(vaultId) {
+  if (!confirm('আপনি কি নিশ্চিত যে এই সিলড ডিভাইস ক্রেডেনশিয়াল মুছে ফেলতে চান?')) return;
+  try {
+    const res = await fetch(`/api/mcp/vault/devices/${encodeURIComponent(vaultId)}`, {
+      method: 'DELETE',
+      headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {}
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    showToast('ডিভাইস ক্রেডেনশিয়াল ভল্ট থেকে মুছে ফেলা হয়েছে।', 'success');
+    await loadSealedDeviceVault();
+  } catch (err) {
+    showToast(`মুছতে ব্যর্থ: ${err.message}`, 'error');
+  }
+}

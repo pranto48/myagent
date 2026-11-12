@@ -505,13 +505,63 @@ async def handle_telegram_chat_message(
     linked_wf_id = ""
     action_status = "SUCCESS"
 
+    # Zero-AI-Leak Intercept: Seal router/server login drops BEFORE any LLM or log sees plaintext
+    from mcp.sealed_vault import SealedDeviceVault
+    intercepted = await SealedDeviceVault.intercept_and_seal_message(msg, actor=f"tg:{sender_name or chat_id}")
+
     # Resolve current WORKFLOWS (Auto) snapshot upfront
     wf_digest = await WorkflowStore.build_workflows_status_report(max_workflows=6, max_runs=4)
     wf_status_summary = wf_digest["summary_line"]
     reply_text = ""
 
+    if intercepted:
+        intent = "sealed_vault_save"
+        msg = intercepted["redacted_prompt"]
+        dev = intercepted["saved"]
+        reply_text = (
+            f"🔒 Router / Device Login Zero-AI-Leak Vault-এ সিল করা হয়েছে!\n"
+            f"• ID: `{dev['id']}`\n"
+            f"• Device: `{dev['device_name']}` (`{dev['host']}:{dev['port']}` / `{dev['protocol'].upper()}`)\n"
+            f"• User: `{dev['username_masked']}` | Pass: `{dev['password_masked']}`\n"
+            f"🛡️ এই পাসওয়ার্ড AES-256-GCM এনক্রিপ্টেড ও AI-ব্লাইন্ড — কোনো AI মডেল কখনোই তা অ্যাক্সেস করতে পারবে না।\n"
+            f"💡 কানেক্টিভিটি টেস্ট করতে লিখুন: `/vault verify {dev['host']}`"
+        )
+
+    # A0. /vault [verify <host>]
+    elif re.match(r"^/vault\b", low):
+        intent = "sealed_vault_query"
+        v_arg = re.sub(r"^/vault\s*", "", msg, flags=re.IGNORECASE).strip()
+        if v_arg.lower().startswith("verify "):
+            target_dev = v_arg[7:].strip()
+            vres = await SealedDeviceVault.verify_device_with_sealed_credential(target_dev)
+            if not vres.get("found"):
+                action_status = "FAILED"
+                reply_text = f"❌ `{target_dev}` কোনো সিল করা ডিভাইস ভল্টে পাওয়া যায়নি।"
+            else:
+                icon = "🟢" if vres.get("reachable") else "🔴"
+                reply_text = (
+                    f"{icon} Sealed Device Blind Check — `{vres['device_name']}`\n"
+                    f"• Host: `{vres['host']}:{vres['port']}` ({vres['protocol'].upper()})\n"
+                    f"• Status: `{vres['verify_status']}` ({vres['latency_ms']} ms)\n"
+                    f"• Detail: {vres['detail']}\n"
+                    f"• Security: {vres['ai_access']}"
+                )
+        else:
+            devs = await SealedDeviceVault.list_devices_safe(query=v_arg or None)
+            if not devs:
+                reply_text = "🔒 Sealed Vault খালি আছে। সেভ করতে লিখুন:\n`/save-router 192.168.9.1 admin YOURPASS`"
+            else:
+                lines_v = [f"🔒 AI-Sealed Device Vault ({len(devs)} devices — Passwords Hidden):"]
+                for d in devs[:10]:
+                    lines_v.append(
+                        f"• `{d['device_name']}` (`{d['host']}:{d['port']}` {d['protocol']}) — "
+                        f"User: `{d['username_masked']}` | `{d['last_verify_status']}`"
+                    )
+                lines_v.append("\n💡 টেস্ট করতে: `/vault verify 192.168.9.1`")
+                reply_text = "\n".join(lines_v)
+
     # A. /start, /id, /help
-    if re.match(r"^/(start|id|help)\b", low) or low in ("help", "menu", "commands"):
+    elif re.match(r"^/(start|id|help)\b", low) or low in ("help", "menu", "commands"):
         intent = "help"
         reply_text = (
             f"🤖 MyAgent WORKFLOWS (Auto) Interactive Bot\n"

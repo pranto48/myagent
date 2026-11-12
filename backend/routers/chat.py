@@ -203,14 +203,48 @@ async def stream_chat_endpoint(
     username = current_user.get("sub", "guest")
     user_role = current_user.get("role", "viewer")
 
-    # Record user message in persistent session store
+    from mcp.sealed_vault import SealedDeviceVault
+    intercepted = await SealedDeviceVault.intercept_and_seal_message(request.prompt, actor=username)
+    stored_prompt = intercepted["redacted_prompt"] if intercepted else request.prompt
+
+    # Record user message in persistent session store (always redacted if sealed credential)
     if session_id:
         await ChatSessionStore.add_message(
             session_id=session_id,
             role="user",
-            content=request.prompt,
+            content=stored_prompt,
             model_name=request.model,
             source="webchat",
+        )
+
+    if intercepted:
+        dev = intercepted["saved"]
+        sealed_reply = (
+            f"🔒 **Zero-AI-Leak Device Vault-এ নিরাপদে সংরক্ষিত হয়েছে!**\n\n"
+            f"- **Device ID:** `{dev['id']}`\n"
+            f"- **ডিভাইস:** `{dev['device_name']}` (`{dev['host']}:{dev['port']}` / `{dev['protocol'].upper()}`)\n"
+            f"- **Username (Masked):** `{dev['username_masked']}`\n"
+            f"- **Password:** `{dev['password_masked']}`\n"
+            f"- **সুরক্ষা নীতি:** আপনার লগইন তথ্য **AES-256-GCM** এনক্রিপশনে সিল করা হয়েছে এবং **AI মডেলকে পাঠানো হয়নি**। "
+            f"কোনো AI মডেল কখনোই এই পাসওয়ার্ড পড়তে পারবে না। হিউম্যান এডমিন হিসেবে **MCP Hub -> AI-Sealed Vault** থেকে প্রয়োজনে দেখতে বা টেস্ট করতে পারবেন।"
+        )
+
+        async def sealed_event_generator():
+            yield f"data: {json.dumps({'type': 'token', 'token': sealed_reply}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'model_used': 'Zero-AI-Leak Vault (Bypassed LLM)'})}\n\n"
+            if session_id:
+                await ChatSessionStore.add_message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=sealed_reply,
+                    model_name="Zero-AI-Leak Vault",
+                    source="webchat",
+                )
+
+        return StreamingResponse(
+            sealed_event_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
         )
 
     async def event_generator():
@@ -278,14 +312,35 @@ async def chat_endpoint(request: ChatRequest, agent: CompanyAIAgent = Depends(ge
     Non-streaming standard chat endpoint with persistent session logging.
     """
     session_id = request.session_id
+    from mcp.sealed_vault import SealedDeviceVault
+    intercepted = await SealedDeviceVault.intercept_and_seal_message(request.prompt, actor="chat_user")
+    stored_prompt = intercepted["redacted_prompt"] if intercepted else request.prompt
+
     if session_id:
         await ChatSessionStore.add_message(
             session_id=session_id,
             role="user",
-            content=request.prompt,
+            content=stored_prompt,
             model_name=request.model,
             source="webchat",
         )
+
+    if intercepted:
+        dev = intercepted["saved"]
+        sealed_reply = (
+            f"🔒 **Zero-AI-Leak Device Vault-এ নিরাপদে সংরক্ষিত হয়েছে!**\n"
+            f"Device: `{dev['device_name']}` (`{dev['host']}:{dev['port']}`) | "
+            f"User: `{dev['username_masked']}` | Password: `{dev['password_masked']}` (AI মডেল কখনোই এই পাসওয়ার্ড দেখতে পারবে না)।"
+        )
+        if session_id:
+            await ChatSessionStore.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=sealed_reply,
+                model_name="Zero-AI-Leak Vault",
+                source="webchat",
+            )
+        return ChatResponse(reply=sealed_reply, sources=[], model_used="Zero-AI-Leak Vault")
 
     try:
         res = await agent.generate_response(

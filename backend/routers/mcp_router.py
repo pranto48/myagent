@@ -2,15 +2,17 @@
 import json
 import uuid
 import asyncio
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from mcp.store import MCPStore
 from mcp.manager import MCPManager
 from mcp.server import MyAgentMCPServer
+from mcp.sealed_vault import SealedDeviceVault
 from memory.project_store import ProjectMemoryStore
 from agent.tools import AgentTools
+from routers.auth import get_current_admin, get_optional_current_user
 
 router = APIRouter(prefix="/api/mcp", tags=["Model Context Protocol (MCP)"])
 
@@ -403,3 +405,100 @@ async def delete_project_memory_item(project_name: str, key: str):
     if not success:
         raise HTTPException(status_code=404, detail=f"Memory '{key}' not found in project '{project_name}'.")
     return {"success": True, "message": f"Memory '{key}' deleted from project '{project_name}'."}
+
+
+# ==============================================================================
+# Zero-AI-Leak Router & Device Credential Vault Endpoints
+# ==============================================================================
+
+class SaveSealedDeviceRequest(BaseModel):
+    device_name: str
+    host: str
+    username: str
+    password: str
+    device_type: str = "router"
+    protocol: str = "http"
+    port: Optional[int] = None
+    enable_secret: str = ""
+    notes: str = ""
+
+
+@router.get("/vault/devices")
+async def list_sealed_devices(query: Optional[str] = None):
+    """Lists all AI-sealed devices (masked usernames & passwords only — NEVER returns secrets)."""
+    items = await SealedDeviceVault.list_devices_safe(query=query)
+    return {
+        "ai_access_policy": "ZERO-AI-LEAK (AES-256-GCM Encrypted at Rest)",
+        "total": len(items),
+        "devices": items,
+    }
+
+
+@router.post("/vault/devices")
+async def save_sealed_device(
+    req: SaveSealedDeviceRequest,
+    current_user: dict = Depends(get_optional_current_user),
+):
+    """Saves router/switch/server login directly into the AI-sealed vault (never touches LLM prompts)."""
+    actor = current_user.get("sub", "admin") if isinstance(current_user, dict) else "admin"
+    saved = await SealedDeviceVault.save_device_credential(
+        device_name=req.device_name,
+        host=req.host,
+        username=req.username,
+        password=req.password,
+        device_type=req.device_type,
+        protocol=req.protocol,
+        port=req.port,
+        enable_secret=req.enable_secret,
+        notes=req.notes,
+        created_by=actor,
+    )
+    return {"success": True, "device": saved}
+
+
+@router.post("/vault/devices/{vault_id}/verify")
+async def verify_sealed_device(vault_id: str):
+    """Executes blind MCP connectivity/auth probe in backend memory without returning secrets."""
+    return await SealedDeviceVault.verify_device_with_sealed_credential(vault_id)
+
+
+@router.post("/vault/devices/{vault_id}/reveal")
+async def reveal_sealed_device_for_human_admin(
+    vault_id: str,
+    request: Request,
+    x_human_admin_reveal: Optional[str] = Header(None, alias="X-Human-Admin-Reveal"),
+    admin_user: dict = Depends(get_current_admin),
+):
+    """
+    HUMAN-ADMIN ONLY: Reveals decrypted device credentials strictly to authenticated Web Panel admins.
+    Requires both Admin JWT token and explicit X-Human-Admin-Reveal: true header. Audited.
+    """
+    if (x_human_admin_reveal or "").lower() != "true":
+        raise HTTPException(
+            status_code=403,
+            detail="Human reveal blocked: X-Human-Admin-Reveal: true header is required.",
+        )
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    revealed = await SealedDeviceVault.human_admin_reveal(
+        vault_id=vault_id,
+        actor=admin_user.get("sub", "admin"),
+        client_ip=client_ip,
+    )
+    if not revealed:
+        raise HTTPException(status_code=404, detail=f"Sealed device '{vault_id}' not found.")
+    return revealed
+
+
+@router.delete("/vault/devices/{vault_id}")
+async def delete_sealed_device(
+    vault_id: str,
+    admin_user: dict = Depends(get_current_admin),
+):
+    """Deletes a sealed device credential entry (Admin only)."""
+    deleted = await SealedDeviceVault.delete_device(
+        vault_id=vault_id,
+        actor=admin_user.get("sub", "admin"),
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Sealed device '{vault_id}' not found.")
+    return {"success": True, "message": f"Sealed device '{vault_id}' deleted."}

@@ -212,6 +212,7 @@ class MyAgentMCPServer:
                             "- IT Infrastructure & Network Ops: ping_network_diagnostics, network_port_scan, lan_subnet_discovery_scan, network_traceroute_or_path, subnet_ip_calculator\n"
                             "- DNS, SSL/TLS & HTTP Monitoring: dns_lookup_diagnostics, ssl_tls_cert_inspector, http_endpoint_health_check\n"
                             "- Server Telemetry, Logs & Maintenance: system_info, server_process_and_ports_audit, system_logs_inspector, cron_schedule_and_maintenance_planner, it_security_utility\n"
+                            "- Zero-AI-Leak Router & Device Vault: save_sealed_device_credential, list_sealed_device_inventory, verify_sealed_device_status (AES-256-GCM sealed; AI models NEVER see plaintext passwords)\n"
                             "- Prompt Engineering & Workflows: enhance_prompt, list_workflows, run_workflow_now, get_workflows_status_report\n"
                             "- Project Memory Vault: save_project_memory, get_project_memory, search_project_memory, save_project_info, get_project_info, list_all_projects\n"
                             "- Autonomous Skills Hub & RAG: list_available_skills, invoke_agent_skill, query_company_memory, save_company_memory, python_runner."
@@ -675,6 +676,12 @@ class MyAgentMCPServer:
                         "name": "IT Admin Host & Port Telemetry",
                         "description": "Live top processes, listening TCP/UDP ports, NIC traffic, and recent logs snapshot",
                         "mimeType": "text/markdown"
+                    },
+                    {
+                        "uri": "myagent://vault/sealed-devices-summary",
+                        "name": "AI-Sealed Device Inventory (Redacted)",
+                        "description": "Masked router/switch/server metadata ONLY. Plaintext credentials are encrypted and denied to all AI models.",
+                        "mimeType": "application/json"
                     }
                 ]
                 try:
@@ -716,6 +723,13 @@ class MyAgentMCPServer:
                     proc_diag = await ITAdminTools.server_process_and_ports_audit(top_n=10, sort_by="memory", include_connections=True)
                     res_text = f"{sys_diag}\n\n{proc_diag}"
                     mime_type = "text/markdown"
+                elif "vault/sealed-devices" in uri:
+                    from mcp.sealed_vault import SealedDeviceVault
+                    items = await SealedDeviceVault.list_devices_safe()
+                    res_text = json.dumps({
+                        "ai_access_policy": "DENIED (Zero-AI-Leak AES-256-GCM Sealed)",
+                        "devices": items
+                    }, indent=2, ensure_ascii=False)
                 elif "diagnostics" in uri:
                     res_text = await asyncio.to_thread(AgentTools.system_info)
                 elif "company/memory" in uri:

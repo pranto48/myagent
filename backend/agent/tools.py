@@ -479,6 +479,8 @@ class AgentTools:
     def fs_read_file(filepath: str, max_chars: int = 5000) -> str:
         """Reads text, markdown, json, or code file contents from data storage."""
         try:
+            if "sealed_vault" in (filepath or "").lower():
+                return "Security Block: 'sealed_vault.db' is an AI-Sealed AES-256-GCM credential vault. AI models are prohibited from accessing it."
             target_path = filepath
             if not os.path.isabs(target_path):
                 for d in [settings.DATA_DIR, os.path.join(settings.DATA_DIR, "documents"), os.path.join(settings.DATA_DIR, "uploads")]:
@@ -513,6 +515,8 @@ class AgentTools:
     def sqlite_query(query: str, db_name: str = "chat_history.db") -> str:
         """Executes safe read-only SQL queries against SQLite databases."""
         try:
+            if "sealed_vault" in (db_name or "").lower() or "mcp_sealed_device_vault" in (query or "").lower():
+                return "Security Block: 'sealed_vault.db' is an AI-Sealed AES-256-GCM credential vault. AI models cannot query or access this table."
             q_lower = query.strip().lower()
             if not q_lower.startswith("select") and not q_lower.startswith("pragma") and not q_lower.startswith("explain"):
                 return "Security Error: Only SELECT or PRAGMA read queries are permitted."
@@ -999,6 +1003,8 @@ class AgentTools:
         Inspects SQLite database tables, columns, row counts, indexes,
         or explains a SQL query execution plan (EXPLAIN QUERY PLAN).
         """
+        if "sealed_vault" in (db_name or "").lower() or "mcp_sealed_device_vault" in (table_name or "").lower():
+            return "Security Block: 'sealed_vault.db' is an AI-Sealed AES-256-GCM credential vault. AI models cannot inspect this database."
         db_path = os.path.join(settings.DATA_DIR, os.path.basename(db_name))
         if not os.path.exists(db_path):
             db_path = os.path.join("./data", os.path.basename(db_name))
@@ -1638,6 +1644,39 @@ class AgentTools:
                     expression=args.get("expression", "0 3 * * *"),
                     count=int(args.get("count", 5))
                 )
+            elif tool_name == "save_sealed_device_credential":
+                from mcp.sealed_vault import SealedDeviceVault
+                saved = await SealedDeviceVault.save_device_credential(
+                    device_name=args.get("device_name", ""),
+                    host=args.get("host", ""),
+                    username=args.get("username", ""),
+                    password=args.get("password", ""),
+                    device_type=args.get("device_type", "router"),
+                    protocol=args.get("protocol", "http"),
+                    port=int(args["port"]) if args.get("port") else None,
+                    enable_secret=args.get("enable_secret", ""),
+                    notes=args.get("notes", ""),
+                    created_by="mcp_sealed_input"
+                )
+                return json.dumps({
+                    "sealed": True,
+                    "message": "Device login sealed with AES-256-GCM. AI models CANNOT retrieve the plaintext password.",
+                    "device": saved
+                }, ensure_ascii=False, indent=2)
+            elif tool_name == "list_sealed_device_inventory":
+                from mcp.sealed_vault import SealedDeviceVault
+                items = await SealedDeviceVault.list_devices_safe(query=args.get("query"))
+                return json.dumps({
+                    "ai_access_policy": "ZERO-AI-LEAK (Only masked metadata is visible; plaintext passwords are blocked for all AI models)",
+                    "total_devices": len(items),
+                    "devices": items
+                }, ensure_ascii=False, indent=2)
+            elif tool_name == "verify_sealed_device_status":
+                from mcp.sealed_vault import SealedDeviceVault
+                res = await SealedDeviceVault.verify_device_with_sealed_credential(
+                    device_or_host=args.get("device_or_host", "")
+                )
+                return json.dumps(res, ensure_ascii=False, indent=2)
 
             else:
                 # Check dynamic MCP manager
@@ -2426,6 +2465,55 @@ class AgentTools:
                             "count": {"type": "integer", "description": "Number of upcoming maintenance runs to calculate (1..20, default: 5)"}
                         },
                         "required": ["expression"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_sealed_device_credential",
+                    "description": "Zero-AI-Leak Device Vault: Encrypts and stores router/switch/firewall/server login credentials with AES-256-GCM. Once sealed, NO AI model or MCP client can ever read back the plaintext username/password.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "device_name": {"type": "string", "description": "Friendly device label (e.g. 'Office Core MikroTik Router')"},
+                            "host": {"type": "string", "description": "Router/device IP address or hostname (e.g. 192.168.9.1)"},
+                            "username": {"type": "string", "description": "Login username (immediately AES-256-GCM encrypted & sealed)"},
+                            "password": {"type": "string", "description": "Login password (immediately AES-256-GCM encrypted & sealed)"},
+                            "device_type": {"type": "string", "enum": ["router", "mikrotik", "switch", "firewall", "server", "nas", "ap", "other"], "description": "Device category (default: router)"},
+                            "protocol": {"type": "string", "enum": ["http", "https", "ssh", "winbox", "routeros_rest", "routeros_api", "rdp", "telnet", "snmp"], "description": "Management protocol (default: http)"},
+                            "port": {"type": "integer", "description": "Management port (auto-defaults by protocol e.g. 80/443/22/8291)"},
+                            "enable_secret": {"type": "string", "description": "Optional enable password, PIN, or API secret"},
+                            "notes": {"type": "string", "description": "Non-secret location/VLAN notes"}
+                        },
+                        "required": ["host", "username", "password"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_sealed_device_inventory",
+                    "description": "AI-Blind Vault Inventory: Lists saved routers/devices with masked usernames and redacted password indicators ONLY. Plaintext credentials are strictly hidden from all AI models.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Optional search filter by device name, IP, or type"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "verify_sealed_device_status",
+                    "description": "Blind MCP Proxy Check: Tests reachability/HTTP auth against a sealed router/device internally in backend memory without ever exposing plaintext credentials to the AI model.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "device_or_host": {"type": "string", "description": "Vault ID, device IP (e.g. 192.168.9.1), or device name"}
+                        },
+                        "required": ["device_or_host"]
                     }
                 }
             }

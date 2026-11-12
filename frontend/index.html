@@ -1380,8 +1380,77 @@
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('subnet_calc')">🧮 14. Subnet Calc (192.168.9.0/24)</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('proc_audit')">🖥️ 15. Process &amp; Ports Audit</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('logs_audit')">📋 16. System Logs Inspector</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('sealed_vault_list')">🔒 17. Check AI-Sealed Vault</button>
               </div>
               <pre id="myagent-mcp-test-output" style="background:#090d16; border:1px solid var(--border-subtle); border-radius:6px; padding:12px; height:140px; overflow-y:auto; font-size:0.78rem; color:#38bdf8; margin:0; font-family:monospace;">পরীক্ষার জন্য উপরের যেকোনো টেস্ট বাটনে ক্লিক করুন...</pre>
+            </div>
+          </div>
+
+          <!-- Section 0.4: Zero-AI-Leak Router & Device Credential Vault -->
+          <div class="card-panel" id="sealed-device-vault-panel" style="margin-bottom: 24px; border: 1px solid rgba(245, 158, 11, 0.35); background: linear-gradient(135deg, rgba(245,158,11,0.06), rgba(15,23,42,0.85));">
+            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="display:flex; align-items:center; gap:8px; color:#fbbf24;">
+                  🔒 জিরো-AI-লিক রাউটার ও ডিভাইস ক্রেডেনশিয়াল ভল্ট (AI-Sealed Vault)
+                </h3>
+                <p style="color:var(--text-muted); font-size:0.84rem; margin-top:4px; line-height:1.5;">
+                  এখানে সেভ করা রাউটার/সুইচ/ফায়ারওয়াল/সার্ভার পাসওয়ার্ড <strong>AES-256-GCM</strong> দিয়ে আলাদা <code>sealed_vault.db</code>-তে সিল থাকে।
+                  <span style="color:#34d399; font-weight:600;">কোনো AI মডেল বা MCP ক্লায়েন্ট কখনোই প্লেইনটেক্সট পাসওয়ার্ড পড়তে পারবে না</span> — AI শুধু ব্লাইন্ড হেলথ/লগইন টেস্ট চালাতে পারবে।
+                </p>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge-tag" style="background:rgba(16,185,129,0.18); color:#6ee7b7; border:1px solid rgba(16,185,129,0.35);">🛡️ AI Access: DENIED</span>
+                <button class="btn-sm-action" onclick="loadSealedDeviceVault()">🔄 রিফ্রেশ</button>
+              </div>
+            </div>
+
+            <!-- Add Device Login Form -->
+            <form id="sealed-device-form" onsubmit="submitSealedDeviceForm(event)" style="margin-top:14px; padding:14px; border-radius:8px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.08);">
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px;">
+                <input type="text" id="sdv-name" class="text-input" placeholder="ডিভাইসের নাম (যেমন: Core MikroTik)" required style="font-size:0.82rem;">
+                <select id="sdv-type" class="text-input" style="font-size:0.82rem; cursor:pointer;">
+                  <option value="router">Router</option>
+                  <option value="mikrotik">MikroTik</option>
+                  <option value="switch">Managed Switch</option>
+                  <option value="firewall">Firewall / VPN</option>
+                  <option value="server">Linux / Windows Server</option>
+                  <option value="nas">NAS Storage</option>
+                  <option value="ap">WiFi AP / Controller</option>
+                </select>
+                <input type="text" id="sdv-host" class="text-input" placeholder="IP / Host (যেমন: 192.168.9.1)" required style="font-size:0.82rem; font-family:monospace;">
+                <select id="sdv-protocol" class="text-input" onchange="onSealedProtoChange()" style="font-size:0.82rem; cursor:pointer;">
+                  <option value="http">HTTP Web Admin (80)</option>
+                  <option value="https">HTTPS Web Admin (443)</option>
+                  <option value="ssh">SSH (22)</option>
+                  <option value="winbox">MikroTik Winbox (8291)</option>
+                  <option value="routeros_rest">RouterOS REST API (443)</option>
+                  <option value="routeros_api">RouterOS API (8728)</option>
+                  <option value="rdp">RDP (3389)</option>
+                </select>
+                <input type="number" id="sdv-port" class="text-input" value="80" min="1" max="65535" placeholder="Port" style="font-size:0.82rem; font-family:monospace;">
+                <input type="text" id="sdv-user" class="text-input" placeholder="Username (যেমন: admin)" required autocomplete="off" style="font-size:0.82rem;">
+                <input type="password" id="sdv-pass" class="text-input" placeholder="Password (AI-Sealed)" required autocomplete="new-password" style="font-size:0.82rem;">
+                <input type="password" id="sdv-secret" class="text-input" placeholder="Enable / API Secret (ঐচ্ছিক)" autocomplete="new-password" style="font-size:0.82rem;">
+                <input type="text" id="sdv-notes" class="text-input" placeholder="নোটস (যেমন: VLAN1 Gateway)" style="font-size:0.82rem;">
+              </div>
+              <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <span style="font-size:0.74rem; color:#94a3b8;">💡 টিপস: Telegram বা Chat-এ <code>/save-router 192.168.9.1 admin PASS</code> লিখলেও পাসওয়ার্ড AI-কে না দেখিয়ে সরাসরি এখানে সিল হয়ে যায়।</span>
+                <button type="submit" class="btn-primary" style="padding:7px 14px; font-size:0.82rem;">🔐 এনক্রিপ্ট ও সিল করুন (Save to Vault)</button>
+              </div>
+            </form>
+
+            <!-- Human-Only Reveal Banner (Auto-clears after 15s) -->
+            <div id="sdv-reveal-banner" style="display:none; margin-top:12px; padding:12px 14px; border-radius:8px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.45); font-family:monospace; font-size:0.82rem; color:#ecfdf5;"></div>
+
+            <!-- Sealed Devices List -->
+            <div style="margin-top:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                <strong style="font-size:0.88rem; color:white;">🗝️ সংরক্ষিত AI-সিলড ডিভাইস তালিকা</strong>
+                <input type="text" id="sdv-search" class="text-input" placeholder="নাম বা IP দিয়ে খুঁজুন..." style="width:210px; padding:4px 8px; font-size:0.78rem;" oninput="loadSealedDeviceVault(this.value)">
+              </div>
+              <div id="sealed-devices-list" style="display:flex; flex-direction:column; gap:8px;">
+                <div style="padding:14px; text-align:center; color:var(--text-muted); font-size:0.84rem;">ভল্ট লোড হচ্ছে...</div>
+              </div>
             </div>
           </div>
 
