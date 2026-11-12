@@ -648,7 +648,7 @@ class ITAdminTools:
                         conn = sqlite3.connect(ops_db)
                         conn.row_factory = sqlite3.Row
                         rows = conn.execute(
-                            "SELECT id, workflow_name, status, trigger_source, duration_ms, started_at, error_summary "
+                            "SELECT id, workflow_name, status, trigger_source, duration_ms, started_at, error_message "
                             "FROM ops_workflow_runs ORDER BY started_at DESC LIMIT ?",
                             (limit,),
                         ).fetchall()
@@ -658,11 +658,11 @@ class ITAdminTools:
                     wf_rows = await asyncio.to_thread(_read_wf_runs)
                     matched_wf = [
                         r for r in wf_rows
-                        if _matches(f"{r.get('workflow_name')} {r.get('status')} {r.get('error_summary')}", str(r.get("status", "")))
+                        if _matches(f"{r.get('workflow_name')} {r.get('status')} {r.get('error_message')}", str(r.get("status", "")))
                     ]
                     sections.append(f"\n**⚙️ Workflow Runs (`{len(matched_wf)}` shown):**")
                     for r in matched_wf[:15]:
-                        err = f" — `{r['error_summary'][:120]}`" if r.get("error_summary") else ""
+                        err = f" — `{r['error_message'][:120]}`" if r.get("error_message") else ""
                         sections.append(
                             f"- `[{r['status']}]` {r['started_at']} | **{r['workflow_name']}** ({r['trigger_source']}, {r['duration_ms']}ms){err}"
                         )
@@ -675,12 +675,13 @@ class ITAdminTools:
                 from workflows.store import WorkflowStore
                 from workflows.telegram_service import telegram_chat_listener
                 tg = await WorkflowStore.get_telegram_config()
-                lst = telegram_chat_listener.get_status()
+                lst = telegram_chat_listener.get_runtime_state()
                 sections.append("\n**🤖 Telegram Bot Telemetry:**")
                 sections.append(
-                    f"- Enabled: `{tg.get('is_enabled')}` | Polling Active: `{lst.get('running')}` | "
+                    f"- Bot: `{tg.get('bot_username') or 'N/A'}` | Enabled: `{tg.get('is_enabled')}` | "
+                    f"Polling Active: `{lst.get('polling_active')}` (Running: `{lst.get('listener_running')}`) | "
                     f"Sent: `{tg.get('sent_count', 0)}` | Last Error: `{tg.get('last_error') or 'None'}` | "
-                    f"Poll Error: `{lst.get('last_error') or 'None'}`"
+                    f"Poll Error: `{lst.get('poll_error') or 'None'}`"
                 )
             except Exception as exc:
                 sections.append(f"- Telegram status note: `{exc}`")
@@ -705,7 +706,10 @@ class ITAdminTools:
                     matched_sec = [r for r in sec_rows if _matches(json.dumps(r, ensure_ascii=False), str(r.get("severity", "INFO")))]
                     sections.append(f"\n**🛡️ Security Audit Events (`{len(matched_sec)}` matched):**")
                     for r in matched_sec[:12]:
-                        sections.append(f"- `{json.dumps(r, ensure_ascii=False)[:180]}`")
+                        sections.append(
+                            f"- `[{r.get('severity', 'INFO')}]` {r.get('iso_time', '')} | "
+                            f"**{r.get('action', '')}** | user=`{r.get('username', '')}` (`{r.get('resource', '')}`)"
+                        )
                 except Exception as exc:
                     sections.append(f"- Security audit read note: `{exc}`")
 
