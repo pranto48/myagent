@@ -292,6 +292,40 @@ async def telegram_send_message(
             "error": err,
         }
 
+    bot_prefix_id = tok.split(":")[0].strip() if ":" in tok else ""
+    if bot_prefix_id and cid == bot_prefix_id:
+        try:
+            cfg_fallback = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
+            allowed_candidates = [
+                x.strip()
+                for x in (cfg_fallback.get("allowed_chat_ids") or "").split(",")
+                if x.strip() and x.strip() != bot_prefix_id
+            ]
+            if allowed_candidates:
+                cid = allowed_candidates[0]
+            else:
+                err = "Target Chat ID cannot be the Bot's own ID. Send /start to your bot and click Auto-Detect Chat ID."
+                await WorkflowStore.record_telegram_log(
+                    event_type=event_type,
+                    status="FAILED",
+                    workflow_id=workflow_id,
+                    workflow_name=workflow_name,
+                    node_id=node_id,
+                    bot_username=bot_username,
+                    chat_id=cid,
+                    message_preview=preview,
+                    error_detail=err,
+                )
+                return {
+                    "ok": False,
+                    "http_status": 403,
+                    "telegram_message_id": "",
+                    "latency_ms": 0,
+                    "error": err,
+                }
+        except Exception:
+            pass
+
     t0 = time.time()
     url = f"{TELEGRAM_API_BASE}/bot{tok}/sendMessage"
     chunks = _split_telegram_text(clean_text, max_len=3850)
@@ -596,7 +630,7 @@ async def handle_telegram_chat_message(
     ):
         intent = "server_health"
         from agent.tools import AgentTools
-        sys_txt = await AgentTools.system_info()
+        sys_txt = await asyncio.to_thread(AgentTools.system_info)
         reply_text = f"🏥 Live Server Health Diagnostics:\n{sys_txt[:1800]}\n\n{wf_digest['report_text']}"
 
     # E3. Recent Workflow Execution History (/history, /runs, recent runs)

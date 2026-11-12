@@ -327,10 +327,20 @@ async def connect_workflow_telegram(
                 "detected_chats": [],
             }
 
+        # Reject accidental bot_id pasted into chat_id, auto-resolving from allowed_chat_ids or getUpdates
+        bot_id_str = verify.get("bot_id", "") or (effective_tok.split(":")[0] if ":" in effective_tok else "")
+        if effective_cid and bot_id_str and effective_cid == bot_id_str:
+            effective_cid = ""
+            raw_allowed = extra_kwargs.get("allowed_chat_ids") if "allowed_chat_ids" in extra_kwargs else current.get("allowed_chat_ids", "")
+            for cand in str(raw_allowed or "").split(","):
+                if cand.strip() and cand.strip() != bot_id_str:
+                    effective_cid = cand.strip()
+                    break
+
         # Auto-discover chat_id if left empty
         if not effective_cid:
             det = await telegram_detect_chats(effective_tok, bot_username=verify.get("bot_username", ""))
-            detected_chats = det.get("chats", [])
+            detected_chats = [c for c in det.get("chats", []) if str(c.get("chat_id") or "") != bot_id_str]
             if detected_chats:
                 effective_cid = detected_chats[0]["chat_id"]
 
