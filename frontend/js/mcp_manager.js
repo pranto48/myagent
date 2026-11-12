@@ -355,6 +355,66 @@ async function runMyAgentMcpTest(testType) {
       method: "prompts/list",
       params: {}
     };
+  } else if (testType === 'dns_audit') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "dns_lookup_diagnostics",
+        arguments: { domain: "itsupport.com.bd", record_types: ["A", "MX", "TXT", "NS"] }
+      }
+    };
+  } else if (testType === 'ssl_inspect') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "ssl_tls_cert_inspector",
+        arguments: { host: "itsupport.com.bd", port: 443 }
+      }
+    };
+  } else if (testType === 'http_health') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "http_endpoint_health_check",
+        arguments: { url: "http://127.0.0.1:8000/api/health", expected_status: 200 }
+      }
+    };
+  } else if (testType === 'subnet_calc') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "subnet_ip_calculator",
+        arguments: { cidr: "192.168.9.0/24" }
+      }
+    };
+  } else if (testType === 'proc_audit') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "server_process_and_ports_audit",
+        arguments: { top_n: 8, sort_by: "memory", include_connections: true }
+      }
+    };
+  } else if (testType === 'logs_audit') {
+    payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: "system_logs_inspector",
+        arguments: { log_source: "all", level: "ALL", tail_lines: 20 }
+      }
+    };
   }
 
   try {
@@ -1023,9 +1083,84 @@ async function addQuickTemplate(templateKey) {
   }
 }
 
+const SANDBOX_DEFAULT_ARGS = {
+  ping_network_diagnostics: { target: "192.168.9.2", count: 3 },
+  network_port_scan: { target: "192.168.9.9" },
+  dns_lookup_diagnostics: { domain: "itsupport.com.bd", record_types: ["A", "MX", "TXT", "NS"] },
+  ssl_tls_cert_inspector: { host: "itsupport.com.bd", port: 443 },
+  http_endpoint_health_check: { url: "http://127.0.0.1:8000/api/health", expected_status: 200 },
+  subnet_ip_calculator: { cidr: "192.168.9.0/24" },
+  lan_subnet_discovery_scan: { subnet: "192.168.9.0/24", max_hosts: 16 },
+  server_process_and_ports_audit: { top_n: 10, sort_by: "memory", include_connections: true },
+  system_logs_inspector: { log_source: "all", level: "ALL", tail_lines: 25 },
+  network_traceroute_or_path: { target: "192.168.9.1", max_hops: 8 },
+  it_security_utility: { action: "generate_password", length: 20 },
+  cron_schedule_and_maintenance_planner: { expression: "0 3 * * 1-5", count: 5 },
+  system_info: {},
+  get_workflows_status_report: {},
+  sqlite_schema_inspector: { db_name: "chat_history.db" },
+  git_repo_inspector: { max_commits: 5 },
+  list_all_projects: {},
+  list_workflows: {}
+};
+
+function renderBuiltinToolsGrid(toolsList) {
+  const container = document.getElementById('builtin-tools-grid');
+  if (!container) return;
+  if (!toolsList || toolsList.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--text-muted);">কোনো টুল পাওয়া যায়নি।</div>`;
+    return;
+  }
+  const activeLabel = typeof t === 'function' ? t('status_online', 'সক্রিয়') : 'সক্রিয়';
+  container.innerHTML = toolsList.map(tool => `
+    <div class="tool-feature-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:6px;">
+        <div style="font-weight:700; font-family:monospace; color:var(--cyan-glow); font-size:0.9rem; word-break:break-word;">
+          ${escapeHtml(tool.name)}
+        </div>
+        <span class="badge-tag" style="background:rgba(16,185,129,0.15); color:#6ee7b7; flex-shrink:0;">${activeLabel}</span>
+      </div>
+      <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.5;">
+        ${escapeHtml(tool.description)}
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterBuiltinToolsGrid(query) {
+  const q = (query || '').trim().toLowerCase();
+  const builtinTools = allDiscoveredTools.filter(item => item.source === 'builtin');
+  if (!q) {
+    renderBuiltinToolsGrid(builtinTools);
+    return;
+  }
+  const filtered = builtinTools.filter(item =>
+    (item.name || '').toLowerCase().includes(q) ||
+    (item.description || '').toLowerCase().includes(q)
+  );
+  renderBuiltinToolsGrid(filtered);
+}
+
+function onSandboxToolChanged() {
+  const toolSelect = document.getElementById('sandbox-tool-select');
+  const argsBox = document.getElementById('sandbox-tool-args');
+  if (!toolSelect || !argsBox) return;
+  const name = toolSelect.value;
+  if (Object.prototype.hasOwnProperty.call(SANDBOX_DEFAULT_ARGS, name)) {
+    argsBox.value = JSON.stringify(SANDBOX_DEFAULT_ARGS[name], null, 2);
+    return;
+  }
+  const matched = allDiscoveredTools.find(item => item.name === name);
+  const props = matched?.parameters?.properties || {};
+  const sample = {};
+  Object.keys(props).slice(0, 3).forEach(k => {
+    sample[k] = props[k].type === 'integer' ? 5 : (props[k].type === 'boolean' ? true : '');
+  });
+  argsBox.value = JSON.stringify(sample, null, 2);
+}
+
 // Load Combined Tools Registry (Builtin + MCP)
 async function loadAllToolsRegistry() {
-  const container = document.getElementById('builtin-tools-grid');
   const toolSelect = document.getElementById('sandbox-tool-select');
 
   try {
@@ -1039,28 +1174,15 @@ async function loadAllToolsRegistry() {
 
     // Populate dropdown
     if (toolSelect) {
-      toolSelect.innerHTML = allDiscoveredTools.map(t => `
-        <option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.source === 'builtin' ? 'Builtin' : 'MCP'})</option>
+      toolSelect.innerHTML = allDiscoveredTools.map(item => `
+        <option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} (${item.source === 'builtin' ? 'Builtin' : 'MCP'})</option>
       `).join('');
+      onSandboxToolChanged();
     }
 
     // Populate Builtin Tools Grid
-    if (container) {
-      const builtinTools = allDiscoveredTools.filter(t => t.source === 'builtin');
-      container.innerHTML = builtinTools.map(t => `
-        <div class="tool-feature-card">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-            <div style="font-weight:700; font-family:monospace; color:var(--cyan-glow); font-size:0.92rem;">
-              ${escapeHtml(t.name)}
-            </div>
-            <span class="badge-tag" style="background:rgba(16,185,129,0.15); color:#6ee7b7;">${typeof t === 'function' ? t('status_online', 'সক্রিয়') : 'সক্রিয়'}</span>
-          </div>
-          <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.5;">
-            ${escapeHtml(t.description)}
-          </div>
-        </div>
-      `).join('');
-    }
+    const builtinTools = allDiscoveredTools.filter(item => item.source === 'builtin');
+    renderBuiltinToolsGrid(builtinTools);
   } catch (err) {
     console.error('Error loading tools registry:', err);
   }

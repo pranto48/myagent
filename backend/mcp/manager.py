@@ -259,7 +259,15 @@ class MCPManager:
                             "params": {"name": tool_name, "arguments": args}
                         }) + "\n"
                     )
-                    stdout, stderr = await asyncio.wait_for(proc.communicate(input=rpc_in.encode()), timeout=15.0)
+                    try:
+                        stdout, stderr = await asyncio.wait_for(proc.communicate(input=rpc_in.encode()), timeout=20.0)
+                    except asyncio.TimeoutError:
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+                        return f"MCP Timeout: Stdio tool '{tool_name}' exceeded 20s timeout."
+
                     for line in stdout.decode("utf-8", errors="replace").splitlines():
                         line = line.strip()
                         if line.startswith("{"):

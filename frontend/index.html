@@ -1374,6 +1374,12 @@
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('port_scan')">🔭 8. Call network_port_scan (192.168.9.9)</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('list_skills')">📦 9. Call list_available_skills</button>
                 <button class="btn-sm-action" onclick="runMyAgentMcpTest('prompts/list')">🎯 10. List MCP Prompts</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('dns_audit')">🌐 11. DNS Audit (itsupport.com.bd)</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('ssl_inspect')">🔐 12. SSL Cert Check</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('http_health')">🩺 13. HTTP Health (Local)</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('subnet_calc')">🧮 14. Subnet Calc (192.168.9.0/24)</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('proc_audit')">🖥️ 15. Process &amp; Ports Audit</button>
+                <button class="btn-sm-action" onclick="runMyAgentMcpTest('logs_audit')">📋 16. System Logs Inspector</button>
               </div>
               <pre id="myagent-mcp-test-output" style="background:#090d16; border:1px solid var(--border-subtle); border-radius:6px; padding:12px; height:140px; overflow-y:auto; font-size:0.78rem; color:#38bdf8; margin:0; font-family:monospace;">পরীক্ষার জন্য উপরের যেকোনো টেস্ট বাটনে ক্লিক করুন...</pre>
             </div>
@@ -1499,9 +1505,12 @@
 
           <!-- Section 3: Built-in Open Source Tools Suite -->
           <div class="card-panel" style="margin-top: 20px;">
-            <div class="panel-header">
-              <h3 data-i18n="mcp_builtin_title">🧰 ডকার অ্যাপে বিল্ট-ইন ওপেন-সোর্স টুলস স্যুট</h3>
-              <p data-i18n="mcp_builtin_desc">এআই এজেন্ট স্বয়ংক্রিয়ভাবে ওপেনএআই ফাংশন কলিং বা রিএক্ট (ReAct) সিনট্যাক্স দিয়ে এই টুলগুলো ব্যবহার করতে পারে</p>
+            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 data-i18n="mcp_builtin_title">🧰 ডকার অ্যাপে বিল্ট-ইন ওপেন-সোর্স টুলস স্যুট</h3>
+                <p data-i18n="mcp_builtin_desc">এআই এজেন্ট স্বয়ংক্রিয়ভাবে ওপেনএআই ফাংশন কলিং বা রিএক্ট (ReAct) সিনট্যাক্স দিয়ে এই টুলগুলো ব্যবহার করতে পারে</p>
+              </div>
+              <input type="text" id="builtin-tools-search" class="text-input" placeholder="🔍 টুল খুঁজুন (যেমন: dns, ssl, subnet, ping)..." style="width:260px; padding:6px 10px; font-size:0.8rem;" oninput="filterBuiltinToolsGrid(this.value)">
             </div>
 
             <div class="builtin-tools-grid" id="builtin-tools-grid">
@@ -1520,7 +1529,7 @@
               <div>
                 <div class="form-group">
                   <label data-i18n="mcp_lbl_select_tool">টুল নির্বাচন করুন</label>
-                  <select id="sandbox-tool-select" class="text-input" style="cursor:pointer;"></select>
+                  <select id="sandbox-tool-select" class="text-input" style="cursor:pointer;" onchange="onSandboxToolChanged()"></select>
                 </div>
                 <div class="form-group" style="margin-top:10px;">
                   <label data-i18n="mcp_lbl_args">আর্গুমেন্টস (JSON Format)</label>

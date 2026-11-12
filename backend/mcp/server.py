@@ -208,13 +208,13 @@ class MyAgentMCPServer:
                         },
                         "instructions": (
                             "Connected to MyAgent Docker MCP Server on 192.168.9.9. "
-                            "You have access to 30+ high-efficiency tools and 67+ specialized domain skills:\n"
-                            "- Prompt Engineering: enhance_prompt (developer/architect/analysis/executive modes)\n"
+                            "You have access to 35+ high-efficiency tools (including dedicated IT Administrator tools) and 67+ specialized domain skills:\n"
+                            "- IT Infrastructure & Network Ops: ping_network_diagnostics, network_port_scan, lan_subnet_discovery_scan, network_traceroute_or_path, subnet_ip_calculator\n"
+                            "- DNS, SSL/TLS & HTTP Monitoring: dns_lookup_diagnostics, ssl_tls_cert_inspector, http_endpoint_health_check\n"
+                            "- Server Telemetry, Logs & Maintenance: system_info, server_process_and_ports_audit, system_logs_inspector, cron_schedule_and_maintenance_planner, it_security_utility\n"
+                            "- Prompt Engineering & Workflows: enhance_prompt, list_workflows, run_workflow_now, get_workflows_status_report\n"
                             "- Project Memory Vault: save_project_memory, get_project_memory, search_project_memory, save_project_info, get_project_info, list_all_projects\n"
-                            "- Autonomous Skills Hub: list_available_skills, invoke_agent_skill\n"
-                            "- Network Diagnostics: ping_network_diagnostics, network_port_scan\n"
-                            "- DevOps & Code Quality: code_quality_and_security_audit, sqlite_schema_inspector, git_repo_inspector, generate_task_breakdown\n"
-                            "- Data Analytics & RAG: query_company_memory, save_company_memory, analyze_big_data, smart_data_summarizer, python_runner, document readers."
+                            "- Autonomous Skills Hub & RAG: list_available_skills, invoke_agent_skill, query_company_memory, save_company_memory, python_runner."
                         )
                     }
                 }
@@ -253,8 +253,17 @@ class MyAgentMCPServer:
                     }
 
                 logger.info(f"Executing MyAgent MCP tool call: {tool_name} with args: {arguments}")
+                if not isinstance(arguments, dict):
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {"code": -32602, "message": "Invalid params: 'arguments' must be a JSON object."}
+                    }
                 try:
-                    output = await AgentTools.dispatch_tool(tool_name, arguments)
+                    output = await asyncio.wait_for(
+                        AgentTools.dispatch_tool(tool_name, arguments),
+                        timeout=45.0
+                    )
                     output_text = str(output) if output is not None else "Tool executed successfully (empty output)."
                     
                     return {
@@ -268,6 +277,21 @@ class MyAgentMCPServer:
                                 }
                             ],
                             "isError": False
+                        }
+                    }
+                except asyncio.TimeoutError:
+                    logger.warning(f"MCP tool '{tool_name}' timed out after 45s.")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Tool Execution Timeout: '{tool_name}' exceeded 45s safety limit. Verify target host reachability or narrow scan scope."
+                                }
+                            ],
+                            "isError": True
                         }
                     }
                 except Exception as ex:
@@ -349,6 +373,25 @@ class MyAgentMCPServer:
                                 "name": "executive_daily_briefing",
                                 "description": "Aggregate system diagnostics, active projects, and git logs into an executive status report",
                                 "arguments": []
+                            },
+                            {
+                                "name": "it_infrastructure_health_audit",
+                                "description": "Full IT Admin server audit: CPU/RAM/Disk, top processes, listening ports, workflow errors, and logs",
+                                "arguments": []
+                            },
+                            {
+                                "name": "ssl_and_dns_security_check",
+                                "description": "Audit domain DNS (A/MX/TXT/SPF/DMARC), TLS certificate expiry, and HTTP security headers",
+                                "arguments": [
+                                    {"name": "domain", "description": "Target domain or hostname (e.g. itsupport.com.bd)", "required": True}
+                                ]
+                            },
+                            {
+                                "name": "lan_incident_triage",
+                                "description": "Subnet calculation, LAN live host discovery, ping, and traceroute incident triage",
+                                "arguments": [
+                                    {"name": "target_or_subnet", "description": "Target IP or CIDR subnet (e.g. 192.168.9.0/24 or 192.168.9.2)", "required": True}
+                                ]
                             }
                         ]
                     }
@@ -527,6 +570,76 @@ class MyAgentMCPServer:
                             ]
                         }
                     }
+                elif p_name == "it_infrastructure_health_audit":
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": "Full IT Infrastructure Health & Log Audit",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            "Run a complete IT Administrator server health audit:\n"
+                                            "1. Call `system_info` and `server_process_and_ports_audit` (top_n=12).\n"
+                                            "2. Call `system_logs_inspector` (log_source='all', level='ALL', tail_lines=25).\n"
+                                            "3. Call `get_workflows_status_report`.\n"
+                                            "Summarize resource bottlenecks, listening sockets, errors, and corrective recommendations."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "ssl_and_dns_security_check":
+                    dom = p_args.get("domain", "itsupport.com.bd")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"DNS, SSL/TLS & HTTP Security Check for {dom}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"Perform a full domain and edge security audit for '{dom}':\n"
+                                            f"1. Call `dns_lookup_diagnostics` with domain='{dom}'.\n"
+                                            f"2. Call `ssl_tls_cert_inspector` with host='{dom}' and port=443.\n"
+                                            f"3. Call `http_endpoint_health_check` with url='https://{dom}'.\n"
+                                            f"Report certificate expiry countdown, SPF/DMARC status, and missing HTTP hardening headers."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                elif p_name == "lan_incident_triage":
+                    tgt = p_args.get("target_or_subnet", "192.168.9.0/24")
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "result": {
+                            "description": f"LAN Network Incident Triage for {tgt}",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": {
+                                        "type": "text",
+                                        "text": (
+                                            f"Triage network connectivity for '{tgt}':\n"
+                                            f"- If CIDR: call `subnet_ip_calculator` and `lan_subnet_discovery_scan` on '{tgt}'.\n"
+                                            f"- If host/IP: call `ping_network_diagnostics`, `network_port_scan`, and `network_traceroute_or_path` on '{tgt}'.\n"
+                                            f"Highlight unreachable hops, latency spikes, and open administrative ports."
+                                        )
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 else:
                     return {
                         "jsonrpc": "2.0",
@@ -556,6 +669,12 @@ class MyAgentMCPServer:
                         "name": "Company Hybrid Memory Stats",
                         "description": "Summary of indexed document chunks and vector store status",
                         "mimeType": "application/json"
+                    },
+                    {
+                        "uri": "myagent://it/server-health",
+                        "name": "IT Admin Host & Port Telemetry",
+                        "description": "Live top processes, listening TCP/UDP ports, NIC traffic, and recent logs snapshot",
+                        "mimeType": "text/markdown"
                     }
                 ]
                 try:
@@ -590,8 +709,15 @@ class MyAgentMCPServer:
             elif method == "resources/read":
                 uri = params.get("uri", "")
                 res_text = "{}"
-                if "diagnostics" in uri:
-                    res_text = AgentTools.system_info()
+                mime_type = "application/json"
+                if "it/server-health" in uri:
+                    from mcp.it_admin_tools import ITAdminTools
+                    sys_diag = await asyncio.to_thread(AgentTools.system_info)
+                    proc_diag = await ITAdminTools.server_process_and_ports_audit(top_n=10, sort_by="memory", include_connections=True)
+                    res_text = f"{sys_diag}\n\n{proc_diag}"
+                    mime_type = "text/markdown"
+                elif "diagnostics" in uri:
+                    res_text = await asyncio.to_thread(AgentTools.system_info)
                 elif "company/memory" in uri:
                     from memory.vector_store import VectorStore
                     res_text = json.dumps(VectorStore().get_stats(), indent=2)
@@ -614,7 +740,7 @@ class MyAgentMCPServer:
                         "contents": [
                             {
                                 "uri": uri,
-                                "mimeType": "application/json",
+                                "mimeType": mime_type,
                                 "text": res_text
                             }
                         ]

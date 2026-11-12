@@ -1561,6 +1561,83 @@ class AgentTools:
                 )
             elif tool_name == "get_workflows_status_report":
                 return await cls.get_workflows_status_report()
+            elif tool_name == "dns_lookup_diagnostics":
+                from mcp.it_admin_tools import ITAdminTools
+                r_types = args.get("record_types")
+                if isinstance(r_types, str):
+                    r_types = [x.strip() for x in r_types.split(",") if x.strip()]
+                return await ITAdminTools.dns_lookup_diagnostics(
+                    domain=args.get("domain", ""),
+                    record_types=r_types,
+                    use_doh=bool(args.get("use_doh", True))
+                )
+            elif tool_name == "ssl_tls_cert_inspector":
+                from mcp.it_admin_tools import ITAdminTools
+                return await ITAdminTools.ssl_tls_cert_inspector(
+                    host=args.get("host", ""),
+                    port=int(args.get("port", 443)),
+                    timeout_sec=float(args.get("timeout_sec", 5.0))
+                )
+            elif tool_name == "http_endpoint_health_check":
+                from mcp.it_admin_tools import ITAdminTools
+                return await ITAdminTools.http_endpoint_health_check(
+                    url=args.get("url", ""),
+                    method=args.get("method", "GET"),
+                    expected_status=int(args.get("expected_status", 200)),
+                    timeout_sec=float(args.get("timeout_sec", 8.0)),
+                    follow_redirects=bool(args.get("follow_redirects", True))
+                )
+            elif tool_name == "subnet_ip_calculator":
+                from mcp.it_admin_tools import ITAdminTools
+                return ITAdminTools.subnet_ip_calculator(cidr=args.get("cidr", ""))
+            elif tool_name == "lan_subnet_discovery_scan":
+                from mcp.it_admin_tools import ITAdminTools
+                p_list = args.get("ports")
+                if isinstance(p_list, str):
+                    p_list = [int(p.strip()) for p in p_list.split(",") if p.strip().isdigit()]
+                return await ITAdminTools.lan_subnet_discovery_scan(
+                    subnet=args.get("subnet", "192.168.9.0/24"),
+                    ports=p_list,
+                    max_hosts=int(args.get("max_hosts", 32)),
+                    start_offset=int(args.get("start_offset", 0)),
+                    timeout_sec=float(args.get("timeout_sec", 0.45))
+                )
+            elif tool_name == "server_process_and_ports_audit":
+                from mcp.it_admin_tools import ITAdminTools
+                return await ITAdminTools.server_process_and_ports_audit(
+                    top_n=int(args.get("top_n", 12)),
+                    sort_by=args.get("sort_by", "memory"),
+                    include_connections=bool(args.get("include_connections", True))
+                )
+            elif tool_name == "system_logs_inspector":
+                from mcp.it_admin_tools import ITAdminTools
+                return await ITAdminTools.system_logs_inspector(
+                    log_source=args.get("log_source", "all"),
+                    keyword=args.get("keyword"),
+                    level=args.get("level", "ALL"),
+                    tail_lines=int(args.get("tail_lines", 30))
+                )
+            elif tool_name == "network_traceroute_or_path":
+                from mcp.it_admin_tools import ITAdminTools
+                return await ITAdminTools.network_traceroute_or_path(
+                    target=args.get("target", ""),
+                    max_hops=int(args.get("max_hops", 12)),
+                    timeout_sec=float(args.get("timeout_sec", 1.5))
+                )
+            elif tool_name == "it_security_utility":
+                from mcp.it_admin_tools import ITAdminTools
+                return ITAdminTools.it_security_utility(
+                    action=args.get("action", "generate_password"),
+                    value=args.get("value"),
+                    length=int(args.get("length", 20)),
+                    hash_alg=args.get("hash_alg", "sha256")
+                )
+            elif tool_name == "cron_schedule_and_maintenance_planner":
+                from mcp.it_admin_tools import ITAdminTools
+                return ITAdminTools.cron_schedule_and_maintenance_planner(
+                    expression=args.get("expression", "0 3 * * *"),
+                    count=int(args.get("count", 5))
+                )
 
             else:
                 # Check dynamic MCP manager
@@ -2177,6 +2254,178 @@ class AgentTools:
                     "parameters": {
                         "type": "object",
                         "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "dns_lookup_diagnostics",
+                    "description": "IT Admin DNS & Email Audit: Resolves A, AAAA, MX, TXT, NS, CNAME, PTR records via OS DNS + DoH, and checks SPF/DMARC configuration.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "domain": {"type": "string", "description": "Domain name or IP address (e.g. itsupport.com.bd, 192.168.9.1)"},
+                            "record_types": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "DNS record types to inspect (default: ['A', 'AAAA', 'MX', 'TXT', 'NS', 'CNAME'])"
+                            },
+                            "use_doh": {"type": "boolean", "description": "Also query Cloudflare/Google DNS-over-HTTPS for MX/TXT/SPF/DMARC (default: true)"}
+                        },
+                        "required": ["domain"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "ssl_tls_cert_inspector",
+                    "description": "IT Admin SSL/TLS Inspector: Checks HTTPS/LDAPS/SMTPS certificate expiry countdown, issuer, SANs, cipher suite, SHA-256 fingerprint, and chain trust.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "description": "Hostname or IP address (e.g. itsupport.com.bd, google.com)"},
+                            "port": {"type": "integer", "description": "TLS port number (default: 443; e.g. 465, 636, 993, 8443)"},
+                            "timeout_sec": {"type": "number", "description": "Connection timeout in seconds (default: 5.0)"}
+                        },
+                        "required": ["host"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "http_endpoint_health_check",
+                    "description": "IT Admin Endpoint Monitor: Measures HTTP/HTTPS status code, latency (ms), redirects, server headers, and OWASP security headers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Target HTTP/HTTPS URL (e.g. http://192.168.9.9:3399, https://itsupport.com.bd)"},
+                            "method": {"type": "string", "enum": ["GET", "HEAD", "OPTIONS"], "description": "Safe read-only HTTP method (default: GET)"},
+                            "expected_status": {"type": "integer", "description": "Expected HTTP status code (default: 200)"},
+                            "timeout_sec": {"type": "number", "description": "Request timeout in seconds (default: 8.0)"},
+                            "follow_redirects": {"type": "boolean", "description": "Follow HTTP 3xx redirects (default: true)"}
+                        },
+                        "required": ["url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "subnet_ip_calculator",
+                    "description": "IT Admin IPv4/IPv6 Subnet Calculator: Computes network/broadcast addresses, subnet mask, wildcard mask, usable host range, total hosts, and RFC1918 scope.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "cidr": {"type": "string", "description": "CIDR block or IP/Netmask (e.g. 192.168.9.0/24, 10.20.0.15/22, 172.16.1.0/255.255.255.128)"}
+                        },
+                        "required": ["cidr"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "lan_subnet_discovery_scan",
+                    "description": "IT Admin Network Discovery: Asynchronously scans an IPv4 CIDR slice (up to 64 hosts) for live devices, reverse DNS hostnames, and open management ports (SSH, HTTP, SMB, RDP).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "subnet": {"type": "string", "description": "IPv4 CIDR block to scan (default: 192.168.9.0/24)"},
+                            "ports": {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                                "description": "TCP ports to probe per host (default: [22, 53, 80, 443, 445, 3389, 3399, 8000, 8080])"
+                            },
+                            "max_hosts": {"type": "integer", "description": "Number of hosts in slice to scan (1..64, default: 32)"},
+                            "start_offset": {"type": "integer", "description": "Host offset in subnet to start scanning from (default: 0)"},
+                            "timeout_sec": {"type": "number", "description": "Per-port probe timeout seconds (default: 0.45)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "server_process_and_ports_audit",
+                    "description": "IT Admin Host Telemetry: Audits top CPU/RAM processes, active listening TCP/UDP sockets, load average, and network interface RX/TX counters.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "top_n": {"type": "integer", "description": "Number of top processes to display (1..30, default: 12)"},
+                            "sort_by": {"type": "string", "enum": ["memory", "cpu"], "description": "Sort processes by 'memory' or 'cpu' (default: memory)"},
+                            "include_connections": {"type": "boolean", "description": "Include active listening TCP/UDP ports (default: true)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "system_logs_inspector",
+                    "description": "IT Admin Incident & Log Inspector: Inspects workflow execution failures, security audit logs, Telegram polling status, and container .log files with keyword/severity filters.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "log_source": {"type": "string", "enum": ["all", "workflows", "security", "telegram", "files"], "description": "Log subsystem to inspect (default: all)"},
+                            "keyword": {"type": "string", "description": "Optional case-insensitive filter keyword"},
+                            "level": {"type": "string", "enum": ["ALL", "ERROR", "WARNING", "FAILED", "SUCCESS"], "description": "Severity/status filter (default: ALL)"},
+                            "tail_lines": {"type": "integer", "description": "Max entries to return per source (default: 30)"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "network_traceroute_or_path",
+                    "description": "IT Admin Routing Path Trace: Safely traces hop-by-hop network routers, reverse DNS, and per-hop RTT latency to a target IP or hostname.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "target": {"type": "string", "description": "Destination IP or hostname (e.g. 8.8.8.8, 192.168.9.1, google.com)"},
+                            "max_hops": {"type": "integer", "description": "Maximum TTL hops to probe (1..25, default: 12)"},
+                            "timeout_sec": {"type": "number", "description": "Timeout per hop in seconds (default: 1.5)"}
+                        },
+                        "required": ["target"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "it_security_utility",
+                    "description": "IT Admin Security Utility: Generates high-entropy passwords or API/JWT tokens, calculates SHA/MD5 digests, audits password strength, or decodes JWT claims and expiry.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": ["generate_password", "generate_api_token", "hash_text", "check_password_strength", "inspect_jwt"],
+                                "description": "Security utility action to perform"
+                            },
+                            "value": {"type": "string", "description": "Input string for hash_text, check_password_strength, or inspect_jwt"},
+                            "length": {"type": "integer", "description": "Character/byte length for generated passwords/tokens (default: 20)"},
+                            "hash_alg": {"type": "string", "enum": ["md5", "sha1", "sha256", "sha512"], "description": "Hash algorithm for hash_text (default: sha256)"}
+                        },
+                        "required": ["action"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "cron_schedule_and_maintenance_planner",
+                    "description": "IT Admin Maintenance Scheduler: Validates 5-field cron expressions or aliases (@daily, @every_15m), explains them in English/Bangla, and lists next N Asia/Dhaka execution windows.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "expression": {"type": "string", "description": "5-field cron expression or alias (e.g. '0 3 * * 1-5', '*/15 * * * *', '@daily')"},
+                            "count": {"type": "integer", "description": "Number of upcoming maintenance runs to calculate (1..20, default: 5)"}
+                        },
+                        "required": ["expression"]
                     }
                 }
             }
