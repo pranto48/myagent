@@ -62,15 +62,16 @@ async function initApp() {
   attachChatEventListeners();
   setupChatDragDropAndPaste();
 
-  // Support deep-link query params e.g. ?tab=workflow-docs or ?tab=workflows&recipe=fleet_ping
+  // Support deep-link query params e.g. ?tab=workflow-docs or ?tab=workflows&subtab=telegram
   try {
     const params = new URLSearchParams(window.location.search);
     const reqTab = params.get('tab');
+    const reqSub = params.get('subtab');
     const reqRecipe = params.get('recipe');
     if (reqRecipe && typeof launchRecipeInStudio === 'function') {
       launchRecipeInStudio(reqRecipe);
     } else if (reqTab) {
-      switchTab(reqTab);
+      switchTab(reqTab, reqSub || null);
     }
   } catch (_) {}
 }

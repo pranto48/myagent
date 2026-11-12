@@ -1784,9 +1784,15 @@ class WorkflowStore:
             final_enabled = False
             final_status = "Disconnected"
 
-        final_bot_id = current["bot_id"] if bot_id is None else str(bot_id).strip()
-        final_bot_user = current["bot_username"] if bot_username is None else str(bot_username).strip()
-        final_bot_name = current["bot_first_name"] if bot_first_name is None else str(bot_first_name).strip()
+        if clear_token:
+            final_bot_id = ""
+            final_bot_user = ""
+            final_bot_name = ""
+            final_upd_id = 0
+        else:
+            final_bot_id = current["bot_id"] if bot_id is None else str(bot_id).strip()
+            final_bot_user = current["bot_username"] if bot_username is None else str(bot_username).strip()
+            final_bot_name = current["bot_first_name"] if bot_first_name is None else str(bot_first_name).strip()
         final_verified = current["last_verified_at"] if last_verified_at is None else str(last_verified_at)
         final_tested = current["last_tested_at"] if last_tested_at is None else str(last_tested_at)
         final_err = current["last_error"] if last_error is None else str(last_error)

@@ -249,9 +249,10 @@ async def connect_workflow_telegram(
 ):
     """Connects/updates Telegram Bot credentials, verifies via getMe, and configures two-way chat & auto reports."""
     import time as _t
-    from workflows.telegram_service import telegram_verify_token, telegram_detect_chats
+    from workflows.telegram_service import telegram_verify_token, telegram_detect_chats, telegram_chat_listener
 
     await WorkflowStore.init_tables_and_seed()
+    telegram_chat_listener.clear_error()
     raw_token = data.get("bot_token")
     chat_id = data.get("chat_id")
     is_enabled = bool(data.get("is_enabled", True))
@@ -333,11 +334,12 @@ async def connect_workflow_telegram(
             if detected_chats:
                 effective_cid = detected_chats[0]["chat_id"]
 
+        next_status = "Connected" if effective_cid else "Standby"
         saved = await WorkflowStore.save_telegram_config(
             bot_token=effective_tok,
             chat_id=effective_cid,
             is_enabled=True,
-            status="Connected",
+            status=next_status,
             bot_id=verify.get("bot_id", ""),
             bot_username=verify.get("bot_username", ""),
             bot_first_name=verify.get("bot_first_name", ""),
@@ -347,17 +349,17 @@ async def connect_workflow_telegram(
         )
         await WorkflowStore.record_telegram_log(
             event_type="connect",
-            status="CONNECTED",
+            status="CONNECTED" if effective_cid else "SUCCESS",
             bot_username=saved.get("bot_username", ""),
             chat_id=effective_cid,
-            message_preview=f"Bot {saved.get('bot_username')} connected successfully",
+            message_preview=f"Bot {saved.get('bot_username')} connected successfully" if effective_cid else f"Bot {saved.get('bot_username')} verified; waiting for Chat ID (/start + Auto-Detect)",
             http_status=200,
             latency_ms=verify.get("latency_ms", 0),
         )
         return {
             "success": True,
             "verified": True,
-            "message": f"Telegram connected as {saved.get('bot_username')}",
+            "message": f"Telegram connected as {saved.get('bot_username')}" if effective_cid else f"Bot {saved.get('bot_username')} verified! Send /start to your bot in Telegram, then click Auto-Detect Chat ID.",
             "telegram": _with_tg_runtime(saved),
             "detected_chats": detected_chats,
         }
@@ -435,11 +437,15 @@ async def disconnect_workflow_telegram(
     user=Depends(get_optional_current_user)
 ):
     """Disconnects Telegram integration (and optionally wipes saved Bot Token)."""
+    from workflows.telegram_service import telegram_chat_listener
     await WorkflowStore.init_tables_and_seed()
+    telegram_chat_listener.clear_error()
     body = data if isinstance(data, dict) else {}
     clear_token = bool(body.get("clear_token", False))
+    clear_chat = bool(body.get("clear_chat_id", False))
     before = await WorkflowStore.get_telegram_config(include_plaintext_token=False)
     saved = await WorkflowStore.save_telegram_config(
+        chat_id="" if clear_chat else None,
         is_enabled=False,
         status="Disconnected",
         last_error="",

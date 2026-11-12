@@ -100,6 +100,13 @@ async def telegram_detect_chats(token: str, bot_username: str = "") -> Dict[str,
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, params={"limit": 20})
+            if resp.status_code == 409:
+                # Auto-clear conflicting webhook so long-polling getUpdates works immediately
+                await client.post(
+                    f"{TELEGRAM_API_BASE}/bot{tok}/deleteWebhook",
+                    json={"drop_pending_updates": False},
+                )
+                resp = await client.get(url, params={"limit": 20})
         latency_ms = int((time.time() - t0) * 1000)
         try:
             body = resp.json()
@@ -610,6 +617,9 @@ class TelegramChatListener:
     def is_polling(self) -> bool:
         return bool(self._running and self._polling_now)
 
+    def clear_error(self):
+        self._last_error = ""
+
     def get_runtime_state(self) -> Dict[str, Any]:
         return {
             "polling_active": self.is_polling(),
@@ -650,6 +660,7 @@ class TelegramChatListener:
                 )
                 if not can_poll:
                     self._polling_now = False
+                    self._last_error = ""
                     await asyncio.sleep(3.0)
                     continue
 
@@ -662,6 +673,12 @@ class TelegramChatListener:
                 url = f"{TELEGRAM_API_BASE}/bot{tok}/getUpdates"
                 async with httpx.AsyncClient(timeout=20.0) as client:
                     resp = await client.get(url, params=params)
+                    if resp.status_code == 409:
+                        await client.post(
+                            f"{TELEGRAM_API_BASE}/bot{tok}/deleteWebhook",
+                            json={"drop_pending_updates": False},
+                        )
+                        resp = await client.get(url, params=params)
 
                 self._last_poll_at = time.strftime("%Y-%m-%d %H:%M:%S")
                 if resp.status_code != 200:

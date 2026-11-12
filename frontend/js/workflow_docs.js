@@ -143,6 +143,18 @@ const WF_DOC_FAQS = [
     q_en: '4. How can Claude Code, Cursor IDE, or external scripts create and trigger daily workflows?',
     a_bn: 'MyAgent MCP সার্ভারে create_daily_agent_task, architect_workflow_from_goal, list_workflows এবং run_workflow_now টুল বিল্ট-ইন রয়েছে। এছাড়া প্রতিটি ওয়ার্কফ্লোর 🔗 Webhook URL-এ যেকোনো সিস্টেম থেকে HTTP POST পাঠিয়েও তৎক্ষণাৎ রান করা যায়।',
     a_en: 'MyAgent MCP Server exposes create_daily_agent_task, architect_workflow_from_goal, list_workflows, and run_workflow_now via JSON-RPC. Any script can also trigger workflows via HTTP POST to the workflow\'s 🔗 Webhook URL.'
+  },
+  {
+    q_bn: '৫. লোকাল LAN সার্ভার (192.168.9.9)-এ পাবলিক ডোমেইন বা HTTPS ছাড়া কি Telegram টু-ওয়ে চ্যাট কাজ করবে?',
+    q_en: '5. Will Telegram Two-Way Chat work on a private LAN server (192.168.9.9) without a public HTTPS domain?',
+    a_bn: 'হ্যাঁ! MyAgent TelegramChatListener বিল্ট-ইন Long-Polling (/getUpdates) ব্যবহার করে। তাই কোনো পাবলিক ডোমেইন বা পোর্ট ফরওয়ার্ডিং ছাড়াই টেলিগ্রাম থেকে ping 192.168.9.2, /status বা /run কমান্ড দিলে সাথে সাথে উত্তর ও ওয়ার্কফ্লো রিপোর্ট পাঠায়।',
+    a_en: 'Yes! MyAgent uses built-in Telegram Long-Polling (/getUpdates) inside TelegramChatListener, so two-way chat commands (ping 192.168.9.2, /status, /run) work cleanly inside private LANs with zero public domain or inbound ports.'
+  },
+  {
+    q_bn: '৬. Telegram কানেক্ট করার সময় Auto-Detect Chat ID খালি দেখালে বা HTTP 401 / 409 ত্রুটি এলে কী করবো?',
+    q_en: '6. How do I fix empty Auto-Detect Chat ID or HTTP 401 / 409 errors when connecting Telegram?',
+    a_bn: 'প্রথমে টেলিগ্রামে আপনার নতুন বটটি ওপেন করে অবশ্যই /start বা যেকোনো একটি মেসেজ পাঠান, তারপর 🔍 Auto-Detect ক্লিক করুন। ভুল বা বাতিল টোকেন হলে HTTP 401 আসে (@BotFather থেকে /token দিয়ে নতুন টোকেন নিন)। অন্য কোথাও Webhook চালু থাকলেও HTTP 409 হয় — MyAgent এখন Auto-Detect/Polling চলাকালীন স্বয়ংক্রিয়ভাবে deleteWebhook চালিয়ে তা ঠিক করে দেয়।',
+    a_en: 'First open your bot in Telegram and send /start or hello before clicking 🔍 Auto-Detect. HTTP 401 means an invalid/revoked Bot Token (regenerate in @BotFather). HTTP 409 Webhook Conflict is automatically resolved by MyAgent calling deleteWebhook during detection/polling.'
   }
 ];
 
@@ -249,11 +261,52 @@ function launchRecipeInStudio(recipeKey) {
   }, 120);
 }
 
-function goBackToWorkflowStudio() {
+function goBackToWorkflowStudio(subTab = null) {
   if (typeof switchTab === 'function') {
-    switchTab('workflows');
+    switchTab('workflows', subTab);
   } else {
-    window.location.href = '/?tab=workflows';
+    const qs = subTab ? `?tab=workflows&subtab=${encodeURIComponent(subTab)}` : '?tab=workflows';
+    window.location.href = `/${qs}`;
+  }
+}
+
+function openTelegramConnectionFromDocs() {
+  goBackToWorkflowStudio('telegram');
+}
+
+async function refreshDocsTelegramLiveBadge() {
+  const pillEl = document.getElementById('wfd-tg-live-pill');
+  const metaEl = document.getElementById('wfd-tg-live-meta');
+  if (!pillEl) return;
+  const isEn = wfDocsState.lang === 'en';
+  try {
+    const res = await fetch('/api/workflows/telegram/status');
+    const data = await res.json();
+    const tg = data?.telegram || {};
+    if (tg.connected) {
+      pillEl.className = 'wfd-tg-status-pill connected';
+      pillEl.textContent = `🟢 CONNECTED${tg.bot_username ? ' (' + tg.bot_username + ')' : ''}`;
+      if (metaEl) {
+        metaEl.textContent = isEn
+          ? `Chat ID: ${tg.chat_id || '-'} • Sent: ${tg.sent_count || 0} • Listener: ${tg.listener_running ? 'Active' : 'Idle'}`
+          : `Chat ID: ${tg.chat_id || '-'} • পাঠানো হয়েছে: ${tg.sent_count || 0}টি • লিসেনার: ${tg.listener_running ? 'চালু' : 'বন্ধ'}`;
+      }
+    } else if (tg.status === 'Error') {
+      pillEl.className = 'wfd-tg-status-pill error';
+      pillEl.textContent = '🟠 ERROR';
+      if (metaEl) metaEl.textContent = tg.last_error || 'Verification failed';
+    } else {
+      pillEl.className = 'wfd-tg-status-pill disconnected';
+      pillEl.textContent = isEn ? '🔴 NOT CONNECTED YET' : '🔴 এখনও সংযুক্ত নয়';
+      if (metaEl) {
+        metaEl.textContent = tg.has_token
+          ? (isEn ? 'Bot token saved; add Chat ID & enable connection in Telegram tab.' : 'Bot টোকেন সেভ আছে; Chat ID দিয়ে Telegram ট্যাবে কানেক্ট করুন।')
+          : (isEn ? 'Follow the 4 steps below, then click "Open Telegram Settings" to connect your bot.' : 'নিচের ৪টি ধাপ অনুসরণ করে "Telegram কানেকশন খুলুন" বাটনে গিয়ে আপনার বট সংযুক্ত করুন।');
+      }
+    }
+  } catch (_) {
+    pillEl.className = 'wfd-tg-status-pill disconnected';
+    pillEl.textContent = '⚪ Offline / Unknown';
   }
 }
 
@@ -286,7 +339,7 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
         <div class="wfd-hero-left">
           <div class="wfd-badge-row">
             <span class="wfd-pill-badge">📚 COMPLETE AUTOMATION DOCUMENTATION</span>
-            <span class="wfd-pill-version">MyAgent v3.4 Engine</span>
+            <span class="wfd-pill-version">MyAgent v3.5 Engine</span>
           </div>
           <h2>${isEn ? 'How to Create Automatic Daily AI Work Tasks & n8n Workflows' : 'দৈনিক অটোমেটিক এআই কাজ (Auto Work Tasks) ও ওয়ার্কফ্লো তৈরির সম্পূর্ণ গাইড ও ডকুমেন্টেশন'}</h2>
           <p>${isEn
@@ -295,6 +348,9 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
           <div class="wfd-hero-actions">
             <button type="button" class="btn-primary" onclick="goBackToWorkflowStudio()">
               ⚡ ${isEn ? 'Open Workflows Studio' : 'ওয়ার্কফ্লো স্টুডিও খুলুন'}
+            </button>
+            <button type="button" class="btn-secondary" onclick="openTelegramConnectionFromDocs()">
+              ✈️ ${isEn ? 'Connect Telegram Bot' : 'টেলিগ্রাম কানেক্ট করুন'}
             </button>
             <button type="button" class="btn-secondary" onclick="launchRecipeInStudio('fleet_ping')">
               🚀 ${isEn ? 'Load Sample Daily Task' : '১-ক্লিকে উদাহরণ টাস্ক লোড করুন'}
@@ -313,15 +369,16 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
             <input type="text" id="wf-docs-search-input" class="text-input"
                    value="${wfDocsEsc(wfDocsState.search)}"
                    oninput="handleWfDocsSearch(this.value)"
-                   placeholder="${isEn ? '🔍 Search nodes, {{variables}}, API endpoints, FAQ...' : '🔍 নোড, {{ভেরিয়েবল}}, API বা প্রশ্ন খুঁজুন...'}">
+                   placeholder="${isEn ? '🔍 Search nodes, {{variables}}, Telegram, API, FAQ...' : '🔍 নোড, {{ভেরিয়েবল}}, টেলিগ্রাম, API বা প্রশ্ন খুঁজুন...'}">
           </div>
           <div class="wfd-toc-links">
             <a href="#wfd-sec-steps">${isEn ? '1. Step-by-Step Guide' : '১. দৈনিক টাস্ক তৈরির ধাপ'}</a>
             <a href="#wfd-sec-recipes">${isEn ? '2. Ready Recipes' : '২. রেডিমেড রেসিপি'}</a>
-            <a href="#wfd-sec-nodes">${isEn ? '3. 13 Node Reference' : '৩. ১৩টি নোড রেফারেন্স'}</a>
+            <a href="#wfd-sec-nodes">${isEn ? '3. 18 Node Reference' : '৩. ১৮টি নোড রেফারেন্স'}</a>
             <a href="#wfd-sec-vars">${isEn ? '4. Template Variables' : '৪. ডাইনামিক ভেরিয়েবল'}</a>
             <a href="#wfd-sec-api">${isEn ? '5. Webhook, API & MCP' : '৫. ওয়েবহুক, API ও MCP'}</a>
-            <a href="#wfd-sec-faq">${isEn ? '6. FAQ & Troubleshooting' : '৬. সমস্যা ও সমাধান (FAQ)'}</a>
+            <a href="#wfd-sec-telegram">${isEn ? '6. Telegram Bot Guide' : '৬. টেলিগ্রাম কানেকশন গাইড'}</a>
+            <a href="#wfd-sec-faq">${isEn ? '7. FAQ & Troubleshooting' : '৭. সমস্যা ও সমাধান (FAQ)'}</a>
           </div>
         </div>
       </div>
@@ -426,12 +483,12 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
       <section class="wfd-section" id="wfd-sec-nodes">
         <div class="wfd-sec-head" style="flex-wrap:wrap; gap:10px;">
           <div>
-            <h3><span>🧩</span> ${isEn ? '3. Complete 17-Node Parallel Engine Reference' : '৩. ১৭টি ওয়ার্কফ্লো নোডের সম্পূর্ণ রেফারেন্স (প্যারালাল DAG)'}</h3>
-            <span class="wfd-sec-sub">${isEn ? 'Triggers, AI agents, parallel merge, switch router, loops, Python, SQL/RAG, sub-workflows & outputs' : 'ট্রিগার, AI, প্যারালাল মার্জ, সুইচ রাউটার, লুপ, পাইথন, SQLite/RAG ও আউটপুট নোডসমূহ'}</span>
+            <h3><span>🧩</span> ${isEn ? '3. Complete 18-Node Parallel Engine Reference' : '৩. ১৮টি ওয়ার্কফ্লো নোডের সম্পূর্ণ রেফারেন্স (প্যারালাল DAG)'}</h3>
+            <span class="wfd-sec-sub">${isEn ? 'Triggers, AI agents, parallel merge, switch router, loops, Python, SQL/RAG, MCP tools, sub-workflows & outputs' : 'ট্রিগার, AI, প্যারালাল মার্জ, সুইচ রাউটার, লুপ, পাইথন, MCP টুল, SQLite/RAG ও আউটপুট নোডসমূহ'}</span>
           </div>
           <div class="wfd-cat-filters">
             ${[
-              ['all', isEn ? 'All (17)' : 'সবগুলো (১৭)'],
+              ['all', isEn ? 'All (18)' : 'সবগুলো (১৮)'],
               ['trigger', isEn ? 'Triggers' : 'ট্রিগার'],
               ['ai', isEn ? 'AI & SubAgents' : 'এআই ও সাব-এজেন্ট'],
               ['logic', isEn ? 'Logic & Loop' : 'লজিক ও লুপ'],
@@ -543,10 +600,95 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
         </div>
       </section>
 
-      <!-- SECTION 6: FAQ & Troubleshooting -->
+      <!-- SECTION 6: Telegram Bot Connection & Two-Way Chat Guide -->
+      <section class="wfd-section" id="wfd-sec-telegram">
+        <div class="wfd-sec-head" style="flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3><span>✈️</span> ${isEn ? '6. How to Connect Your Telegram Bot to WORKFLOWS (Auto)' : '৬. কীভাবে আপনার টেলিগ্রাম বট MyAgent WORKFLOWS (Auto)-তে যুক্ত করবেন'}</h3>
+            <span class="wfd-sec-sub">${isEn ? 'Receive automatic daily workflow reports & run live two-way commands (ping servers, check status, run workflows) right from Telegram' : 'প্রতিদিনের অটো ওয়ার্কফ্লো রিপোর্ট টেলিগ্রামে পান এবং সরাসরি Telegram চ্যাট থেকেই সার্ভার পিং ও ওয়ার্কফ্লো কমান্ড চালান'}</span>
+          </div>
+          <button type="button" class="btn-primary" style="padding:7px 14px; font-size:0.82rem;" onclick="openTelegramConnectionFromDocs()">
+            ✈️ ${isEn ? 'Open Telegram Connection Settings' : 'Telegram কানেকশন সেটিংস খুলুন'}
+          </button>
+        </div>
+
+        <div class="wfd-tg-live-bar">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span id="wfd-tg-live-pill" class="wfd-tg-status-pill disconnected">⏳ ${isEn ? 'Checking Telegram status...' : 'স্ট্যাটাস যাচাই হচ্ছে...'}</span>
+            <span id="wfd-tg-live-meta" style="font-size:0.8rem; color:var(--text-secondary);"></span>
+          </div>
+          <button type="button" class="btn-sm-action-cyber" onclick="refreshDocsTelegramLiveBadge()">🔄 ${isEn ? 'Refresh Status' : 'রিফ্রেশ'}</button>
+        </div>
+
+        <div class="wfd-steps-grid" style="margin-top:14px;">
+          <div class="wfd-step-card">
+            <div class="wfd-step-num">STEP 1 • BOTFATHER TOKEN</div>
+            <h4>🤖 ${isEn ? 'Create a Bot & Copy Token' : '@BotFather থেকে নতুন বট ও টোকেন নিন'}</h4>
+            <ol>
+              <li>${isEn ? 'Open Telegram and search for official verified <code>@BotFather</code>.' : 'আপনার টেলিগ্রাম অ্যাপে গিয়ে ভেরিফায়েড <code>@BotFather</code> সার্চ করে ওপেন করুন।'}</li>
+              <li>${isEn ? 'Send <code>/newbot</code>, give a display name (e.g. <i>MyAgent Ops Bot</i>), and choose a username ending in <code>_bot</code>.' : '<code>/newbot</code> মেসেজ পাঠান, বটের একটি নাম দিন এবং শেষে <code>_bot</code> আছে এমন ইউজারনেম দিন।'}</li>
+              <li>${isEn ? 'Copy the HTTP API Bot Token (looks like <code>1234567890:ABCdef...</code>) — MyAgent encrypts it with AES-256.' : 'পাওয়া HTTP API Bot Token (যেমন: <code>1234567890:ABCdef...</code>) কপি করুন — এটি AES-256 এনক্রিপ্টেড থাকবে।'}</li>
+            </ol>
+          </div>
+
+          <div class="wfd-step-card">
+            <div class="wfd-step-num">STEP 2 • CHAT ID DETECT</div>
+            <h4>🆔 ${isEn ? 'Start Bot & Auto-Detect Chat ID' : 'বটে /start পাঠিয়ে Chat ID ডিটেক্ট করুন'}</h4>
+            <ol>
+              <li>${isEn ? 'Click your new bot link (<code>t.me/your_bot</code>) in Telegram and tap <b>Start</b> (or send <code>/start</code>).' : 'টেলিগ্রামে আপনার নতুন বটটি ওপেন করে <b>Start</b> চাপুন বা <code>/start</code> লিখুন।'}</li>
+              <li>${isEn ? 'For a Group/Channel: add the bot to the group as Admin and send any test message.' : 'গ্রুপ বা চ্যানেলে অ্যালার্ট চাইলে বটকে গ্রুপের Admin হিসেবে যোগ করে একটি মেসেজ দিন।'}</li>
+              <li>${isEn ? 'Go to <b>WORKFLOWS (Auto) → ✈️ Telegram Connection & Logs</b>, paste your token, and click <b>🔍 Auto-Detect</b> to fill Chat ID automatically!' : '<b>WORKFLOWS (অটো) → ✈️ টেলিগ্রাম কানেকশন ও লগ</b> ট্যাবে টোকেন বসিয়ে <b>🔍 Auto-Detect</b> চাপলেই Chat ID অটো বসে যাবে!'}</li>
+            </ol>
+          </div>
+
+          <div class="wfd-step-card wfd-step-highlight">
+            <div class="wfd-step-num">STEP 3 • CONNECT & VERIFY</div>
+            <h4>🟢 ${isEn ? 'Verify Live & Send Test Alert' : 'কানেক্ট, লাইভ ভেরিফাই ও টেস্ট মেসেজ'}</h4>
+            <ol>
+              <li>${isEn ? 'Keep <b>Two-Way Telegram Chat Listener</b> and <b>Auto-Send Reports</b> checked.' : '<b>Two-Way Chat Listener</b> ও <b>Auto-Send Workflow Reports</b> অপশন দুটি চালু রাখুন।'}</li>
+              <li>${isEn ? 'Click <b>🔗 Connect & Verify Bot</b> — MyAgent verifies live via <code>api.telegram.org/getMe</code> and turns status 🟢 <b>CONNECTED</b>.' : '<b>🔗 Connect & Verify Bot</b> ক্লিক করুন — <code>getMe</code> API যাচাই শেষে স্ট্যাটাস 🟢 <b>CONNECTED</b> হবে।'}</li>
+              <li>${isEn ? 'Click <b>📨 Send Test</b> to confirm the test notification arrives in your Telegram app instantly.' : '<b>📨 Send Test</b> বাটনে ক্লিক করে আপনার টেলিগ্রামে টেস্ট মেসেজ আসছে কিনা নিশ্চিত করুন।'}</li>
+            </ol>
+          </div>
+
+          <div class="wfd-step-card">
+            <div class="wfd-step-num">STEP 4 • WORKFLOWS & TWO-WAY CHAT</div>
+            <h4>📣 ${isEn ? 'Use in Daily Tasks & Chat Commands' : 'ডেইলি ওয়ার্কফ্লো ও টু-ওয়ে চ্যাট ব্যবহার'}</h4>
+            <ol>
+              <li>${isEn ? 'In Quick Daily Builder, check <b>📡 Telegram/Discord</b> — or use <code>📣 Notify Chat & Channels</code> with target <code>telegram</code>.' : 'কুইক বিল্ডারে <b>📡 Telegram/Discord</b> টিক দিন অথবা ক্যানভাসে <code>📣 Notify Chat & Channels</code> নোডে টার্গেট <code>telegram</code> দিন।'}</li>
+              <li>${isEn ? 'Works on private LAN <code>192.168.9.9</code> with zero public HTTPS domain via Long-Polling.' : 'কোনো পাবলিক ডোমেইন বা পোর্ট ফরওয়ার্ডিং ছাড়াই লোকাল LAN (<code>192.168.9.9</code>)-এ Long-Polling দিয়ে টু-ওয়ে চ্যাট কাজ করে।'}</li>
+              <li>${isEn ? 'Optionally list extra teammate Chat IDs (comma-separated) in <b>Allowed Chat IDs</b>.' : 'একাধিক ইউজার ব্যবহার করতে চাইলে <b>Allowed Chat IDs</b> ঘরে কমা দিয়ে বাড়তি ID বসাতে পারেন।'}</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="wfd-info-panel" style="margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <h4 style="margin:0;">💬 ${isEn ? 'Supported Two-Way Telegram Chat Commands (Click to Copy)' : 'টেলিগ্রাম বটে সরাসরি ব্যবহারযোগ্য টু-ওয়ে চ্যাট কমান্ডসমূহ (ক্লিক করে কপি করুন)'}</h4>
+            <span style="font-size:0.74rem; color:var(--text-muted);">${isEn ? 'Every reply automatically includes live WORKFLOWS (Auto) status' : 'প্রতিটি উত্তরের সাথে WORKFLOWS (Auto)-এর লাইভ স্ট্যাটাস রিপোর্ট যুক্ত থাকে'}</span>
+          </div>
+          <div class="wfd-tg-cmd-grid">
+            ${[
+              ['ping 192.168.9.2 server and show status', isEn ? 'ICMP Ping server(s) + full WORKFLOWS (Auto) report' : 'সার্ভার পিং (ICMP ল্যাটেন্সি/লস) ও WORKFLOWS (Auto) স্ট্যাটাস'],
+              ['/port 192.168.9.2', isEn ? 'TCP Port scan on target host + workflow digest' : 'সার্ভারের খোলা পোর্ট স্ক্যান ও ওয়ার্কফ্লো ডাইজেস্ট'],
+              ['/status', isEn ? 'Show active daily schedules, recent runs & success rate' : 'সকল সক্রিয় ওয়ার্কফ্লো ও সাম্প্রতিক রানের পূর্ণ রিপোর্ট'],
+              ['/run morning', isEn ? 'Immediately execute matching workflow & send trace report' : 'নাম বা ID অনুযায়ী সাথে সাথে ওয়ার্কফ্লো রান করে রিপোর্ট দেখা'],
+              ['/create Daily 08:30 ping 192.168.9.2 and save report', isEn ? 'AI-architect & activate a new daily workflow directly from Telegram' : 'টেলিগ্রাম থেকেই নতুন ডেইলি অটো ওয়ার্কফ্লো তৈরি ও চালু করা'],
+              ['/id', isEn ? 'Returns your Telegram Chat ID + workflow summary' : 'আপনার Telegram Chat ID ও ওয়ার্কফ্লো সামারি জানা'],
+            ].map(([cmd, desc]) => `
+              <div class="wfd-tg-cmd-chip" onclick="wfDocsCopy('${wfDocsEsc(cmd)}', '${wfDocsEsc(cmd)}')" title="Click to copy command">
+                <code>${wfDocsEsc(cmd)}</code>
+                <span>${wfDocsEsc(desc)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 7: FAQ & Troubleshooting -->
       <section class="wfd-section" id="wfd-sec-faq">
         <div class="wfd-sec-head">
-          <h3><span>❓</span> ${isEn ? '6. Frequently Asked Questions & Best Practices' : '৬. সচরাচর জিজ্ঞাসিত প্রশ্ন (FAQ) ও টিপস'}</h3>
+          <h3><span>❓</span> ${isEn ? '7. Frequently Asked Questions & Best Practices' : '৭. সচরাচর জিজ্ঞাসিত প্রশ্ন (FAQ) ও টিপস'}</h3>
         </div>
         <div class="wfd-faq-list">
           ${filteredFaqs.map(f => `
@@ -559,6 +701,7 @@ function renderWorkflowDocsPage(targetContainerId = 'wf-docs-root') {
       </section>
     </div>
   `;
+  refreshDocsTelegramLiveBadge();
 }
 
 // Keep language synced cleanly inside SPA
@@ -582,3 +725,5 @@ window.goBackToWorkflowStudio = goBackToWorkflowStudio;
 window.wfDocsCopy = wfDocsCopy;
 window.wfDocsCopyRecipePrompt = wfDocsCopyRecipePrompt;
 window.wfDocsCopyCurl = wfDocsCopyCurl;
+window.openTelegramConnectionFromDocs = openTelegramConnectionFromDocs;
+window.refreshDocsTelegramLiveBadge = refreshDocsTelegramLiveBadge;

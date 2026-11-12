@@ -3680,6 +3680,9 @@ function renderTelegramLogsTable() {
       verify: '🛡️ Verify',
       test_send: '📨 Test Send',
       workflow_notify: '⚡ Workflow Alert',
+      workflow_report: '📊 Auto Report',
+      chat_in: '💬 Chat In',
+      chat_reply: '🤖 Bot Reply',
       detect_chat: '🔍 Detect Chat',
       disconnect: '🔌 Disconnect'
     };
