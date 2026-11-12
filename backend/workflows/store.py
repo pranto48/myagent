@@ -178,6 +178,7 @@ NODE_CATALOG: List[Dict[str, Any]] = [
             "use_memory": True,
             "enable_tools": True,
             "use_mcp": True,
+            "fallback_on_error": True,
             "language": "bn",
             "max_turns": 5
         }
@@ -451,6 +452,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "project_name": "myagent",
                     "use_memory": True,
                     "enable_tools": True,
+                    "fallback_on_error": True,
                     "language": "bn",
                     "max_turns": 4
                 }
@@ -574,6 +576,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "project_name": "myagent",
                     "use_memory": False,
                     "enable_tools": False,
+                    "fallback_on_error": True,
                     "language": "bn",
                     "max_turns": 3
                 }
@@ -631,6 +634,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "project_name": "myagent",
                     "use_memory": True,
                     "enable_tools": True,
+                    "fallback_on_error": True,
                     "language": "bn",
                     "max_turns": 5
                 }
@@ -703,6 +707,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "project_name": "",
                     "use_memory": True,
                     "enable_tools": True,
+                    "fallback_on_error": True,
                     "language": "bn",
                     "max_turns": 4
                 }
@@ -869,6 +874,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "project_name": "myagent",
                     "use_memory": True,
                     "enable_tools": True,
+                    "fallback_on_error": True,
                     "language": "bn",
                     "max_turns": 4,
                     "fallback_on_error": True
@@ -1160,6 +1166,29 @@ class WorkflowStore:
                     ))
                 await db.commit()
                 logger.info("Seeded default n8n-style daily workflows into ops_workflows.")
+            else:
+                # Ensure existing seeded daily workflows inherit fallback_on_error=True if unset
+                for wf_seed_id in ("wf_daily_morning_brief", "wf_daily_security_audit", "wf_daily_custom_ai_task"):
+                    async with db.execute("SELECT nodes_json FROM ops_workflows WHERE id = ?", (wf_seed_id,)) as cur_s:
+                        srow = await cur_s.fetchone()
+                    if srow and srow["nodes_json"]:
+                        try:
+                            snodes = json.loads(srow["nodes_json"])
+                            changed = False
+                            for nd in snodes:
+                                if nd.get("type") == "ai_agent":
+                                    nc = nd.setdefault("config", {})
+                                    if "fallback_on_error" not in nc:
+                                        nc["fallback_on_error"] = True
+                                        changed = True
+                            if changed:
+                                await db.execute(
+                                    "UPDATE ops_workflows SET nodes_json = ? WHERE id = ?",
+                                    (json.dumps(snodes, ensure_ascii=False), wf_seed_id),
+                                )
+                        except Exception:
+                            pass
+                await db.commit()
         finally:
             await db.close()
 

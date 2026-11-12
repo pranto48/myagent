@@ -120,7 +120,15 @@
           <div class="status-dot" id="system-status-dot"></div>
           <span id="agent-online-status" data-i18n="status_online">অনলাইন</span>
         </div>
-        <span class="server-ip">192.168.9.9:3399</span>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button type="button" id="sidebar-tg-badge" class="sidebar-tg-badge disconnected" onclick="switchTab('workflows', 'telegram')" title="Telegram Bot স্ট্যাটাস — ক্লিক করে সেটিংস খুলুন">✈️ TG</button>
+          <span class="server-ip">192.168.9.9:3399</span>
+        </div>
+      </div>
+
+      <!-- Quick Sidebar Navigation Filter -->
+      <div class="sidebar-nav-filter-wrap">
+        <input type="text" id="sidebar-nav-search" class="sidebar-nav-search" placeholder="🔎 মেনু খুঁজুন (workflows, chat, telegram...)" oninput="filterSidebarNav(this.value)">
       </div>
 
       <!-- Navigation Menu: Autonomous Agent Operational Suite -->
@@ -713,6 +721,27 @@
                 <div class="kpi-num" id="kpi-storage-val">0 B</div>
                 <div class="kpi-label" data-i18n="dash_kpi_storage">ব্যবহৃত মোট স্টোরেজ</div>
               </div>
+            </div>
+          </div>
+
+          <!-- Live WORKFLOWS (Auto) & Telegram Operations Strip -->
+          <div class="card-panel dash-auto-banner" id="dash-automation-card">
+            <div class="dash-auto-left">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="font-size:1.05rem;">⚡</span>
+                <strong style="font-size:0.95rem;">WORKFLOWS (Auto) ও ✈️ Telegram লাইভ অপারেশনস</strong>
+                <span id="dash-tg-state" class="wfd-tg-status-pill disconnected">🔴 TG Checking...</span>
+              </div>
+              <div class="dash-auto-metrics">
+                <span>🟢 সক্রিয় শিডিউল: <strong id="dash-wf-active">0 / 0</strong></span>
+                <span>📊 সাফল্যের হার: <strong id="dash-wf-rate">100%</strong></span>
+                <span>⏱️ পরবর্তী / সর্বশেষ রান: <strong id="dash-wf-next">-</strong></span>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-sm-action-cyber" onclick="switchTab('workflows')">🎨 Workflows Studio</button>
+              <button type="button" class="btn-sm-action-cyber" onclick="switchTab('workflows', 'telegram')">✈️ Telegram Setup</button>
+              <button type="button" class="btn-sm-action-cyber" onclick="switchTab('history')">📜 Unified History</button>
             </div>
           </div>
 
@@ -3300,6 +3329,16 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                   <button type="button" class="btn-sm-action-cyber" onclick="refreshWorkflowTelegramChats()">🔄 রিফ্রেশ চ্যাট</button>
                   <button type="button" class="btn-sm-danger" onclick="clearWorkflowTelegramChats()" title="চ্যাট ইতিহাস মুছুন">🗑️</button>
                 </div>
+              </div>
+
+              <div class="wf-tg-quick-cmds">
+                <span style="font-size:0.72rem; color:var(--text-muted);">১-ক্লিক কমান্ড:</span>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('ping 192.168.9.2 server and show status')">📡 Ping 192.168.9.2</button>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('/health')">🏥 /health</button>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('/status')">📊 /status</button>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('/history')">📜 /history</button>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('/workflows')">⚙️ /workflows</button>
+                <button type="button" class="wf-tg-quick-btn" onclick="runQuickTelegramCommand('/port 192.168.9.2')">🔍 /port 192.168.9.2</button>
               </div>
 
               <form onsubmit="submitTelegramChatCommand(event)" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">

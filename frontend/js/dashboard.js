@@ -92,6 +92,44 @@ async function loadDashboardMetrics() {
     console.warn('Dashboard stats error:', err);
   }
 
+  // Also refresh live WORKFLOWS (Auto) & Telegram telemetry strip
+  try {
+    const [wfRes, tgRes] = await Promise.all([
+      fetch('/api/workflows', { headers: typeof getAuthHeaders === 'function' ? getAuthHeaders() : {} }),
+      fetch('/api/workflows/telegram/status')
+    ]);
+    if (wfRes.ok) {
+      const wfData = await wfRes.json();
+      const st = wfData.stats || {};
+      const wfs = wfData.workflows || [];
+      const activeEl = document.getElementById('dash-wf-active');
+      const rateEl = document.getElementById('dash-wf-rate');
+      const nextEl = document.getElementById('dash-wf-next');
+      if (activeEl) activeEl.textContent = `${st.active_workflows ?? 0} / ${st.total_workflows ?? wfs.length}`;
+      if (rateEl) rateEl.textContent = `${st.success_rate ?? 100}% (${st.total_runs ?? 0} runs)`;
+      const firstActive = wfs.find(w => w.is_enabled && w.next_run);
+      const latestRun = (wfData.recent_runs || [])[0];
+      if (nextEl) {
+        nextEl.textContent = firstActive
+          ? `${firstActive.next_run} (${firstActive.name.slice(0, 26)})`
+          : (latestRun ? `${latestRun.status} @ ${latestRun.started_at}` : 'No active schedules');
+      }
+    }
+    if (tgRes.ok) {
+      const tgJson = await tgRes.json();
+      const tg = tgJson.telegram || {};
+      const tgEl = document.getElementById('dash-tg-state');
+      if (tgEl) {
+        tgEl.className = `wfd-tg-status-pill ${tg.connected ? 'connected' : (tg.status === 'Error' ? 'error' : 'disconnected')}`;
+        tgEl.textContent = tg.connected
+          ? `🟢 TG Connected (${tg.bot_username || tg.chat_id || 'Bot'})`
+          : (tg.status === 'Error' ? '🟠 TG Error' : '🔴 TG Disconnected');
+      }
+    }
+  } catch (e) {
+    console.warn('Dashboard workflows/telegram card notice:', e);
+  }
+
   // Load charts separately
   loadChartJS(() => loadAnalyticsCharts());
 }

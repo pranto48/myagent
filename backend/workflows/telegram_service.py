@@ -20,6 +20,22 @@ logger = logging.getLogger("myagent.workflows.telegram")
 TELEGRAM_API_BASE = "https://api.telegram.org"
 
 
+TELEGRAM_BOT_COMMANDS = [
+    {"command": "status", "description": "Show WORKFLOWS (Auto) live status & recent runs"},
+    {"command": "ping", "description": "Ping server(s) e.g. /ping 192.168.9.2 + workflow status"},
+    {"command": "port", "description": "TCP port scan host e.g. /port 192.168.9.2"},
+    {"command": "health", "description": "Live CPU, RAM, Disk & Docker server health"},
+    {"command": "history", "description": "Show last 5 workflow execution runs & traces"},
+    {"command": "workflows", "description": "List all saved daily workflows & schedules"},
+    {"command": "run", "description": "Execute a workflow immediately e.g. /run morning"},
+    {"command": "enable", "description": "Enable a workflow schedule e.g. /enable morning"},
+    {"command": "disable", "description": "Pause a workflow schedule e.g. /disable morning"},
+    {"command": "create", "description": "Auto-create a daily workflow from plain goal"},
+    {"command": "id", "description": "Show your Telegram Chat ID & quick commands"},
+    {"command": "help", "description": "Show interactive command reference"},
+]
+
+
 def _sanitize_tg_error(err_text: str, token: str) -> str:
     msg = str(err_text or "")
     if token and len(token) >= 6:
@@ -184,6 +200,58 @@ async def telegram_detect_chats(token: str, bot_username: str = "") -> Dict[str,
         return {"ok": False, "chats": [], "error": err}
 
 
+async def telegram_sync_commands(token: str) -> bool:
+    """Registers slash command autocomplete menu on the Telegram Bot via setMyCommands."""
+    tok = (token or "").strip()
+    if not tok:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                f"{TELEGRAM_API_BASE}/bot{tok}/setMyCommands",
+                json={"commands": TELEGRAM_BOT_COMMANDS},
+            )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+async def telegram_send_chat_action(token: str, chat_id: str, action: str = "typing") -> None:
+    """Shows immediate 'typing...' indicator inside Telegram while heavy diagnostics run."""
+    tok = (token or "").strip()
+    cid = (chat_id or "").strip()
+    if not tok or not cid:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{TELEGRAM_API_BASE}/bot{tok}/sendChatAction",
+                json={"chat_id": cid, "action": action},
+            )
+    except Exception:
+        pass
+
+
+def _split_telegram_text(text: str, max_len: int = 3850) -> List[str]:
+    clean = (text or "").strip() or "(Empty workflow message)"
+    if len(clean) <= max_len:
+        return [clean]
+    chunks: List[str] = []
+    remaining = clean
+    while remaining and len(chunks) < 3:
+        if len(remaining) <= max_len:
+            chunks.append(remaining)
+            break
+        split_at = remaining.rfind("\n", 0, max_len)
+        if split_at < max_len // 2:
+            split_at = max_len
+        chunks.append(remaining[:split_at].rstrip())
+        remaining = remaining[split_at:].lstrip()
+    if remaining and chunks:
+        chunks[-1] = chunks[-1][:max_len - 20] + "\n... (truncated)"
+    return chunks
+
+
 async def telegram_send_message(
     token: str,
     chat_id: str,
@@ -198,7 +266,7 @@ async def telegram_send_message(
     """Sends a real Telegram Bot API sendMessage, logs telemetry, and updates connection health."""
     tok = (token or "").strip()
     cid = (chat_id or "").strip()
-    clean_text = (text or "").strip()[:3900] or "(Empty workflow message)"
+    clean_text = (text or "").strip()[:11500] or "(Empty workflow message)"
     preview = clean_text.replace("\n", " ")[:180]
     now_s = time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -226,22 +294,28 @@ async def telegram_send_message(
 
     t0 = time.time()
     url = f"{TELEGRAM_API_BASE}/bot{tok}/sendMessage"
-    payload: Dict[str, Any] = {"chat_id": cid, "text": clean_text}
+    chunks = _split_telegram_text(clean_text, max_len=3850)
     pm = (parse_mode or "").strip()
-    if pm in ("Markdown", "MarkdownV2", "HTML"):
-        payload["parse_mode"] = pm
 
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            resp = await client.post(url, json=payload)
-            # Retry once as plain text if entity parsing fails on rich agent markdown output
-            if resp.status_code == 400 and "parse_mode" in payload and "parse entities" in resp.text.lower():
-                payload.pop("parse_mode", None)
+        resp = None
+        body: Dict[str, Any] = {}
+        async with httpx.AsyncClient(timeout=14.0) as client:
+            for chunk_txt in chunks:
+                payload: Dict[str, Any] = {"chat_id": cid, "text": chunk_txt}
+                if pm in ("Markdown", "MarkdownV2", "HTML"):
+                    payload["parse_mode"] = pm
                 resp = await client.post(url, json=payload)
+                # Retry once as plain text if entity parsing fails on rich agent markdown output
+                if resp.status_code == 400 and "parse_mode" in payload and "parse entities" in resp.text.lower():
+                    payload.pop("parse_mode", None)
+                    resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    break
 
         latency_ms = int((time.time() - t0) * 1000)
         try:
-            body = resp.json()
+            body = resp.json() if resp is not None else {}
         except Exception:
             body = {}
 
@@ -411,8 +485,12 @@ async def handle_telegram_chat_message(
             f"⚡ Quick Chat Commands:\n"
             f"• `ping 192.168.9.2` — সার্ভার পিং + WORKFLOWS (Auto) স্ট্যাটাস\n"
             f"• `/port 192.168.9.2` — পোর্ট স্ক্যান + স্ট্যাটাস\n"
-            f"• `/status` বা `workflow status` — WORKFLOWS (Auto) পূর্ণ রিপোর্ট\n"
+            f"• `/health` — CPU, RAM, Disk ও সার্ভার হেলথ\n"
+            f"• `/status` — WORKFLOWS (Auto) পূর্ণ স্ট্যাটাস রিপোর্ট\n"
+            f"• `/history` — সাম্প্রতিক ৫টি ওয়ার্কফ্লো রান ইতিহাস\n"
+            f"• `/workflows` — সব ওয়ার্কফ্লোর তালিকা ও সময়সূচি\n"
             f"• `/run <name_or_id>` — তাৎক্ষণিক ওয়ার্কফ্লো রান ও রিপোর্ট\n"
+            f"• `/enable <name>` / `/disable <name>` — শিডিউল অন/অফ\n"
             f"• `/create <daily goal>` — অটো নতুন ডেইলি ওয়ার্কফ্লো তৈরি\n\n"
             f"{wf_digest['report_text']}"
         )
@@ -512,14 +590,86 @@ async def handle_telegram_chat_message(
                 + wf_digest["report_text"]
             )
 
+    # E2. Server Health (/health, cpu, ram, disk)
+    elif re.match(r"^/health\b", low) or any(
+        k in low for k in ["server health", "সার্ভার হেলথ", "system info", "cpu usage", "ram usage", "disk space"]
+    ):
+        intent = "server_health"
+        from agent.tools import AgentTools
+        sys_txt = await AgentTools.system_info()
+        reply_text = f"🏥 Live Server Health Diagnostics:\n{sys_txt[:1800]}\n\n{wf_digest['report_text']}"
+
+    # E3. Recent Workflow Execution History (/history, /runs, recent runs)
+    elif re.match(r"^/(history|runs|logs)\b", low) or any(
+        k in low for k in ["run history", "recent runs", "last run", "গত রান", "হিস্ট্রি"]
+    ):
+        intent = "workflow_history"
+        recent_runs = await WorkflowStore.list_runs(limit=6)
+        if not recent_runs:
+            reply_text = f"📜 এখনও কোনো ওয়ার্কফ্লো রান ইতিহাস নেই।\n\n{wf_digest['report_text']}"
+        else:
+            r_lines = ["📜 Recent WORKFLOWS (Auto) Executions (Last 6):"]
+            for idx, rr in enumerate(recent_runs, 1):
+                rst = str(rr.get("status") or "").upper()
+                ric = "✅" if rst == "SUCCESS" else ("⚠️" if rst == "PARTIAL" else ("🛑" if rst == "STOPPED" else "❌"))
+                snip = (rr.get("error_message") or rr.get("final_output") or "").replace("\n", " ").strip()[:110]
+                r_lines.append(
+                    f"{idx}. {ric} {rr.get('workflow_name') or rr.get('workflow_id')} [{rst}]\n"
+                    f"   • Trigger: {rr.get('trigger_source', 'manual')} | {rr.get('duration_ms', 0)}ms | {rr.get('started_at', '')}\n"
+                    + (f"   • Output: {snip}" if snip else "")
+                )
+            reply_text = "\n".join(r_lines) + f"\n\n📊 {wf_status_summary}"
+
+    # E4. List Workflows (/workflows, /list)
+    elif re.match(r"^/(workflows|list)\b", low) or low in ("workflows", "list workflows"):
+        intent = "workflow_list"
+        all_wfs = await WorkflowStore.list_workflows()
+        if not all_wfs:
+            reply_text = "⚙️ কোনো সংরক্ষিত ওয়ার্কফ্লো পাওয়া যায়নি।"
+        else:
+            w_lines = [f"⚙️ Saved WORKFLOWS (Auto) ({len(all_wfs)}):"]
+            for w in all_wfs[:15]:
+                st_badge = "🟢 ON" if w.get("is_enabled") else "⏸️ OFF"
+                w_lines.append(
+                    f"• {w.get('icon', '⚡')} {w.get('name')} [{st_badge}]\n"
+                    f"  ID: `{w['id']}` | Sched: {w.get('human_bn') or w.get('daily_time') or w.get('trigger_type')} | Last: {w.get('last_status', 'IDLE')} | Next: {w.get('next_run') or '-'}"
+                )
+            reply_text = "\n".join(w_lines)
+
+    # E5. Enable / Disable Workflow Schedule (/enable <q> | /disable <q>)
+    elif re.match(r"^/(enable|disable)\s+(.+)", msg, flags=re.IGNORECASE):
+        m_tog = re.match(r"^/(enable|disable)\s+(.+)", msg, flags=re.IGNORECASE)
+        want_enable = m_tog.group(1).lower() == "enable"
+        query = m_tog.group(2).strip().lower()
+        intent = "workflow_toggle"
+        all_wfs = await WorkflowStore.list_workflows()
+        matched = next(
+            (w for w in all_wfs if w["id"].lower() == query or query in (w.get("name") or "").lower()),
+            None,
+        )
+        if not matched:
+            action_status = "FAILED"
+            reply_text = f"❌ Workflow '{query}' পাওয়া যায়নি।\n\n{wf_digest['report_text']}"
+        else:
+            linked_wf_id = matched["id"]
+            updated_wf = await WorkflowStore.set_workflow_enabled(matched["id"], want_enable)
+            wf_digest = await WorkflowStore.build_workflows_status_report(max_workflows=6, max_runs=4)
+            wf_status_summary = wf_digest["summary_line"]
+            state_txt = "🟢 ENABLED" if want_enable else "⏸️ PAUSED"
+            reply_text = (
+                f"{state_txt} Workflow '{matched['name']}' (`{matched['id']}`)\n"
+                f"• Next Run: {(updated_wf or {}).get('next_run') or '-'}\n\n"
+                f"{wf_digest['report_text']}"
+            )
+
     # F. Explicit WORKFLOWS (Auto) Status / Report
-    elif re.match(r"^/(status|workflows|report|runs)\b", low) or any(
-        k in low for k in ["workflow", "workflows", "ওয়ার্কফ্লো", "স্ট্যাটাস", "রিপোর্ট", "auto report", "show status"]
+    elif re.match(r"^/(status|report)\b", low) or any(
+        k in low for k in ["workflow status", "workflows status", "ওয়ার্কফ্লো", "স্ট্যাটাস", "রিপোর্ট", "auto report", "show status"]
     ):
         intent = "workflow_status"
         reply_text = wf_digest["report_text"]
 
-    # G. General AI Chat fallback
+    # G. General AI Chat fallback (with RAG + ProjectMemory offline synthesis if LLM unreachable)
     else:
         intent = "ai_chat"
         try:
@@ -539,9 +689,28 @@ async def handle_telegram_chat_message(
                 reply_text = f"{ai_res['output'][:2200]}\n\n---\n📊 {wf_status_summary}"
             else:
                 err_txt = ai_res.get("error") or "Primary LLM offline"
+                kb_snippets: List[str] = []
+                try:
+                    from memory.project_store import ProjectMemoryStore
+                    pm_hits = await ProjectMemoryStore.search_memories(query=msg[:120], limit=3)
+                    for h in pm_hits[:3]:
+                        kb_snippets.append(f"• [{h.get('project_name')}/{h.get('key')}]: {str(h.get('content') or '')[:220]}")
+                except Exception:
+                    pass
+                try:
+                    from memory.vector_store import VectorMemoryStore
+                    v_hits = VectorMemoryStore().search(msg[:120], top_k=2)
+                    for vh in v_hits[:2]:
+                        meta = vh.get("metadata") or {}
+                        kb_snippets.append(f"• [Memory: {meta.get('title') or meta.get('source', 'Note')}]: {str(vh.get('content') or '')[:220]}")
+                except Exception:
+                    pass
+
+                kb_block = ("\n📚 সংরক্ষিত মেমোরি থেকে প্রাসঙ্গিক তথ্য:\n" + "\n".join(kb_snippets) + "\n") if kb_snippets else ""
                 reply_text = (
-                    f"⚠️ AI মডেল রেসপন্স পাওয়া যায়নি ({err_txt})।\n"
-                    f"টিপস: সরাসরি কমান্ড দিন — `ping 192.168.9.2`, `/status`, `/port <ip>`, `/run <name>`।\n\n"
+                    f"⚠️ প্রাইমারি AI মডেল এখন অফলাইন ({err_txt})।\n"
+                    f"{kb_block}\n"
+                    f"⚡ ইনস্ট্যান্ট বট কমান্ড: `ping 192.168.9.2`, `/health`, `/port 192.168.9.2`, `/status`, `/history`, `/workflows`, `/run <name>`\n\n"
                     f"{wf_digest['report_text']}"
                 )
         except Exception as ai_err:
@@ -613,6 +782,7 @@ class TelegramChatListener:
         self._polling_now = False
         self._last_poll_at = ""
         self._last_error = ""
+        self._synced_tokens: set = set()
 
     def is_polling(self) -> bool:
         return bool(self._running and self._polling_now)
@@ -665,6 +835,9 @@ class TelegramChatListener:
                     continue
 
                 self._polling_now = True
+                if tok not in self._synced_tokens:
+                    self._synced_tokens.add(tok)
+                    asyncio.create_task(telegram_sync_commands(tok))
                 offset = int(cfg.get("last_update_id") or 0)
                 params: Dict[str, Any] = {"timeout": 12, "limit": 20}
                 if offset > 0:
@@ -743,6 +916,7 @@ class TelegramChatListener:
                         continue
 
                     try:
+                        await telegram_send_chat_action(tok, incoming_cid, "typing")
                         await handle_telegram_chat_message(
                             chat_id=incoming_cid,
                             sender_name=sender,

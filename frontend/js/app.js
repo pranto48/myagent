@@ -94,11 +94,34 @@ async function loadServerStatus() {
       if (sideModel && data.llm_model) sideModel.innerText = data.llm_model;
       if (topModelSelect && data.llm_model) topModelSelect.value = data.llm_model;
     }
+    const tgRes = await fetch('/api/workflows/telegram/status');
+    if (tgRes.ok) {
+      const tgJson = await tgRes.json();
+      const tg = tgJson?.telegram || {};
+      const tgBadge = document.getElementById('sidebar-tg-badge');
+      if (tgBadge) {
+        tgBadge.className = `sidebar-tg-badge ${tg.connected ? 'connected' : (tg.status === 'Error' ? 'error' : 'disconnected')}`;
+        tgBadge.textContent = tg.connected ? `🟢 ${tg.bot_username || 'TG'}` : (tg.status === 'Error' ? '🟠 TG' : '✈️ TG');
+      }
+    }
   } catch (e) {
     const statusText = document.getElementById('agent-online-status');
     if (statusText) statusText.innerText = typeof t === 'function' ? t('status_offline', 'অফলাইন') : 'অফলাইন';
     console.warn('Server status check notice:', e);
   }
+}
+
+function filterSidebarNav(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const nav = document.getElementById('main-nav-menu');
+  if (!nav) return;
+  nav.querySelectorAll('.nav-btn').forEach(btn => {
+    const text = (btn.innerText || btn.textContent || '') + ' ' + (btn.id || '');
+    btn.style.display = (!q || text.toLowerCase().includes(q)) ? '' : 'none';
+  });
+  nav.querySelectorAll('.ops-nav-divider').forEach(div => {
+    div.style.display = q ? 'none' : '';
+  });
 }
 
 /**

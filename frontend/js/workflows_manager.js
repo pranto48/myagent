@@ -3770,8 +3770,12 @@ function renderTelegramChatFeed() {
     const intentIcon = {
       ping: '📡 Ping & Status',
       port_scan: '🔍 Port Scan',
+      server_health: '🏥 Server Health',
       workflow_status: '📊 WORKFLOWS Status',
       workflow_report: '📢 Auto Report',
+      workflow_history: '📜 Run History',
+      workflow_list: '⚙️ Workflows List',
+      workflow_toggle: '🔄 Schedule Toggle',
       workflow_run: '⚡ Workflow Run',
       workflow_create: '🧠 Created Workflow',
       help: 'ℹ️ Help / ID',
@@ -3797,6 +3801,13 @@ function renderTelegramChatFeed() {
       </div>
     `;
   }).join('');
+}
+
+function runQuickTelegramCommand(cmd) {
+  const inp = document.getElementById('wf-tg-cmd-input');
+  if (!inp) return;
+  inp.value = cmd;
+  submitTelegramChatCommand();
 }
 
 async function submitTelegramChatCommand(event) {
@@ -3985,6 +3996,7 @@ window.disconnectWorkflowTelegram = disconnectWorkflowTelegram;
 window.refreshWorkflowTelegramLogs = refreshWorkflowTelegramLogs;
 window.clearWorkflowTelegramLogs = clearWorkflowTelegramLogs;
 window.refreshWorkflowTelegramChats = refreshWorkflowTelegramChats;
+window.runQuickTelegramCommand = runQuickTelegramCommand;
 window.submitTelegramChatCommand = submitTelegramChatCommand;
 window.sendWorkflowReportToTelegram = sendWorkflowReportToTelegram;
 window.clearWorkflowTelegramChats = clearWorkflowTelegramChats;

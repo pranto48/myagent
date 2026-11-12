@@ -249,7 +249,7 @@ async def connect_workflow_telegram(
 ):
     """Connects/updates Telegram Bot credentials, verifies via getMe, and configures two-way chat & auto reports."""
     import time as _t
-    from workflows.telegram_service import telegram_verify_token, telegram_detect_chats, telegram_chat_listener
+    from workflows.telegram_service import telegram_verify_token, telegram_detect_chats, telegram_chat_listener, telegram_sync_commands
 
     await WorkflowStore.init_tables_and_seed()
     telegram_chat_listener.clear_error()
@@ -356,6 +356,7 @@ async def connect_workflow_telegram(
             http_status=200,
             latency_ms=verify.get("latency_ms", 0),
         )
+        await telegram_sync_commands(effective_tok)
         return {
             "success": True,
             "verified": True,

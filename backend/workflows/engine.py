@@ -763,18 +763,48 @@ class WorkflowEngine:
                     "reasoning": res.get("reasoning", "")
                 }
                 if not res.get("success"):
-                    if bool(cfg.get("fallback_on_error", False)):
-                        upstream_txt = ctx.get("prev", {}).get("output", "")
-                        err_detail = res.get("error") or res.get("output") or "LLM unavailable"
+                    err_detail = res.get("error") or res.get("output") or "LLM unavailable"
+                    is_conn_err = any(
+                        tok in str(err_detail).lower()
+                        for tok in ("connection error", "timed out", "connecterror", "offline", "unavailable", "apiconnectionerror")
+                    )
+                    explicit_flag = cfg.get("fallback_on_error")
+                    allow_fallback = bool(explicit_flag) or (explicit_flag is None and is_conn_err)
+
+                    if allow_fallback:
+                        # Collect all executed non-trigger upstream node outputs cleanly
+                        upstream_sections: List[str] = []
+                        upstream_anomaly = False
+                        for up_id, up_entry in (ctx.get("nodes") or {}).items():
+                            if not isinstance(up_entry, dict):
+                                continue
+                            up_type = str(up_entry.get("type") or "")
+                            if up_type.startswith("trigger_"):
+                                continue
+                            up_out = str(up_entry.get("output") or "").strip()
+                            if not up_out:
+                                continue
+                            up_title = up_entry.get("title") or up_id
+                            up_status = str(up_entry.get("status") or "").upper()
+                            if up_status == "FAILED" or re.search(r'"offline_count"\s*:\s*[1-9]|STATUS:\s*OFFLINE|\bOFFLINE\b|\bCRITICAL\b', up_out, flags=re.IGNORECASE):
+                                upstream_anomaly = True
+                            upstream_sections.append(f"#### {up_title} ({up_status})\n{up_out[:1800]}")
+
+                        combined_upstream = "\n\n".join(upstream_sections) if upstream_sections else (ctx.get("prev", {}).get("output", "") or "")
                         data["degraded_offline"] = True
                         data["llm_error"] = err_detail
                         status = "SUCCESS"
-                        summary = f"WARNING: Offline Telemetry Fallback ({res.get('model_used')})"
+                        summary = f"Auto Telemetry Digest (LLM Unreachable: {res.get('model_used')})"
+                        health_line = (
+                            "🚨 CRITICAL: সিস্টেম/নেটওয়ার্ক টেলিমেট্রিতে সমস্যা বা অফলাইন রিসোর্স শনাক্ত হয়েছে!"
+                            if upstream_anomaly
+                            else "✅ ALL SYSTEMS HEALTHY (লাইভ টেলিমেট্রি ও ডায়াগনস্টিকস যাচাই সম্পন্ন)"
+                        )
                         output = (
-                            f"⚠️ **[WARNING: AI মডেল সংযোগ পাওয়া যায়নি ({res.get('model_used')}) — অফলাইন টেলিমেট্রি ডাইজেস্ট]**\n"
-                            f"- ত্রুটির কারণ: {err_detail}\n"
-                            f"- সময়: {ctx.get('trigger', {}).get('datetime', '')}\n\n"
-                            f"### সংগৃহীত পূর্ববর্তী ধাপের ডেটা:\n{upstream_txt or '(কোনো আপস্ট্রিম ডেটা পাওয়া যায়নি)'}"
+                            f"### 📊 অটোনোমাস টেলিমেট্রি ডাইজেস্ট ({ctx.get('trigger', {}).get('datetime', '')})\n"
+                            f"- **স্বাস্থ্য অবস্থা:** {health_line}\n"
+                            f"- **নোট:** প্রাইমারি AI মডেল (`{res.get('model_used')}`) সাড়া দেয়নি ({err_detail[:120]}); সংগৃহীত সিস্টেম ও নেটওয়ার্ক ডেটা নিচে যুক্ত করা হলো।\n\n"
+                            f"{combined_upstream or '(কোনো আপস্ট্রিম ডেটা পাওয়া যায়নি)'}"
                         )
                     else:
                         status = "FAILED"
