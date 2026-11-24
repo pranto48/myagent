@@ -850,6 +850,8 @@ async def create_quick_daily_workflow(
     save_memory = bool(data.get("save_memory", False))
     post_to_chat = bool(data.get("post_to_chat", True))
     notify_channels = bool(data.get("notify_channels", False))
+    send_email = bool(data.get("send_email", False))
+    email_to = (data.get("email_to") or "").strip()
     custom_webhook_url = (data.get("custom_webhook_url") or "").strip()
     language = (data.get("language") or "bn").strip()
     use_mcp = bool(data.get("use_mcp", True))
@@ -866,6 +868,8 @@ async def create_quick_daily_workflow(
         save_memory=save_memory,
         post_to_chat=post_to_chat,
         notify_channels=notify_channels,
+        send_email=send_email,
+        email_to=email_to,
         custom_webhook_url=custom_webhook_url,
         language=language,
         use_mcp=use_mcp
@@ -901,6 +905,8 @@ async def ai_architect_workflow(
     timezone_str = (data.get("timezone") or "Asia/Dhaka").strip()
     model = (data.get("model") or "").strip()
     project_name = (data.get("project_name") or "").strip()
+    send_email = bool(data.get("send_email", False))
+    email_to = (data.get("email_to") or "").strip()
 
     wf = await WorkflowStore.architect_workflow_from_goal(
         goal=goal,
@@ -910,6 +916,8 @@ async def ai_architect_workflow(
         timezone_str=timezone_str,
         model=model,
         project_name=project_name,
+        send_email=send_email,
+        email_to=email_to,
         auto_enable=bool(data.get("is_enabled", True))
     )
     return {

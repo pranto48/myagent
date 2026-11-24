@@ -415,6 +415,8 @@ async function submitQuickDailyTask(event) {
   const save_memory = !!document.getElementById('wf-quick-save-memory')?.checked;
   const post_to_chat = !!document.getElementById('wf-quick-post-chat')?.checked;
   const notify_channels = !!document.getElementById('wf-quick-notify-channels')?.checked;
+  const send_email = !!document.getElementById('wf-quick-send-email')?.checked;
+  const email_to = (document.getElementById('wf-quick-email-to')?.value || '').trim();
   const use_mcp = document.getElementById('wf-quick-use-mcp')?.checked !== false;
   const run_immediately = !!document.getElementById('wf-quick-run-now')?.checked;
 
@@ -440,6 +442,8 @@ async function submitQuickDailyTask(event) {
         save_memory,
         post_to_chat,
         notify_channels,
+        send_email,
+        email_to,
         use_mcp,
         run_immediately,
         language: typeof getAppLanguage === 'function' ? getAppLanguage() : 'bn'
@@ -486,6 +490,8 @@ async function architectWorkflowFromBuilder() {
   const frequency = document.getElementById('wf-quick-frequency')?.value || 'daily';
   const model = document.getElementById('wf-quick-model')?.value || '';
   const project_name = (document.getElementById('wf-quick-project')?.value || '').trim();
+  const send_email = !!document.getElementById('wf-quick-send-email')?.checked;
+  const email_to = (document.getElementById('wf-quick-email-to')?.value || '').trim();
 
   const btn = document.getElementById('btn-wf-ai-architect');
   const origHtml = btn ? btn.innerHTML : '';
@@ -505,6 +511,8 @@ async function architectWorkflowFromBuilder() {
         timezone: 'Asia/Dhaka',
         model,
         project_name,
+        send_email,
+        email_to,
         is_enabled: true
       })
     });
@@ -3048,6 +3056,7 @@ function renderRunOutputPanel() {
       <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button type="button" class="mini-btn-copy" onclick="switchTab('reports')">📄 AI Reports দেখুন</button>
         <button type="button" class="mini-btn-copy" onclick="switchTab('chat')">💬 Chat Digest দেখুন</button>
+        <button type="button" class="mini-btn-copy" style="border-color:rgba(14,165,233,0.5); color:#38bdf8;" onclick="emailActiveRunResult()">📧 Email Run Result</button>
       </div>
     </div>
 
@@ -4227,5 +4236,53 @@ async function sendResendTestEmailFromUI() {
   }
 }
 
+async function emailActiveRunResult() {
+  const run = wfState.activeRun;
+  if (!run) {
+    if (typeof wfToast === 'function') wfToast('কোনো সক্রিয় এক্সিকিউশন রান পাওয়া যায়নি।', 'warning');
+    else if (typeof showToast === 'function') showToast('কোনো সক্রিয় এক্সিকিউশন রান পাওয়া যায়নি।', 'warning');
+    return;
+  }
+  const defaultTo = (document.getElementById('wf-quick-email-to')?.value || '').trim() || 'admin@itsupport.bd';
+  const targetEmail = prompt('ওয়ার্কফ্লো রান রিপোর্ট পাঠানোর জন্য প্রাপক ইমেইল দিন (Resend API):', defaultTo);
+  if (!targetEmail || !targetEmail.trim()) return;
+
+  const wfName = (wfState.activeWorkflow && wfState.activeWorkflow.name) || run.workflow_name || 'Workflow Execution';
+  const subject = `[${run.status || 'REPORT'}] ${wfName} Execution Summary`;
+
+  let bodyContent = `Workflow: ${wfName}\nStatus: ${run.status}\nTrigger: ${run.trigger_source || 'manual'}\nDuration: ${run.duration_ms || 0} ms\nFinished: ${run.finished_at || new Date().toISOString()}\n\n`;
+  if (run.final_output) {
+    bodyContent += `--- FINAL OUTPUT ---\n${typeof run.final_output === 'object' ? JSON.stringify(run.final_output, null, 2) : String(run.final_output)}\n\n`;
+  }
+  if (run.node_results && run.node_results.length) {
+    bodyContent += `--- NODE EXECUTION STEPS (${run.node_results.length}) ---\n`;
+    run.node_results.forEach((s, idx) => {
+      bodyContent += `${idx + 1}. [${s.status}] ${s.title || s.node_id} (${s.duration_ms || 0}ms)\n${s.summary ? 'Summary: ' + s.summary + '\n' : ''}\n`;
+    });
+  }
+
+  if (typeof wfToast === 'function') wfToast('📧 Resend API দিয়ে ইমেইল পাঠানো হচ্ছে...', 'info');
+  try {
+    const res = await wfFetch('/api/email/resend/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        to: targetEmail.trim(),
+        subject: subject,
+        body: bodyContent
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.detail || data.message || 'Email dispatch failed');
+    const msgId = (data.details && data.details.id) ? ` (ID: ${data.details.id})` : '';
+    if (typeof wfToast === 'function') wfToast(`✅ ইমেইল সফলভাবে পাঠানো হয়েছে: ${targetEmail}${msgId}`, 'success');
+    else if (typeof showToast === 'function') showToast(`✅ ইমেইল সফলভাবে পাঠানো হয়েছে: ${targetEmail}${msgId}`, 'success');
+  } catch (err) {
+    const msg = `ইমেইল পাঠাতে ত্রুটি: ${err.message}`;
+    if (typeof wfToast === 'function') wfToast(msg, 'error');
+    else if (typeof showToast === 'function') showToast(msg, 'error');
+  }
+}
+
+window.emailActiveRunResult = emailActiveRunResult;
 window.refreshResendEmailStatus = refreshResendEmailStatus;
 window.sendResendTestEmailFromUI = sendResendTestEmailFromUI;

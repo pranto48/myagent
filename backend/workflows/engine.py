@@ -668,6 +668,41 @@ class WorkflowEngine:
             except Exception as auto_tg_err:
                 logger.debug(f"Auto workflow Telegram report note: {auto_tg_err}")
 
+        # Auto-dispatch WORKFLOWS (Auto) Report to Resend Email if enabled in workflow & not already emailed
+        if not dry_run and trigger_source not in ("sub_workflow",):
+            try:
+                wf_cfg = wf.get("config") or {}
+                auto_email = bool(wf.get("auto_send_email") or wf_cfg.get("auto_email") or wf.get("email_to") or wf_cfg.get("email_to"))
+                target_email = (wf.get("email_to") or wf_cfg.get("email_to") or "").strip()
+                if auto_email and target_email:
+                    already_emailed = any(
+                        s.get("type") == "resend_email"
+                        and s.get("status") == "SUCCESS"
+                        for s in node_results
+                    )
+                    if not already_emailed:
+                        from services.resend_service import resend_service
+                        if resend_service.is_configured():
+                            subject = f"[{overall_status}] Workflow: {wf['name']} ({started_str[:16]})"
+                            email_body = (
+                                f"Autonomous Workflow '{wf['name']}' execution completed.\n\n"
+                                f"Status: {overall_status}\n"
+                                f"Trigger: {trigger_source}\n"
+                                f"Duration: {duration_ms} ms\n"
+                                f"Started: {started_str}\n"
+                                f"Finished: {finished_str}\n\n"
+                                f"Final Output:\n{str(final_output)[:2500]}"
+                            )
+                            await resend_service.send_email(
+                                to=[target_email],
+                                subject=subject,
+                                body=email_body,
+                                workflow_name=wf["name"],
+                                run_id=run_id
+                            )
+            except Exception as auto_email_err:
+                logger.debug(f"Auto workflow Resend email report note: {auto_email_err}")
+
         return run_summary
 
     async def execute_single_node(

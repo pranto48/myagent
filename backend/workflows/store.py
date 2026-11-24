@@ -335,6 +335,20 @@ NODE_CATALOG: List[Dict[str, Any]] = [
         }
     },
     {
+        "type": "resend_email",
+        "category": "output",
+        "icon": "📧",
+        "label_en": "Send Resend Email",
+        "label_bn": "ইমেইল পাঠান (Resend)",
+        "color": "#0ea5e9",
+        "default_config": {
+            "to": "admin@itsupport.bd",
+            "subject": "📢 [MyAgent] {{workflow.name}} - {{trigger.date}}",
+            "body": "{{prev.output}}",
+            "from_email": ""
+        }
+    },
+    {
         "type": "merge_combine",
         "category": "logic",
         "icon": "🤝",
@@ -2194,6 +2208,8 @@ class WorkflowStore:
         save_memory: bool = False,
         post_to_chat: bool = True,
         notify_channels: bool = False,
+        send_email: bool = False,
+        email_to: str = "",
         custom_webhook_url: str = "",
         language: str = "bn",
         use_mcp: bool = True
@@ -2309,6 +2325,26 @@ class WorkflowStore:
                 }
             })
             edges.append({"id": f"e{len(edges)+1}", "source": last_node_id, "target": nid, "condition": ""})
+            last_node_id = nid
+            next_x += 310
+
+        if send_email:
+            eid = f"node_{len(nodes) + 1}"
+            target_to = email_to.strip() if email_to else "admin@itsupport.bd"
+            nodes.append({
+                "id": eid,
+                "type": "resend_email",
+                "title": "📧 Resend স্বয়ংক্রিয় ইমেইল প্রেরণ",
+                "x": next_x,
+                "y": 150,
+                "config": {
+                    "to": target_to,
+                    "subject": f"📢 [MyAgent Daily Task] {name} - {{{{trigger.date}}}}",
+                    "body": "{{nodes.node_2.output}}",
+                    "from_email": ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": last_node_id, "target": eid, "condition": ""})
 
         return await cls.create_workflow({
             "name": name,
@@ -2591,6 +2627,8 @@ class WorkflowStore:
         timezone_str: str = "Asia/Dhaka",
         model: str = "",
         project_name: str = "",
+        send_email: bool = False,
+        email_to: str = "",
         auto_enable: bool = True
     ) -> Dict[str, Any]:
         """
@@ -2617,6 +2655,7 @@ class WorkflowStore:
         wants_memory = any(k in lower for k in ["memory", "remember", "note", "project", "মেমোরি", "নোট", "প্রজেক্ট"])
         wants_condition = any(k in lower for k in ["if ", "else", "alert", "error", "warning", "fail", "down", "যদি", "সতর্ক", "অ্যালার্ট", "সমস্যা"])
         wants_notify_ext = any(k in lower for k in ["telegram", "discord", "slack", "channel", "টেলিগ্রাম", "ডিসকর্ড", "স্ল্যাক", "চ্যানেল"])
+        wants_email = bool(send_email) or any(k in lower for k in ["email", "mail", "ইমেইল", "মেইল", "resend", "ইনবক্স", "alert email", "send email"])
 
         # Extract any URL or IP list mentioned in the prompt
         found_urls = _re.findall(r"https?://[^\s'\"<>]+", clean_goal)
@@ -2963,6 +3002,26 @@ class WorkflowStore:
                 }
             })
             edges.append({"id": f"e{len(edges)+1}", "source": prev_out, "target": chat_id, "condition": ""})
+            prev_out = chat_id
+            col_x += 290
+
+        if wants_email:
+            eid = f"node_{len(nodes) + 1}"
+            target_to = email_to.strip() if email_to else "admin@itsupport.bd"
+            nodes.append({
+                "id": eid,
+                "type": "resend_email",
+                "title": "📧 Resend স্বয়ংক্রিয় ইমেইল প্রেরণ",
+                "x": col_x,
+                "y": 150,
+                "config": {
+                    "to": target_to,
+                    "subject": f"📢 [MyAgent AI] {derived_name} - {{{{trigger.date}}}}",
+                    "body": f"{{{{nodes.{ai_id}.output}}}}",
+                    "from_email": ""
+                }
+            })
+            edges.append({"id": f"e{len(edges)+1}", "source": prev_out if 'prev_out' in locals() else ai_id, "target": eid, "condition": ""})
 
         wf = await cls.create_workflow({
             "name": derived_name,
