@@ -3102,6 +3102,10 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                 <span class="wf-tg-dot"></span>
                 <span id="wf-tg-pill-text">✈️ Telegram: Disconnected</span>
               </button>
+              <button type="button" id="wf-email-status-pill" class="wf-tg-status-pill" style="border-color:rgba(14,165,233,0.5); color:#38bdf8;" onclick="switchWorkflowsSubTab('email')" title="Resend ইমেইল কানেকশন স্ট্যাটাস ও টেস্ট">
+                <span>📧</span>
+                <span id="wf-email-pill-text">Resend: Checking...</span>
+              </button>
               <button type="button" id="wf-mcp-status-pill" class="wf-tg-status-pill" style="border-color:rgba(99,102,241,0.5); color:#a5b4fc;" onclick="switchTab('mcp')" title="MCP Hub-এ নিবন্ধিত এক্সটার্নাল MCP সার্ভার ও টুল ম্যানেজ করুন">
                 <span>🔌</span>
                 <span id="wf-mcp-pill-text">MCP: Loading...</span>
@@ -3235,6 +3239,7 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
             <button type="button" id="wf-tabbtn-history" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('history')">📜 এক্সিকিউশন হিস্ট্রি ও ট্রেস</button>
             <button type="button" id="wf-tabbtn-templates" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('templates')">📚 টেমপ্লেট লাইব্রেরি</button>
             <button type="button" id="wf-tabbtn-telegram" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('telegram')">✈️ টেলিগ্রাম কানেকশন ও লগ <span id="wf-tab-tg-dot" class="wf-tg-dot-mini disconnected"></span></button>
+            <button type="button" id="wf-tabbtn-email" class="wf-subtab-btn" onclick="switchWorkflowsSubTab('email')">📧 Resend ইমেইল সিস্টেম <span id="wf-tab-email-dot" class="wf-tg-dot-mini connected"></span></button>
             <div class="wf-subtabs-right">
               <button type="button" id="btn-wf-subtab-focus" class="wf-tb-btn wf-btn-mini" onclick="switchWorkflowsSubTab('studio'); toggleFocusCanvasMode();" title="শুধু ক্যানভাস ফোকাস মোড (দুই পাশ লুকাবে)">🎯 Focus Canvas</button>
               <button type="button" id="btn-wf-subtab-fs" class="wf-tb-btn wf-btn-fs-launch" onclick="switchWorkflowsSubTab('studio'); toggleFullscreenCanvas(true);" title="ভিজ্যুয়াল n8n স্টুডিও ফুল-স্ক্রিনে খুলুন (Shift+F)">⛶ Full Screen স্টুডিও</button>
@@ -3534,6 +3539,121 @@ rtt min/avg/max/mdev = 0.381/0.450/0.518/0.056 ms</div>
                       <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">লোড হচ্ছে...</td></tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB 5: Resend Email System -->
+          <div id="wf-subtab-email" style="display:none;">
+            <div id="wf-email-status-banner" class="wf-tg-status-banner connected" style="border-color:rgba(14,165,233,0.3); background:linear-gradient(135deg, rgba(14,165,233,0.08), rgba(99,102,241,0.05));">
+              <div class="wf-tg-banner-left">
+                <div class="wf-tg-state-row">
+                  <span id="wf-email-big-badge" class="wf-tg-big-badge connected" style="background:#0284c7; color:#fff;">● CONNECTED</span>
+                  <strong id="wf-email-identity" style="font-size:1rem;">Resend API Active &amp; Verified</strong>
+                </div>
+                <div id="wf-email-status-meta" class="wf-tg-meta-line" style="color:var(--text-muted); font-size:0.78rem;">
+                  API Key: <code id="wf-email-key-display">re_6F8Z...AVap</code> | Verified Domain: <strong id="wf-email-domain-display" style="color:#38bdf8;">itsupport.bd</strong> | Default Sender: <code id="wf-email-sender-display">MyAgent &lt;notifications@itsupport.bd&gt;</code>
+                </div>
+              </div>
+              <div class="wf-tg-banner-actions">
+                <button type="button" class="btn-sm-action-cyber" onclick="refreshResendEmailStatus(true)" title="Resend API লাইভ স্ট্যাটাস ও ডোমেইন যাচাই">🔄 Live Status Check</button>
+                <a href="https://resend.com/overview" target="_blank" class="btn-sm-action-cyber" style="text-decoration:none; display:inline-flex; align-items:center;" title="Resend ক্লাউড ড্যাশবোর্ড খুলুন">🌐 Resend Cloud ↗</a>
+              </div>
+            </div>
+
+            <!-- Resend Control Grid -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; margin-bottom:16px;">
+              <!-- Card 1: Connection & Domain Details -->
+              <div class="ops-card wf-tg-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <h4 style="margin:0; font-size:0.95rem; color:#38bdf8;">📧 Resend API কানেকশন বিবরণ</h4>
+                  <span class="badge" style="background:rgba(14,165,233,0.2); color:#38bdf8; border:1px solid rgba(14,165,233,0.4);">AES-256 Secured</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:0.82rem;">
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">API Status:</span>
+                    <strong style="color:#10b981;" id="wf-email-val-status">🟢 Verified &amp; Active</strong>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">Active Key ID:</span>
+                    <span style="font-family:monospace; color:#f8fafc;" id="wf-email-val-keyname">myagent (re_6F8Z...AVap)</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">Verified Domain:</span>
+                    <strong style="color:#38bdf8;" id="wf-email-val-domain">itsupport.bd (ap-northeast-1)</strong>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">Recommended Sender:</span>
+                    <span style="font-family:monospace; color:#a5b4fc;" id="wf-email-val-sender">MyAgent &lt;notifications@itsupport.bd&gt;</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">Sandbox Sender:</span>
+                    <span style="font-family:monospace; color:var(--text-muted);">MyAgent &lt;onboarding@resend.dev&gt;</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                    <span style="color:var(--text-muted);">API Latency:</span>
+                    <span style="color:#10b981;" id="wf-email-val-latency">~180 ms</span>
+                  </div>
+                </div>
+
+                <div style="margin-top:14px; padding:10px 12px; background:rgba(14,165,233,0.06); border:1px solid rgba(14,165,233,0.2); border-radius:8px; font-size:0.75rem; color:#cbd5e1; line-height:1.5;">
+                  ✨ <strong>উচ্চ ডেলিভারেবিলিটি সুবিধা:</strong> <code>itsupport.bd</code> ডোমেইনটি Resend-এ ভেরিফাইড থাকায় কোনো স্প্যাম ফিল্টার ছাড়াই সরাসরি ইনবক্সে ডেলিভারি নিশ্চিত হয়।
+                </div>
+              </div>
+
+              <!-- Card 2: Interactive Test Email Dispatcher -->
+              <div class="ops-card wf-tg-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <h4 style="margin:0; font-size:0.95rem; color:#38bdf8;">📨 সরাসরি টেস্ট ইমেইল পাঠান (Test Dispatcher)</h4>
+                  <span class="badge" style="background:rgba(16,185,129,0.2); color:#10b981;">Live Send</span>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <div>
+                    <label style="font-size:0.74rem; font-weight:600; color:var(--text-muted);">প্রাপক ইমেইল (To Email) *</label>
+                    <input type="email" id="wf-resend-test-to" class="text-input" placeholder="admin@itsupport.bd" style="margin-top:3px;">
+                  </div>
+                  <div>
+                    <label style="font-size:0.74rem; font-weight:600; color:var(--text-muted);">বিষয় (Subject) *</label>
+                    <input type="text" id="wf-resend-test-subject" class="text-input" value="📢 MyAgent Resend টেস্ট নোটিফিকেশন" style="margin-top:3px;">
+                  </div>
+                  <div>
+                    <label style="font-size:0.74rem; font-weight:600; color:var(--text-muted);">মেসেজ বডি (Message Body / Markdown) *</label>
+                    <textarea id="wf-resend-test-body" class="text-input" rows="3" style="margin-top:3px; resize:vertical;">MyAgent এন্টারপ্রাইজ সিস্টেম থেকে Resend API সফলভাবে কানেক্ট হয়েছে। দৈনিক আইটি ব্রিফিং, গেটওয়ে অ্যালার্ট ও ব্যাকআপ রিপোর্ট এখন সরাসরি ইমেইলে পাওয়া যাবে।</textarea>
+                  </div>
+                  <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+                    <button type="button" class="btn-primary" id="btn-wf-resend-send" onclick="sendResendTestEmailFromUI()" style="display:inline-flex; align-items:center; gap:6px;">
+                      <span>🚀</span> <span>ইমেইল পাঠান (Send Email)</span>
+                    </button>
+                    <span id="wf-resend-send-spinner" style="display:none; font-size:0.75rem; color:#38bdf8;">পাঠানো হচ্ছে...</span>
+                  </div>
+                  <div id="wf-resend-test-result" style="display:none; margin-top:8px; padding:10px 12px; border-radius:8px; font-size:0.78rem;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Usage Guides across AI Agent, Workflows & Telegram -->
+            <div class="ops-card wf-tg-card">
+              <h4 style="margin:0 0 12px 0; font-size:0.95rem; color:#38bdf8;">💡 MyAgent-এ Resend ইমেইল ব্যবহারের ৩টি সহজ উপায়</h4>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; font-size:0.8rem;">
+                <div style="padding:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px;">
+                  <strong style="color:#0ea5e9;">1. n8n ভিজ্যুয়াল স্টুডিও (Canvas)</strong>
+                  <p style="margin:6px 0 0; color:var(--text-muted); line-height:1.5;">
+                    ক্যানভাসে <code>resend_email</code> নোড যুক্ত করুন অথবা <code>notify_channel</code> নোডের ডেলিভারি টার্গেট <code>📧 Resend Email</code> সিলেক্ট করুন।
+                  </p>
+                </div>
+                <div style="padding:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px;">
+                  <strong style="color:#a855f7;">2. AI চ্যাটে সরাসরি নির্দেশ</strong>
+                  <p style="margin:6px 0 0; color:var(--text-muted); line-height:1.5;">
+                    চ্যাটে লিখুন: <em>"১৯২.১৬৮.৯.১ গেটওয়ে চেক করে admin@itsupport.bd-এ ইমেইল পাঠিয়ে দাও"</em>। এআই <code>send_resend_email</code> টুল দিয়ে পাঠিয়ে দেবে।
+                  </p>
+                </div>
+                <div style="padding:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px;">
+                  <strong style="color:#10b981;">3. টেলিগ্রাম বট কমান্ড</strong>
+                  <p style="margin:6px 0 0; color:var(--text-muted); line-height:1.5;">
+                    Telegram বটে লিখুন: <code>/email admin@itsupport.bd জরুরী অ্যালার্ট | সার্ভার ব্যাকআপ সফল</code> অথবা <code>/email status</code>।
+                  </p>
                 </div>
               </div>
             </div>

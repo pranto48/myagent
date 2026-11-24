@@ -121,6 +121,7 @@ function wfNodeMeta(type) {
     save_report: { icon: '📄', label_bn: 'AI রিপোর্ট সেভ', label_en: 'Save Report', color: '#10b981', category: 'output' },
     memory_save: { icon: '💾', label_bn: 'মেমোরি সেভ', label_en: 'Save Memory', color: '#14b8a6', category: 'output' },
     notify_channel: { icon: '📣', label_bn: 'চ্যাট/চ্যানেল নোটিফাই', label_en: 'Notify Digest', color: '#ec4899', category: 'output' },
+    resend_email: { icon: '📧', label_bn: 'ইমেইল পাঠান (Resend)', label_en: 'Resend Email', color: '#0ea5e9', category: 'output' },
     merge_combine: { icon: '🤝', label_bn: 'ব্রাঞ্চ মার্জ (Join)', label_en: 'Merge Branches', color: '#14b8a6', category: 'logic' },
     switch_router: { icon: '🚦', label_bn: 'সুইচ রাউটার (৩+ শাখা)', label_en: 'Switch Router', color: '#f97316', category: 'logic' },
     sub_workflow: { icon: '🔗', label_bn: 'সাব-ওয়ার্কফ্লো কল', label_en: 'Sub-Workflow', color: '#8b5cf6', category: 'action' },
@@ -201,6 +202,7 @@ async function loadWorkflowsStudio(preserveActiveId = null) {
     renderWorkflowsSidebar();
     populateWfHistoryWorkflowFilter();
     renderExecutionHistoryTable();
+    refreshResendEmailStatus(false);
 
     const targetId = preserveActiveId || (wfState.activeWorkflow ? wfState.activeWorkflow.id : null);
     let nextSelected = targetId ? wfState.workflows.find(w => w.id === targetId) : null;
@@ -250,7 +252,7 @@ function populateQuickModelSelect() {
 // ------------------------------------------------------------------------------
 function switchWorkflowsSubTab(tabName) {
   wfState.subTab = tabName;
-  ['studio', 'history', 'templates', 'telegram'].forEach(t => {
+  ['studio', 'history', 'templates', 'telegram', 'email'].forEach(t => {
     const pane = document.getElementById(`wf-subtab-${t}`);
     const btn = document.getElementById(`wf-tabbtn-${t}`);
     if (pane) pane.style.display = t === tabName ? '' : 'none';
@@ -275,6 +277,8 @@ function switchWorkflowsSubTab(tabName) {
         refreshWorkflowTelegramLogs(false);
       }
     }, 4500);
+  } else if (tabName === 'email') {
+    refreshResendEmailStatus(true);
   }
 }
 
@@ -1571,6 +1575,9 @@ function getNodeSummaryLine(node) {
       return `Project: ${c.project_name || 'myagent'} / ${c.key || 'note'}`;
     case 'notify_channel':
       return `To: ${c.target || 'chat_and_channels'}`;
+    case 'resend_email':
+    case 'send_email':
+      return `To: ${c.to || 'admin@itsupport.bd'}`;
     case 'merge_combine':
       return `Join all branches (${c.mode || 'markdown'})`;
     case 'switch_router':
@@ -2704,9 +2711,15 @@ function renderNodeInspector() {
         <select class="text-input" onchange="updateNodeCfg('target', this.value)">
           <option value="chat_and_channels" ${c.target === 'chat_and_channels' ? 'selected' : ''}>💬 Chat Session + 📡 Telegram/Discord/Slack</option>
           <option value="telegram" ${c.target === 'telegram' ? 'selected' : ''}>✈️ শুধুমাত্র Telegram Bot-এ</option>
+          <option value="email" ${c.target === 'email' ? 'selected' : ''}>📧 শুধুমাত্র Resend Email-এ</option>
+          <option value="all" ${c.target === 'all' ? 'selected' : ''}>🌐 All (Chat + Telegram + Email + Webhook)</option>
           <option value="chat_session" ${c.target === 'chat_session' ? 'selected' : ''}>💬 শুধুমাত্র Chat Session-এ</option>
           <option value="channels" ${c.target === 'channels' ? 'selected' : ''}>📡 শুধুমাত্র External Channels-এ</option>
         </select>
+      </div>
+      <div class="wf-field-group">
+        <label>Resend Email প্রাপক (To Email - ঐচ্ছিক)</label>
+        <input type="email" class="text-input" value="${wfEsc(c.email_to || '')}" placeholder="admin@itsupport.bd" onchange="updateNodeCfg('email_to', this.value)">
       </div>
       <div class="wf-field-group">
         <label>শিরোনাম</label>
@@ -2734,6 +2747,28 @@ function renderNodeInspector() {
       <div class="wf-field-group">
         <label>কাস্টম Webhook URL</label>
         <input type="text" class="text-input" value="${wfEsc(c.custom_webhook_url || '')}" placeholder="https://..." onchange="updateNodeCfg('custom_webhook_url', this.value)">
+      </div>
+    `;
+  } else if (node.type === 'resend_email' || node.type === 'send_email') {
+    fieldsHtml = `
+      <div class="wf-field-group">
+        <label>ইমেইল প্রাপক (To Email) *</label>
+        <input type="email" class="text-input" value="${wfEsc(c.to || '')}" placeholder="admin@itsupport.bd" onchange="updateNodeCfg('to', this.value)">
+      </div>
+      <div class="wf-field-group">
+        <label>বিষয় / শিরোনাম (Subject) *</label>
+        <input type="text" class="text-input" value="${wfEsc(c.subject || '')}" placeholder="দৈনিক রিপোর্ট / অ্যালার্ট" onchange="updateNodeCfg('subject', this.value)">
+      </div>
+      <div class="wf-field-group">
+        <label>মেসেজ বডি (Message Body / Markdown) *</label>
+        <textarea id="wf-cfg-email-body" class="text-input" rows="4"
+                  onfocus="wfState.lastFocusedFieldId='wf-cfg-email-body'"
+                  onchange="updateNodeCfg('body', this.value)">${wfEsc(c.body || '{{prev.output}}')}</textarea>
+        ${varsHtml}
+      </div>
+      <div class="wf-field-group">
+        <label>প্রেরক ইমেইল (From Email - ঐচ্ছিক)</label>
+        <input type="text" class="text-input" value="${wfEsc(c.from_email || '')}" placeholder="খালি রাখলে ডিফল্ট MyAgent <notifications@itsupport.bd> ব্যবহার হবে" onchange="updateNodeCfg('from_email', this.value)">
       </div>
     `;
   } else if (node.type === 'merge_combine') {
@@ -4053,3 +4088,144 @@ if (typeof document !== 'undefined' && !window.__wfDynamicTextboxBound) {
     }
   });
 }
+
+// ------------------------------------------------------------------------------
+// Resend Email System UI Handlers
+// ------------------------------------------------------------------------------
+async function refreshResendEmailStatus(force = false) {
+  try {
+    const res = await wfFetch('/api/email/resend/status');
+    const data = await res.json();
+    const pill = document.getElementById('wf-email-status-pill');
+    const pillText = document.getElementById('wf-email-pill-text');
+    const dot = document.getElementById('wf-tab-email-dot');
+
+    const isConnected = data && data.ok && data.is_valid;
+    if (pill) {
+      pill.className = `wf-tg-status-pill ${isConnected ? 'connected' : 'disconnected'}`;
+      if (isConnected) {
+        pill.style.borderColor = 'rgba(16,185,129,0.5)';
+        pill.style.color = '#34d399';
+      } else {
+        pill.style.borderColor = 'rgba(239,68,68,0.5)';
+        pill.style.color = '#f87171';
+      }
+    }
+    if (pillText) {
+      pillText.textContent = isConnected
+        ? `Resend: Active (${data.verified_domains?.[0] || 'ok'})`
+        : (data.configured ? 'Resend: Invalid Key' : 'Resend: Unset');
+    }
+    if (dot) {
+      dot.className = `wf-tg-dot-mini ${isConnected ? 'connected' : 'disconnected'}`;
+    }
+
+    // Populate Subtab details if elements exist
+    const badge = document.getElementById('wf-email-big-badge');
+    const ident = document.getElementById('wf-email-identity');
+    const banner = document.getElementById('wf-email-status-banner');
+    if (badge) badge.className = `wf-tg-big-badge ${isConnected ? 'connected' : 'disconnected'}`;
+    if (badge) badge.textContent = isConnected ? '● CONNECTED' : '● DISCONNECTED';
+    if (ident) ident.textContent = isConnected ? 'Resend API Active & Verified' : (data.error || 'Resend API Not Connected');
+    if (banner) banner.className = `wf-tg-status-banner ${isConnected ? 'connected' : 'disconnected'}`;
+
+    const keyDisp = document.getElementById('wf-email-key-display');
+    const domainDisp = document.getElementById('wf-email-domain-display');
+    const senderDisp = document.getElementById('wf-email-sender-display');
+    if (keyDisp) keyDisp.textContent = data.api_key_masked || 'None';
+    if (domainDisp) domainDisp.textContent = (data.verified_domains || []).join(', ') || 'sandbox (resend.dev)';
+    if (senderDisp) senderDisp.textContent = data.recommended_from || 'MyAgent <onboarding@resend.dev>';
+
+    const valStatus = document.getElementById('wf-email-val-status');
+    const valKeyname = document.getElementById('wf-email-val-keyname');
+    const valDomain = document.getElementById('wf-email-val-domain');
+    const valSender = document.getElementById('wf-email-val-sender');
+    const valLatency = document.getElementById('wf-email-val-latency');
+    if (valStatus) valStatus.textContent = isConnected ? '🟢 Verified & Active' : '🔴 Error: ' + (data.error || 'Failed');
+    if (valKeyname) valKeyname.textContent = `${data.active_key_name || 'default'} (${data.api_key_masked || 'None'})`;
+    if (valDomain) valDomain.textContent = (data.verified_domains || []).join(', ') || 'onboarding@resend.dev';
+    if (valSender) valSender.textContent = data.recommended_from || 'MyAgent <onboarding@resend.dev>';
+    if (valLatency) valLatency.textContent = `${data.latency_ms || 0} ms`;
+
+    if (force && typeof showToast === 'function') {
+      showToast(isConnected ? 'Resend API কানেকশন সফল ও সক্রিয়!' : 'Resend কানেকশন ব্যর্থ হয়েছে।', isConnected ? 'success' : 'error');
+    }
+  } catch (err) {
+    console.error('Error fetching Resend status:', err);
+  }
+}
+
+async function sendResendTestEmailFromUI() {
+  const toEl = document.getElementById('wf-resend-test-to');
+  const subjEl = document.getElementById('wf-resend-test-subject');
+  const bodyEl = document.getElementById('wf-resend-test-body');
+  const btn = document.getElementById('btn-wf-resend-send');
+  const spinner = document.getElementById('wf-resend-send-spinner');
+  const resEl = document.getElementById('wf-resend-test-result');
+
+  const to = (toEl?.value || '').trim();
+  const subject = (subjEl?.value || '').trim();
+  const body = (bodyEl?.value || '').trim();
+
+  if (!to || !to.includes('@')) {
+    if (typeof showToast === 'function') showToast('অনুগ্রহ করে সঠিক প্রাপক ইমেইল লিখুন।', 'warning');
+    if (toEl) toEl.focus();
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.style.display = 'inline';
+  if (resEl) {
+    resEl.style.display = 'block';
+    resEl.style.background = 'rgba(14,165,233,0.1)';
+    resEl.style.border = '1px solid rgba(14,165,233,0.3)';
+    resEl.style.color = '#38bdf8';
+    resEl.textContent = `🚀 '${to}'-এ ইমেইল পাঠানো হচ্ছে...`;
+  }
+
+  try {
+    const res = await wfFetch('/api/email/resend/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      if (typeof showToast === 'function') showToast('ইমেইল সফলভাবে পাঠানো হয়েছে!', 'success');
+      if (resEl) {
+        resEl.style.background = 'rgba(16,185,129,0.12)';
+        resEl.style.border = '1px solid rgba(16,185,129,0.4)';
+        resEl.style.color = '#34d399';
+        resEl.innerHTML = `✅ <strong>সফলভাবে পাঠানো হয়েছে!</strong><br/>
+          Message ID: <code>${data.details?.id || 'OK'}</code><br/>
+          To: <code>${data.details?.to?.join(', ') || to}</code><br/>
+          Sender: <code>${data.details?.from || 'MyAgent'}</code>
+        `;
+      }
+    } else {
+      const errMsg = data.detail || data.error || 'Email dispatch failed';
+      if (typeof showToast === 'function') showToast(`ইমেইল ব্যর্থ: ${errMsg}`, 'error');
+      if (resEl) {
+        resEl.style.background = 'rgba(239,68,68,0.12)';
+        resEl.style.border = '1px solid rgba(239,68,68,0.4)';
+        resEl.style.color = '#f87171';
+        resEl.innerHTML = `❌ <strong>ইমেইল পাঠানো ব্যর্থ হয়েছে:</strong><br/>${errMsg}`;
+      }
+    }
+  } catch (err) {
+    if (typeof showToast === 'function') showToast(`রিকোয়েস্ট এরর: ${err.message}`, 'error');
+    if (resEl) {
+      resEl.style.background = 'rgba(239,68,68,0.12)';
+      resEl.style.border = '1px solid rgba(239,68,68,0.4)';
+      resEl.style.color = '#f87171';
+      resEl.textContent = `❌ নেটওয়ার্ক ত্রুটি: ${err.message}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+window.refreshResendEmailStatus = refreshResendEmailStatus;
+window.sendResendTestEmailFromUI = sendResendTestEmailFromUI;

@@ -30,6 +30,7 @@ from routers import (
     backup_router,
     ops_router,
     workflows_router,
+    email_router,
     init_ops_db
 ) 
 from routers.reports import router as reports_router
@@ -136,6 +137,7 @@ app.include_router(memory_router)
 app.include_router(settings_router)
 app.include_router(ops_router)
 app.include_router(workflows_router)
+app.include_router(email_router)
 
 @app.get("/api/version")
 async def get_version():

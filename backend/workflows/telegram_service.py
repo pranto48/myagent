@@ -31,6 +31,7 @@ TELEGRAM_BOT_COMMANDS = [
     {"command": "enable", "description": "Enable a workflow schedule e.g. /enable morning"},
     {"command": "disable", "description": "Pause a workflow schedule e.g. /disable morning"},
     {"command": "create", "description": "Auto-create a daily workflow from plain goal"},
+    {"command": "email", "description": "Send email via Resend e.g. /email to@domain.com Subj | Body"},
     {"command": "id", "description": "Show your Telegram Chat ID & quick commands"},
     {"command": "help", "description": "Show interactive command reference"},
 ]
@@ -559,6 +560,55 @@ async def handle_telegram_chat_message(
                     )
                 lines_v.append("\n💡 টেস্ট করতে: `/vault verify 192.168.9.1`")
                 reply_text = "\n".join(lines_v)
+
+    # A0.5 /email [status | <to> <subject> | <body>]
+    elif re.match(r"^/email\b", low):
+        intent = "resend_email"
+        e_arg = re.sub(r"^/email\s*", "", msg, flags=re.IGNORECASE).strip()
+        from services.resend_service import resend_service
+        if not e_arg or e_arg.lower() in ("status", "check", "info"):
+            st = await resend_service.check_status()
+            if not st.get("configured"):
+                reply_text = "❌ Resend API Key কনফিগার করা নেই।"
+            elif not st.get("is_valid"):
+                reply_text = f"❌ Resend API Error: {st.get('error')}"
+            else:
+                v_domains = ", ".join(st.get("verified_domains", [])) or "None (sandbox)"
+                reply_text = (
+                    f"📧 Resend Email System Active!\n"
+                    f"• Status: 🟢 Connected ({st.get('latency_ms')} ms)\n"
+                    f"• Active Key: `{st.get('api_key_masked')}` ({st.get('active_key_name', 'key')})\n"
+                    f"• Verified Domains: `{v_domains}`\n"
+                    f"• Default Sender: `{st.get('recommended_from')}`\n\n"
+                    f"💡 ইমেইল পাঠাতে লিখুন:\n`/email to@example.com Subject | Message Body`"
+                )
+        else:
+            parts = [p.strip() for p in e_arg.split("|", 1)]
+            first_part = parts[0].split(None, 1)
+            target_to = first_part[0].strip() if first_part else ""
+            mail_subj = first_part[1].strip() if len(first_part) > 1 else "Telegram Command Notification"
+            mail_body = parts[1].strip() if len(parts) > 1 else mail_subj
+
+            if "@" not in target_to:
+                action_status = "FAILED"
+                reply_text = "❌ সঠিক ইমেইল ঠিকানা দিন।\nব্যবহারবিধি: `/email user@domain.com Subject | Message Body`"
+            else:
+                m_res = await resend_service.send_email(
+                    to=target_to,
+                    subject=mail_subj,
+                    body=mail_body
+                )
+                if m_res.get("ok"):
+                    reply_text = (
+                        f"✅ Email Successfully Dispatched via Resend!\n"
+                        f"• ID: `{m_res.get('id')}`\n"
+                        f"• To: `{', '.join(m_res.get('to', []))}`\n"
+                        f"• From: `{m_res.get('from')}`\n"
+                        f"• Subject: `{mail_subj}`"
+                    )
+                else:
+                    action_status = "FAILED"
+                    reply_text = f"❌ Resend Email Failed: {m_res.get('error')}"
 
     # A. /start, /id, /help
     elif re.match(r"^/(start|id|help)\b", low) or low in ("help", "menu", "commands"):

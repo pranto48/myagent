@@ -213,27 +213,27 @@ function renderUnifiedTimelineHtml(items) {
   return `
     <div class="hist-timeline-list">
       ${items.map(it => {
-        const icon = it.kind === 'chat' ? '💬' : (it.kind === 'workflow' ? '⚡' : '✈️');
-        const kindLabel = it.kind === 'chat' ? 'Chat AI' : (it.kind === 'workflow' ? 'WORKFLOW (Auto)' : 'Telegram Bot');
-        let actionsHtml = '';
-        if (it.kind === 'chat') {
-          actionsHtml = `
+    const icon = it.kind === 'chat' ? '💬' : (it.kind === 'workflow' ? '⚡' : '✈️');
+    const kindLabel = it.kind === 'chat' ? 'Chat AI' : (it.kind === 'workflow' ? 'WORKFLOW (Auto)' : 'Telegram Bot');
+    let actionsHtml = '';
+    if (it.kind === 'chat') {
+      actionsHtml = `
             <button type="button" class="btn-sm-action-cyber" onclick="openChatSessionDetailModal('${histEsc(it.session_id)}')">👁️ ট্রান্সক্রিপ্ট</button>
             <button type="button" class="btn-sm-action-cyber" onclick="histOpenSessionInChat('${histEsc(it.session_id)}')">💬 চ্যাটে খুলুন</button>
           `;
-        } else if (it.kind === 'workflow') {
-          actionsHtml = `
+    } else if (it.kind === 'workflow') {
+      actionsHtml = `
             <button type="button" class="btn-sm-action-cyber" onclick="openWorkflowRunDetailModal('${histEsc(it.raw_id)}')">🔍 ফুল ট্রেস</button>
             <button type="button" class="btn-sm-action-cyber" onclick="histOpenRunInStudio('${histEsc(it.workflow_id || '')}', '${histEsc(it.raw_id)}')">🎨 স্টুডিও</button>
             <button type="button" class="btn-sm-action-cyber" onclick="histRerunWorkflow('${histEsc(it.workflow_id || '')}')">▶ Re-Run</button>
           `;
-        } else {
-          actionsHtml = `
+    } else {
+      actionsHtml = `
             <button type="button" class="btn-sm-action-cyber" onclick="openTelegramChatDetailModal('${histEsc(it.raw_id)}')">✈️ বিস্তারিত</button>
           `;
-        }
+    }
 
-        return `
+    return `
           <div class="hist-timeline-card kind-${histEsc(it.kind)}">
             <div class="hist-card-top">
               <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -248,7 +248,7 @@ function renderUnifiedTimelineHtml(items) {
             <div class="hist-card-actions">${actionsHtml}</div>
           </div>
         `;
-      }).join('')}
+  }).join('')}
     </div>
   `;
 }
@@ -359,9 +359,9 @@ function renderWorkflowRunsHtml(runsData) {
           </thead>
           <tbody>
             ${runs.map(r => {
-              const steps = r.node_results || [];
-              const preview = (r.error_message || r.final_output || '').replace(/\s+/g, ' ').trim().slice(0, 110);
-              return `
+    const steps = r.node_results || [];
+    const preview = (r.error_message || r.final_output || '').replace(/\s+/g, ' ').trim().slice(0, 110);
+    return `
                 <tr style="border-bottom:1px solid var(--border-subtle);">
                   <td style="padding:10px 12px;">
                     <div style="font-weight:700; color:var(--text-primary);">${histEsc(r.workflow_name || r.workflow_id)}</div>
@@ -382,7 +382,7 @@ function renderWorkflowRunsHtml(runsData) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>
@@ -806,3 +806,4 @@ window.histDeleteChatMessage = histDeleteChatMessage;
 window.histRenameChatSession = histRenameChatSession;
 window.exportChatSessionById = exportChatSessionById;
 window.exportUnifiedHistory = exportUnifiedHistory;
+

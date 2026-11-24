@@ -1546,16 +1546,83 @@ class WorkflowEngine:
                         except Exception as wh_err:
                             channel_errors.append(f"Webhook: {str(wh_err)[:60]}")
 
-                    if target_mode == "telegram" and channel_errors and not delivered_to:
+                    # D. Resend Email Dispatch
+                    email_target = (cfg.get("email_to") or cfg.get("to_email") or "").strip()
+                    should_email = (target_mode in ("email", "resend", "all") or (target_mode == "chat_and_channels" and email_target))
+                    if should_email:
+                        try:
+                            from services.resend_service import resend_service
+                            target_recipients = email_target or getattr(settings, "RESEND_ADMIN_EMAIL", "")
+                            if target_recipients:
+                                mail_res = await resend_service.send_email(
+                                    to=target_recipients,
+                                    subject=msg_title,
+                                    body=msg_body
+                                )
+                                if mail_res.get("ok"):
+                                    mid = mail_res.get("id") or ""
+                                    delivered_to.append(f"ResendEmail(ok{', id=' + mid[:8] if mid else ''})")
+                                else:
+                                    channel_errors.append(f"ResendEmail: {mail_res.get('error')}")
+                            elif target_mode in ("email", "resend"):
+                                channel_errors.append("ResendEmail: No recipient email address specified in email_to.")
+                        except Exception as mail_err:
+                            logger.warning(f"Resend notify warning: {mail_err}")
+                            channel_errors.append(f"ResendEmail: {mail_err}")
+
+                    if target_mode in ("telegram", "email", "resend") and channel_errors and not delivered_to:
                         status = "FAILED"
                         data = {"delivered_to": [], "errors": channel_errors, "title": msg_title}
-                        output = f"❌ Telegram delivery failed: {'; '.join(channel_errors)}"
-                        summary = f"Telegram failed: {channel_errors[0][:50]}"
+                        output = f"❌ {target_mode.capitalize()} delivery failed: {'; '.join(channel_errors)}"
+                        summary = f"{target_mode.capitalize()} failed: {channel_errors[0][:50]}"
                     else:
                         data = {"delivered_to": delivered_to, "errors": channel_errors, "title": msg_title}
                         err_note = f"\n⚠️ Errors: {'; '.join(channel_errors)}" if channel_errors else ""
                         output = f"✅ Delivered to: {', '.join(delivered_to) if delivered_to else 'OpsLogs only'}{err_note}\n\n{msg_body[:800]}"
                         summary = f"Notified {', '.join(delivered_to) if delivered_to else 'Log'}"
+
+            # 10. Resend Email Dedicated Node
+            elif ntype in ("resend_email", "send_email"):
+                from services.resend_service import resend_service
+
+                to_email = (cfg.get("to") or cfg.get("to_email") or "").strip()
+                subject = (cfg.get("subject") or f"[{ctx['workflow']['name']}] Notification").strip()
+                body = (cfg.get("body") or cfg.get("message") or ctx.get("prev", {}).get("output") or "").strip()
+                from_email = (cfg.get("from_email") or cfg.get("from") or "").strip()
+                custom_html = (cfg.get("html") or "").strip()
+
+                if not to_email:
+                    to_email = getattr(settings, "RESEND_ADMIN_EMAIL", "") or ""
+
+                if not to_email:
+                    raise ValueError("No recipient email ('to') specified for Resend Email node.")
+
+                if is_dry_run:
+                    output = f"[🧪 DRY-RUN PREVIEW] Would send Resend Email to '{to_email}' with subject '{subject}':\n{body[:600]}"
+                    data = {"dry_run": True, "to": to_email, "subject": subject, "from": from_email or "default"}
+                    summary = f"[DRY-RUN] Email to {to_email}"
+                else:
+                    mail_res = await resend_service.send_email(
+                        to=to_email,
+                        subject=subject,
+                        body=body,
+                        html=custom_html,
+                        from_email=from_email or None
+                    )
+                    if not mail_res.get("ok"):
+                        raise RuntimeError(f"Resend email delivery failed: {mail_res.get('error')}")
+
+                    msg_id = mail_res.get("id") or ""
+                    data = mail_res
+                    output = (
+                        f"✅ Email successfully delivered via Resend API!\n"
+                        f"- Message ID: `{msg_id}`\n"
+                        f"- To: `{', '.join(mail_res.get('to', []))}`\n"
+                        f"- From: `{mail_res.get('from')}`\n"
+                        f"- Subject: `{subject}`\n\n"
+                        f"{body[:500]}"
+                    )
+                    summary = f"Email sent ({msg_id[:12]})"
 
             else:
                 status = "FAILED"

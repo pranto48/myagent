@@ -1036,6 +1036,85 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             {"id": "e9", "source": "node_6", "target": "node_8", "condition": "route_2"},
             {"id": "e10", "source": "node_6", "target": "node_9", "condition": "default"}
         ]
+    },
+    {
+        "id": "tpl_daily_it_brief_email",
+        "name": "📧 দৈনিক আইটি ডাইজেস্ট ও ইমেইল নোটিফিকেশন (Resend)",
+        "description": "সার্ভার ও নেটওয়ার্ক স্বাস্থ্য পরীক্ষা করে স্বয়ংক্রিয়ভাবে Resend API-এর মাধ্যমে প্রফেশনাল ইমেইল রিপোর্ট ও অ্যালার্ট পাঠায়।",
+        "category": "executive",
+        "icon": "📧",
+        "tags": ["email", "resend", "daily", "digest", "ops"],
+        "schedule": {
+            "type": "cron",
+            "cron_expr": "0 9 * * *",
+            "timezone": "Asia/Dhaka",
+            "is_enabled": True
+        },
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "⏰ সকাল ৯:০০ টার শিডিউল",
+                "x": 60,
+                "y": 140,
+                "config": {"time": "09:00", "timezone": "Asia/Dhaka"}
+            },
+            {
+                "id": "node_2",
+                "type": "tool_call",
+                "title": "📡 গেটওয়ে পিং ও লেটেন্সি টেস্ট",
+                "x": 340,
+                "y": 140,
+                "config": {
+                    "tool_name": "ping_network_diagnostics",
+                    "arguments": {"target": "192.168.9.1", "ping_type": "icmp", "count": 3}
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "ai_agent",
+                "title": "🧠 এক্সিকিউটিভ আইটি ডাইজেস্ট তৈরি",
+                "x": 620,
+                "y": 140,
+                "config": {
+                    "system_prompt": "You are MyAgent Enterprise IT Intelligence. Generate an executive morning briefing in Bangla with clear operational metrics, server availability, and recommended actions.",
+                    "user_prompt": "আজকের তারিখ {{trigger.date}}। নেটওয়ার্ক ও গেটওয়ে পিং ফলাফল:\n{{prev.output}}\n\nএকটি সুন্দর ও পূর্ণাঙ্গ আইটি এক্সিকিউটিভ রিপোর্ট তৈরি করুন।",
+                    "temperature": 0.2,
+                    "fallback_on_error": True
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "resend_email",
+                "title": "📧 Resend স্বয়ংক্রিয় ইমেইল প্রেরণ",
+                "x": 900,
+                "y": 140,
+                "config": {
+                    "to": "admin@itsupport.bd",
+                    "subject": "📢 MyAgent দৈনিক আইটি ব্রিফিং - {{trigger.date}}",
+                    "body": "{{prev.output}}"
+                }
+            },
+            {
+                "id": "node_5",
+                "type": "save_report",
+                "title": "📄 রিপোর্ট হিস্ট্রিতে আর্কাইভ",
+                "x": 1180,
+                "y": 140,
+                "config": {
+                    "title": "Resend Daily IT Morning Brief - {{trigger.date}}",
+                    "report_type": "executive_summary",
+                    "content": "{{nodes.node_3.output}}",
+                    "index_in_memory": True
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""}
+        ]
     }
 ]
 

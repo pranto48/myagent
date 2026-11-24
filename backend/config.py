@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     AUDIT_LOG_ENABLED: bool = True
     RATE_LIMIT_ENABLED: bool = True
 
+    # Resend Email Integration Settings
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_DEFAULT_FROM: str = "MyAgent <onboarding@resend.dev>"
+    RESEND_VERIFIED_FROM: str = "MyAgent <notifications@itsupport.bd>"
+    RESEND_ADMIN_EMAIL: str = ""
+
     class Config:
         env_file = ".env"
         extra = "allow"

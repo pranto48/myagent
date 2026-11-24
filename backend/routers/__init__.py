@@ -18,4 +18,5 @@ from .security_router import router as security_router
 from .backup import router as backup_router
 from .ops_router import router as ops_router, init_ops_db, record_ops_log
 from .workflows_router import router as workflows_router
+from .email_router import router as email_router
 

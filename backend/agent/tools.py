@@ -1351,11 +1351,69 @@ class AgentTools:
         except Exception as e:
             return f"Failed to inspect workflows status: {str(e)}"
 
+    @staticmethod
+    async def send_resend_email(
+        to: str,
+        subject: str,
+        body: str = "",
+        html: str = "",
+        from_email: Optional[str] = None
+    ) -> str:
+        """Sends an email using Resend API connection (with verified domain itsupport.bd / onboarding@resend.dev)."""
+        try:
+            from services.resend_service import resend_service
+            res = await resend_service.send_email(
+                to=to,
+                subject=subject,
+                body=body,
+                html=html,
+                from_email=from_email
+            )
+            if res.get("ok"):
+                return f"✅ Email sent successfully via Resend!\nMessage ID: {res.get('id')}\nTo: {', '.join(res.get('to', []))}\nFrom: {res.get('from')}\nSubject: {res.get('subject')}"
+            return f"❌ Failed to send email via Resend: {res.get('error')}"
+        except Exception as e:
+            return f"Exception sending email: {str(e)}"
+
+    @staticmethod
+    async def check_resend_status() -> str:
+        """Inspects Resend API connection status, active keys, and verified domains."""
+        try:
+            from services.resend_service import resend_service
+            st = await resend_service.check_status()
+            if not st.get("configured"):
+                return "❌ Resend API is not configured (RESEND_API_KEY missing)."
+            if not st.get("is_valid"):
+                return f"❌ Resend API connection error: {st.get('error')}"
+            domains_str = ", ".join([f"{d['name']} ({d['status']})" for d in st.get("domains", [])]) or "None"
+            return (
+                f"✅ Resend API Connection Active!\n"
+                f"- Key: {st.get('api_key_masked')} (Name: {st.get('active_key_name', 'default')})\n"
+                f"- Verified Domains: {', '.join(st.get('verified_domains', [])) or 'None (using sandbox)'}\n"
+                f"- All Domains: {domains_str}\n"
+                f"- Recommended Sender: {st.get('recommended_from')}\n"
+                f"- Latency: {st.get('latency_ms', 0)}ms"
+            )
+        except Exception as e:
+            return f"Exception checking Resend status: {str(e)}"
+
     @classmethod
     async def dispatch_tool(cls, tool_name: str, args: Dict[str, Any]) -> str:
         """Dynamically dispatches a tool call by name and executes it."""
         try:
-            if tool_name == "query_company_memory":
+            if tool_name == "send_resend_email":
+                return await cls.send_resend_email(
+                    to=args.get("to", ""),
+                    subject=args.get("subject", ""),
+                    body=args.get("body", ""),
+                    html=args.get("html", ""),
+                    from_email=args.get("from_email")
+                )
+
+            elif tool_name == "check_resend_status":
+                return await cls.check_resend_status()
+
+            elif tool_name == "query_company_memory":
                 q = args.get("query", "")
                 k = int(args.get("top_k", 4))
                 hits = cls.query_company_memory(query=q, top_k=k)
@@ -2514,6 +2572,35 @@ class AgentTools:
                             "device_or_host": {"type": "string", "description": "Vault ID, device IP (e.g. 192.168.9.1), or device name"}
                         },
                         "required": ["device_or_host"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_resend_email",
+                    "description": "Enterprise Email Sub-Agent: Sends professional email via Resend API (supports verified domain @itsupport.bd and onboarding@resend.dev). Use whenever you need to notify admins, send reports, or dispatch alerts.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "to": {"type": "string", "description": "Recipient email address or comma-separated list of emails (e.g. admin@itsupport.bd)"},
+                            "subject": {"type": "string", "description": "Email subject title"},
+                            "body": {"type": "string", "description": "Email content / body in markdown or plain text"},
+                            "html": {"type": "string", "description": "Optional raw HTML body (if omitted, a responsive dark-themed card is auto-generated)"},
+                            "from_email": {"type": "string", "description": "Optional custom sender e.g. MyAgent <notifications@itsupport.bd>"}
+                        },
+                        "required": ["to", "subject", "body"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "check_resend_status",
+                    "description": "Checks Resend API connection health, active key metadata, and verified sending domains (e.g. itsupport.bd).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
                     }
                 }
             }
