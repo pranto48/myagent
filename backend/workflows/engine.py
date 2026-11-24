@@ -1030,6 +1030,105 @@ class WorkflowEngine:
                 data = {"lines": len(output.splitlines())}
                 summary = f"Python transformed ({len(output)} chars)"
 
+            # 4B2. No-Code Ping Status Report Formatter Node
+            elif ntype == "ping_report_formatter":
+                sec1_title = str(cfg.get("section1_title") or "Unit router ping status:").strip()
+                sec2_title = str(cfg.get("section2_title") or "Server Ping Status:").strip()
+                loss_text = str(cfg.get("loss_text") or "IP ping loss").strip()
+
+                raw_routers = str(cfg.get("unit_routers_text") or "")
+                raw_servers = str(cfg.get("servers_text") or "")
+
+                def _parse_lines_to_targets(text: str) -> List[Tuple[str, str]]:
+                    parsed = []
+                    for line in text.splitlines():
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        m = re.match(r"^(.+?)[\s:=|]+((?:\d{1,3}\.){3}\d{1,3})$", line)
+                        if m:
+                            parsed.append((m.group(1).strip(), m.group(2).strip()))
+                        else:
+                            ip_m = re.search(r"((?:\d{1,3}\.){3}\d{1,3})", line)
+                            if ip_m:
+                                ip_val = ip_m.group(1).strip()
+                                lbl = line.replace(ip_val, "").strip(" :=|-") or ip_val
+                                parsed.append((lbl, ip_val))
+                    return parsed
+
+                unit_routers = _parse_lines_to_targets(raw_routers)
+                servers = _parse_lines_to_targets(raw_servers)
+
+                # Collect ping results from prev node or all prior nodes
+                item_map: Dict[str, Dict[str, Any]] = {}
+
+                prev_data_dict = ctx.get("prev", {}).get("data", {}) or {}
+                items_list = prev_data_dict.get("items") or []
+                if not items_list:
+                    for _nid, _nv in (ctx.get("nodes") or {}).items():
+                        _it = (_nv.get("data") or {}).get("items")
+                        if _it and isinstance(_it, list):
+                            items_list = _it
+                            break
+
+                if items_list:
+                    for it in items_list:
+                        if isinstance(it, dict) and "item" in it:
+                            item_map[str(it["item"]).strip()] = it
+
+                prev_text = str(ctx.get("prev", {}).get("output", "") or "")
+                all_targets = unit_routers + servers
+                for _, ip_target in all_targets:
+                    if ip_target not in item_map:
+                        for line in prev_text.splitlines():
+                            if re.search(r"\b" + re.escape(ip_target) + r"\b", line):
+                                is_online = ("ONLINE" in line) and not any(bad in line.upper() for bad in ("OFFLINE", "ERROR", "100%", "FAIL"))
+                                item_map[ip_target] = {
+                                    "item": ip_target,
+                                    "status": "ONLINE" if is_online else "OFFLINE",
+                                    "output": line
+                                }
+                                break
+
+                def _extract_ms(ip_val: str) -> str:
+                    info = item_map.get(ip_val)
+                    if not info or info.get("status") != "ONLINE":
+                        return loss_text
+                    out_str = str(info.get("output", ""))
+                    m = re.search(r"\(([\d\.]+)\s*ms\)", out_str)
+                    if m:
+                        ms_val = int(round(float(m.group(1))))
+                        return f"{ms_val}ms"
+                    return loss_text
+
+                out_lines: List[str] = []
+                if sec1_title:
+                    out_lines.append(sec1_title)
+                for name, ip in unit_routers:
+                    res_ms = _extract_ms(ip)
+                    out_lines.append(f"{name} Average Ping Time for {ip}: {res_ms}")
+
+                if servers:
+                    if out_lines:
+                        out_lines.append("")
+                    if sec2_title:
+                        out_lines.append(sec2_title)
+                    for idx, (name, ip) in enumerate(servers, 1):
+                        res_ms = _extract_ms(ip)
+                        if res_ms == loss_text:
+                            out_lines.append(f"{idx}.\t{name} {ip} Average Ping Time: {loss_text}")
+                        else:
+                            out_lines.append(f"{idx}.\t{name} {ip} Average Ping Time {res_ms}")
+
+                output = "\n".join(out_lines)
+                summary = f"Ping Report ({len(unit_routers)} routers, {len(servers)} servers)"
+                data = {
+                    "total_routers": len(unit_routers),
+                    "total_servers": len(servers),
+                    "routers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in unit_routers],
+                    "servers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in servers]
+                }
+
             # 4C. ForEach Batch Loop Iterator Node
             elif ntype == "loop_foreach":
                 from agent.tools import AgentTools

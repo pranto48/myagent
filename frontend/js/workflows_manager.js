@@ -122,6 +122,7 @@ function wfNodeMeta(type) {
     memory_save: { icon: '💾', label_bn: 'মেমোরি সেভ', label_en: 'Save Memory', color: '#14b8a6', category: 'output' },
     notify_channel: { icon: '📣', label_bn: 'চ্যাট/চ্যানেল নোটিফাই', label_en: 'Notify Digest', color: '#ec4899', category: 'output' },
     resend_email: { icon: '📧', label_bn: 'ইমেইল পাঠান (Resend)', label_en: 'Resend Email', color: '#0ea5e9', category: 'output' },
+    ping_report_formatter: { icon: '📊', label_bn: 'পিং রিপোর্ট ফরম্যাটার (নো-কোড)', label_en: 'Ping Report Formatter', color: '#38bdf8', category: 'action' },
     merge_combine: { icon: '🤝', label_bn: 'ব্রাঞ্চ মার্জ (Join)', label_en: 'Merge Branches', color: '#14b8a6', category: 'logic' },
     switch_router: { icon: '🚦', label_bn: 'সুইচ রাউটার (৩+ শাখা)', label_en: 'Switch Router', color: '#f97316', category: 'logic' },
     sub_workflow: { icon: '🔗', label_bn: 'সাব-ওয়ার্কফ্লো কল', label_en: 'Sub-Workflow', color: '#8b5cf6', category: 'action' },
@@ -1567,6 +1568,11 @@ function getNodeSummaryLine(node) {
       return `🔌 MCP: ${c.tool_name || 'select tool'}${c.server_id ? ' @ ' + c.server_id : ''}`;
     case 'python_transform':
       return `Python: ${(c.code || '').split('\n').slice(0, 2).join(' ')}`;
+    case 'ping_report_formatter': {
+      const rCnt = (c.unit_routers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
+      const sCnt = (c.servers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
+      return `📊 নো-কোড রিপোর্ট: ${rCnt} রাউটার, ${sCnt} সার্ভার`;
+    }
     case 'loop_foreach': {
       const cnt = (c.items_text || '').split(/[\r\n,]+/).filter(x => x.trim()).length;
       return `${c.action_type || 'ping'} loop • ${cnt} items`;
@@ -2777,6 +2783,60 @@ function renderNodeInspector() {
       <div class="wf-field-group">
         <label>প্রেরক ইমেইল (From Email - ঐচ্ছিক)</label>
         <input type="text" class="text-input" value="${wfEsc(c.from_email || '')}" placeholder="খালি রাখলে ডিফল্ট MyAgent <notifications@itsupport.bd> ব্যবহার হবে" onchange="updateNodeCfg('from_email', this.value)">
+      </div>
+    `;
+  } else if (node.type === 'ping_report_formatter') {
+    fieldsHtml = `
+      <div style="margin-bottom:12px; font-size:0.78rem; line-height:1.45; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:10px 12px; color:#38bdf8;">
+        💡 <strong>নো-কোড পিং রিপোর্ট কনফিগারেশন:</strong><br/>
+        কোনো প্রোগ্রামিং না জেনেই সহজে আইপি তালিকা পরিচালনা করুন। প্রতিটি লাইনে শুধু <code>নাম: আইপি</code> লিখুন (যেমন: <code>IAL: 192.168.9.1</code>)।
+      </div>
+
+      <div class="wf-field-group">
+        <label style="display:flex; justify-content:space-between; align-items:center;">
+          <span>🏢 ইউনিট ও রাউটার তালিকা (Unit Routers)</span>
+          <span style="font-size:0.7rem; color:var(--text-muted);">ফরমেট: নাম: আইপি</span>
+        </label>
+        <textarea id="wf-cfg-prf-routers" class="text-input" rows="8"
+                  style="font-family:'Fira Code', monospace; font-size:0.8rem; line-height:1.5;"
+                  placeholder="IAL: 192.168.9.1&#10;SETL: 192.168.11.1&#10;CityOffice: 192.168.1.1"
+                  oninput="updateNodeCfg('unit_routers_text', this.value); syncPingLoopItemsFromFormatter();">${wfEsc(c.unit_routers_text || '')}</textarea>
+      </div>
+
+      <div class="wf-field-group" style="margin-top:12px;">
+        <label style="display:flex; justify-content:space-between; align-items:center;">
+          <span>🖥️ সার্ভার তালিকা (Server Ping Status)</span>
+          <span style="font-size:0.7rem; color:var(--text-muted);">ফরমেট: নাম: আইপি</span>
+        </label>
+        <textarea id="wf-cfg-prf-servers" class="text-input" rows="5"
+                  style="font-family:'Fira Code', monospace; font-size:0.8rem; line-height:1.5;"
+                  placeholder="IP Phone Server: 192.168.6.2&#10;ERP Server: 192.168.9.3&#10;Fast React Server: 192.168.9.216"
+                  oninput="updateNodeCfg('servers_text', this.value); syncPingLoopItemsFromFormatter();">${wfEsc(c.servers_text || '')}</textarea>
+      </div>
+
+      <div class="wf-field-row" style="margin-top:10px;">
+        <div class="wf-field-group">
+          <label>রাউটার সেকশন শিরোনাম</label>
+          <input type="text" class="text-input" value="${wfEsc(c.section1_title || 'Unit router ping status:')}"
+                 onchange="updateNodeCfg('section1_title', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>সার্ভার সেকশন শিরোনাম</label>
+          <input type="text" class="text-input" value="${wfEsc(c.section2_title || 'Server Ping Status:')}"
+                 onchange="updateNodeCfg('section2_title', this.value)">
+        </div>
+      </div>
+
+      <div class="wf-field-group" style="margin-top:8px;">
+        <label>প্যাকেট লস / অফলাইন সতর্কবার্তা টেক্সট</label>
+        <input type="text" class="text-input" value="${wfEsc(c.loss_text || 'IP ping loss')}"
+               onchange="updateNodeCfg('loss_text', this.value)">
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" style="font-size:0.75rem; padding:6px 12px; border-color:rgba(56,189,248,0.4); color:#38bdf8;" onclick="syncPingLoopItemsFromFormatter(true)">
+          🔄 পিং লুপ নোডে আইপি অটো-সিঙ্ক করুন
+        </button>
       </div>
     `;
   } else if (node.type === 'merge_combine') {
@@ -4283,6 +4343,36 @@ async function emailActiveRunResult() {
   }
 }
 
+function syncPingLoopItemsFromFormatter(notify = false) {
+  const wf = wfState.activeWorkflow;
+  if (!wf) return;
+  const node = (wf.nodes || []).find(n => n.id === wfState.selectedNodeId);
+  if (!node || node.type !== 'ping_report_formatter') return;
+
+  const c = node.config || {};
+  const allLines = `${c.unit_routers_text || ''}\n${c.servers_text || ''}`.split(/\r?\n/);
+  const ips = [];
+  allLines.forEach(l => {
+    const m = l.match(/(?:\d{1,3}\.){3}\d{1,3}/);
+    if (m && !ips.includes(m[0])) ips.push(m[0]);
+  });
+
+  if (!ips.length) return;
+
+  const loopNode = (wf.nodes || []).find(n => n.type === 'loop_foreach');
+  if (loopNode) {
+    if (!loopNode.config) loopNode.config = {};
+    loopNode.config.items_text = ips.join('\n');
+    loopNode.config.action_type = 'ping';
+    markWfDirty();
+    renderWorkflowCanvas();
+    if (notify && typeof wfToast === 'function') {
+      wfToast(`✅ পিং নোডে (${loopNode.title || loopNode.id}) ${ips.length}টি আইপি অটো-সিঙ্ক করা হয়েছে!`, 'success');
+    }
+  }
+}
+
+window.syncPingLoopItemsFromFormatter = syncPingLoopItemsFromFormatter;
 window.emailActiveRunResult = emailActiveRunResult;
 window.refreshResendEmailStatus = refreshResendEmailStatus;
 window.sendResendTestEmailFromUI = sendResendTestEmailFromUI;

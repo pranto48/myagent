@@ -349,6 +349,35 @@ NODE_CATALOG: List[Dict[str, Any]] = [
         }
     },
     {
+        "type": "ping_report_formatter",
+        "category": "transform",
+        "icon": "📊",
+        "label_en": "Ping Report Formatter",
+        "label_bn": "পিং রিপোর্ট ফরম্যাটার (নো-কোড)",
+        "color": "#38bdf8",
+        "default_config": {
+            "unit_routers_text": (
+                "IAL: 192.168.9.1\n"
+                "SETL: 192.168.11.1\n"
+                "CityOffice: 192.168.1.1\n"
+                "ICL: 192.168.35.1\n"
+                "IKL: 192.168.10.1\n"
+                "NSN: 192.168.18.1\n"
+                "CNF: 192.168.19.1\n"
+                "Dhansiri: 192.168.40.5"
+            ),
+            "servers_text": (
+                "IP Phone Server: 192.168.6.2\n"
+                "ERP Server: 192.168.9.3\n"
+                "Fast React Server: 192.168.9.216\n"
+                "Accpack Server: 192.168.21.5"
+            ),
+            "section1_title": "Unit router ping status:",
+            "section2_title": "Server Ping Status:",
+            "loss_text": "IP ping loss"
+        }
+    },
+    {
         "type": "merge_combine",
         "category": "logic",
         "icon": "🤝",
@@ -1175,65 +1204,30 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             },
             {
                 "id": "node_3",
-                "type": "python_transform",
+                "type": "ping_report_formatter",
                 "title": "📊 পিং স্ট্যাটাস রিপোর্ট ফরম্যাটার",
                 "x": 680,
                 "y": 160,
                 "config": {
-                    "code": (
-                        "import re\n\n"
-                        "unit_routers = [\n"
-                        "    ('IAL', '192.168.9.1'),\n"
-                        "    ('SETL', '192.168.11.1'),\n"
-                        "    ('CityOffice', '192.168.1.1'),\n"
-                        "    ('ICL', '192.168.35.1'),\n"
-                        "    ('IKL', '192.168.10.1'),\n"
-                        "    ('NSN', '192.168.18.1'),\n"
-                        "    ('CNF', '192.168.19.1'),\n"
-                        "    ('Dhansiri', '192.168.40.5'),\n"
-                        "]\n\n"
-                        "servers = [\n"
-                        "    ('IP Phone Server', '192.168.6.2'),\n"
-                        "    ('ERP Server', '192.168.9.3'),\n"
-                        "    ('Fast React Server', '192.168.9.216'),\n"
-                        "    ('Accpack Server', '192.168.21.5'),\n"
-                        "]\n\n"
-                        "item_map = {}\n"
-                        "items = prev_data.get('items') or (nodes_data.get('node_2', {}).get('data', {}) or {}).get('items', [])\n"
-                        "if items:\n"
-                        "    for it in items:\n"
-                        "        item_map[str(it.get('item', '')).strip()] = it\n"
-                        "else:\n"
-                        "    for line in str(prev_output or '').splitlines():\n"
-                        "        for _, ip in unit_routers + servers:\n"
-                        "            if re.search(r'\\b' + re.escape(ip) + r'\\b', line):\n"
-                        "                is_online = ('ONLINE' in line) and not any(bad in line.upper() for bad in ('OFFLINE', 'ERROR', '100%'))\n"
-                        "                item_map[ip] = {'item': ip, 'status': 'ONLINE' if is_online else 'OFFLINE', 'output': line}\n\n"
-                        "def get_ms(ip):\n"
-                        "    info = item_map.get(ip)\n"
-                        "    if not info or info.get('status') != 'ONLINE':\n"
-                        "        return 'IP ping loss'\n"
-                        "    out = info.get('output', '')\n"
-                        "    m = re.search(r'\\(([\\d\\.]+)\\s*ms\\)', out)\n"
-                        "    if m:\n"
-                        "        ms_val = int(round(float(m.group(1))))\n"
-                        "        return f'{ms_val}ms'\n"
-                        "    return 'IP ping loss'\n\n"
-                        "lines = []\n"
-                        "lines.append('Unit router ping status:')\n"
-                        "for name, ip in unit_routers:\n"
-                        "    res = get_ms(ip)\n"
-                        "    lines.append(f'{name} Average Ping Time for {ip}: {res}')\n\n"
-                        "lines.append('')\n"
-                        "lines.append('Server Ping Status:')\n"
-                        "for idx, (name, ip) in enumerate(servers, 1):\n"
-                        "    res = get_ms(ip)\n"
-                        "    if res == 'IP ping loss':\n"
-                        "        lines.append(f'{idx}.\\t{name} {ip} Average Ping Time: IP ping loss')\n"
-                        "    else:\n"
-                        "        lines.append(f'{idx}.\\t{name} {ip} Average Ping Time {res}')\n\n"
-                        "print('\\n'.join(lines))"
-                    )
+                    "unit_routers_text": (
+                        "IAL: 192.168.9.1\n"
+                        "SETL: 192.168.11.1\n"
+                        "CityOffice: 192.168.1.1\n"
+                        "ICL: 192.168.35.1\n"
+                        "IKL: 192.168.10.1\n"
+                        "NSN: 192.168.18.1\n"
+                        "CNF: 192.168.19.1\n"
+                        "Dhansiri: 192.168.40.5"
+                    ),
+                    "servers_text": (
+                        "IP Phone Server: 192.168.6.2\n"
+                        "ERP Server: 192.168.9.3\n"
+                        "Fast React Server: 192.168.9.216\n"
+                        "Accpack Server: 192.168.21.5"
+                    ),
+                    "section1_title": "Unit router ping status:",
+                    "section2_title": "Server Ping Status:",
+                    "loss_text": "IP ping loss"
                 }
             },
             {
