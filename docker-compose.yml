@@ -27,6 +27,9 @@ services:
       - DATA_DIR=/app/data
       - DOCUMENTS_DIR=/app/data/documents
       - CHROMA_DIR=/app/data/chroma_db
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_DEFAULT_FROM=${RESEND_DEFAULT_FROM:-MyAgent <onboarding@resend.dev>}
+      - RESEND_VERIFIED_FROM=${RESEND_VERIFIED_FROM:-MyAgent <notifications@itsupport.bd>}
     volumes:
       - ./backend:/app
       - ./data:/app/data
