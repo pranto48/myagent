@@ -1129,6 +1129,132 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
             {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""}
         ]
+    },
+    {
+        "id": "tpl_daily_ping_status_report",
+        "name": "🌐 দৈনিক নেটওয়ার্ক পিং স্ট্যাটাস রিপোর্ট (08:30 AM)",
+        "description": "প্রতিদিন সকাল ৮:৩০ মিনিটে গেটওয়ে ও রাউটার আইপি পিং চেক করে Ping Status Report ফরম্যাটে arif.it@icl.bdrmg.com ঠিকানায় ইমেইল পাঠায়। কোনো আইপি অফলাইন থাকলে 'IP ping loss' দেখায়।",
+        "icon": "🌐",
+        "trigger_type": "daily",
+        "schedule_expr": "30 8 * * *",
+        "daily_time": "08:30",
+        "timezone": "Asia/Dhaka",
+        "is_enabled": 1,
+        "nodes": [
+            {
+                "id": "node_1",
+                "type": "trigger_daily",
+                "title": "⏰ প্রতিদিন সকাল ০৮:৩০ (Daily 08:30 AM)",
+                "x": 60,
+                "y": 160,
+                "config": {"daily_time": "08:30", "timezone": "Asia/Dhaka", "frequency": "daily"}
+            },
+            {
+                "id": "node_2",
+                "type": "loop_foreach",
+                "title": "🌐 রাউটার ও গেটওয়ে ব্যাচ পিং চেক",
+                "x": 370,
+                "y": 160,
+                "config": {
+                    "items_text": "192.168.9.1\n192.168.11.1\n192.168.1.1\n192.168.35.1\n192.168.10.1\n192.168.18.1\n192.168.19.1\n192.168.40.5",
+                    "action_type": "ping"
+                }
+            },
+            {
+                "id": "node_3",
+                "type": "python_transform",
+                "title": "📊 পিং স্ট্যাটাস রিপোর্ট ফরম্যাটার",
+                "x": 680,
+                "y": 160,
+                "config": {
+                    "code": (
+                        "import re\n\n"
+                        "targets = [\n"
+                        "    '192.168.9.1',\n"
+                        "    '192.168.11.1',\n"
+                        "    '192.168.1.1',\n"
+                        "    '192.168.35.1',\n"
+                        "    '192.168.10.1',\n"
+                        "    '192.168.18.1',\n"
+                        "    '192.168.19.1',\n"
+                        "    '192.168.40.5'\n"
+                        "]\n\n"
+                        "item_map = {}\n"
+                        "items = prev_data.get('items') or (nodes_data.get('node_2', {}).get('data', {}) or {}).get('items', [])\n"
+                        "if items:\n"
+                        "    for it in items:\n"
+                        "        item_map[str(it.get('item', '')).strip()] = it\n"
+                        "else:\n"
+                        "    for line in str(prev_output or '').splitlines():\n"
+                        "        for ip in targets:\n"
+                        "            if re.search(r'\\b' + re.escape(ip) + r'\\b', line):\n"
+                        "                is_online = ('ONLINE' in line) and not any(bad in line.upper() for bad in ('OFFLINE', 'ERROR', '100%'))\n"
+                        "                item_map[ip] = {'item': ip, 'status': 'ONLINE' if is_online else 'OFFLINE', 'output': line}\n\n"
+                        "report_lines = ['Ping Status Report']\n"
+                        "for ip in targets:\n"
+                        "    info = item_map.get(ip)\n"
+                        "    if not info or info.get('status') != 'ONLINE':\n"
+                        "        report_lines.append(f'Average Ping Time for {ip}: IP ping loss')\n"
+                        "    else:\n"
+                        "        out = info.get('output', '')\n"
+                        "        m = re.search(r'\\(([\\d\\.]+)\\s*ms\\)', out)\n"
+                        "        if m:\n"
+                        "            ms_val = int(round(float(m.group(1))))\n"
+                        "            report_lines.append(f'Average Ping Time for {ip}: {ms_val}ms')\n"
+                        "        else:\n"
+                        "            report_lines.append(f'Average Ping Time for {ip}: IP ping loss')\n\n"
+                        "print('\\n'.join(report_lines))"
+                    )
+                }
+            },
+            {
+                "id": "node_4",
+                "type": "resend_email",
+                "title": "📧 রেজাল্ট ইমেইল প্রেরণ (Resend)",
+                "x": 990,
+                "y": 160,
+                "config": {
+                    "to": "arif.it@icl.bdrmg.com",
+                    "subject": "📢 Ping Status Report - {{trigger.date}} (08:30 AM)",
+                    "body": "{{nodes.node_3.output}}",
+                    "from_email": ""
+                }
+            },
+            {
+                "id": "node_5",
+                "type": "save_report",
+                "title": "📄 দৈনিক পিং রিপোর্ট আর্কাইভ",
+                "x": 1300,
+                "y": 80,
+                "config": {
+                    "title": "Ping Status Report - {{trigger.date}}",
+                    "report_type": "system_health",
+                    "content": "{{nodes.node_3.output}}",
+                    "index_in_memory": True
+                }
+            },
+            {
+                "id": "node_6",
+                "type": "notify_channel",
+                "title": "💬 চ্যাট সেশনে ব্রিফিং",
+                "x": 1300,
+                "y": 250,
+                "config": {
+                    "target": "chat_session",
+                    "session_title": "📅 Daily Automated Agent Reports",
+                    "title": "📊 Daily Ping Status Report ({{trigger.date}})",
+                    "message": "{{nodes.node_3.output}}",
+                    "custom_webhook_url": ""
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1", "source": "node_1", "target": "node_2", "condition": ""},
+            {"id": "e2", "source": "node_2", "target": "node_3", "condition": ""},
+            {"id": "e3", "source": "node_3", "target": "node_4", "condition": ""},
+            {"id": "e4", "source": "node_4", "target": "node_5", "condition": ""},
+            {"id": "e5", "source": "node_4", "target": "node_6", "condition": ""}
+        ]
     }
 ]
 
