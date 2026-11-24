@@ -16,7 +16,7 @@ import logging
 import traceback
 from collections import defaultdict, deque
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional, Set, Tuple
 
 import httpx
 
@@ -1039,7 +1039,7 @@ class WorkflowEngine:
                 raw_routers = str(cfg.get("unit_routers_text") or "")
                 raw_servers = str(cfg.get("servers_text") or "")
 
-                def _parse_lines_to_targets(text: str) -> List[Tuple[str, str]]:
+                def _parse_lines_to_targets(text: str):
                     parsed = []
                     for line in text.splitlines():
                         line = line.strip()
