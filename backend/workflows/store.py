@@ -385,10 +385,11 @@ NODE_CATALOG: List[Dict[str, Any]] = [
                 "IAL-MMS2: 192.168.4.32\n"
                 "IAL-SAMPLE-ROOM-IT: 192.168.4.28\n"
                 "IAL-1ST-FLOOR-IT: 192.168.4.29\n"
-                "IAL-STORE-SCANNER: 192.168.4.31\n"
                 "IAL-BOARD-ROOM-2NDF-IN: 192.168.4.34\n"
                 "IAL-N9F-BUYER-LUNCH: 192.168.4.35\n"
-                "IAL-INTERSTOFF_BOD2: 192.168.4.37"
+                "IAL-INTERSTOFF_BOD2: 192.168.4.37\n"
+                "IAL-BOARD-ROOM-NF9: 192.168.4.40\n"
+                "IAL-Merchandising2-IT: 192.168.4.41"
             ),
             "section1_title": "Unit router ping status:",
             "section2_title": "Server Ping Status:",
@@ -1229,10 +1230,11 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                         "192.168.4.32\n"
                         "192.168.4.28\n"
                         "192.168.4.29\n"
-                        "192.168.4.31\n"
                         "192.168.4.34\n"
                         "192.168.4.35\n"
-                        "192.168.4.37"
+                        "192.168.4.37\n"
+                        "192.168.4.40\n"
+                        "192.168.4.41"
                     ),
                     "action_type": "ping"
                 }
@@ -1273,10 +1275,11 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                         "IAL-MMS2: 192.168.4.32\n"
                         "IAL-SAMPLE-ROOM-IT: 192.168.4.28\n"
                         "IAL-1ST-FLOOR-IT: 192.168.4.29\n"
-                        "IAL-STORE-SCANNER: 192.168.4.31\n"
                         "IAL-BOARD-ROOM-2NDF-IN: 192.168.4.34\n"
                         "IAL-N9F-BUYER-LUNCH: 192.168.4.35\n"
-                        "IAL-INTERSTOFF_BOD2: 192.168.4.37"
+                        "IAL-INTERSTOFF_BOD2: 192.168.4.37\n"
+                        "IAL-BOARD-ROOM-NF9: 192.168.4.40\n"
+                        "IAL-Merchandising2-IT: 192.168.4.41"
                     ),
                     "section1_title": "Unit router ping status:",
                     "section2_title": "Server Ping Status:",
