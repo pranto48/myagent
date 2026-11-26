@@ -1571,7 +1571,8 @@ function getNodeSummaryLine(node) {
     case 'ping_report_formatter': {
       const rCnt = (c.unit_routers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
       const sCnt = (c.servers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
-      return `📊 নো-কোড রিপোর্ট: ${rCnt} রাউটার, ${sCnt} সার্ভার`;
+      const apCnt = (c.access_points_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
+      return `📊 নো-কোড রিপোর্ট: ${rCnt} রাউটার, ${sCnt} সার্ভার, ${apCnt} AP`;
     }
     case 'loop_foreach': {
       const cnt = (c.items_text || '').split(/[\r\n,]+/).filter(x => x.trim()).length;
@@ -2814,6 +2815,17 @@ function renderNodeInspector() {
                   oninput="updateNodeCfg('servers_text', this.value); syncPingLoopItemsFromFormatter();">${wfEsc(c.servers_text || '')}</textarea>
       </div>
 
+      <div class="wf-field-group" style="margin-top:12px;">
+        <label style="display:flex; justify-content:space-between; align-items:center;">
+          <span>📶 অ্যাক্সেস পয়েন্ট তালিকা (Access Points - AP)</span>
+          <span style="font-size:0.7rem; color:var(--text-muted);">ফরমেট: নাম: আইপি</span>
+        </label>
+        <textarea id="wf-cfg-prf-aps" class="text-input" rows="8"
+                  style="font-family:'Fira Code', monospace; font-size:0.8rem; line-height:1.5;"
+                  placeholder="IAL-AMZAD-SIR-IT: 192.168.4.7&#10;IAL-BOD-COO-IT: 192.168.4.8"
+                  oninput="updateNodeCfg('access_points_text', this.value); syncPingLoopItemsFromFormatter();">${wfEsc(c.access_points_text || '')}</textarea>
+      </div>
+
       <div class="wf-field-row" style="margin-top:10px;">
         <div class="wf-field-group">
           <label>রাউটার সেকশন শিরোনাম</label>
@@ -2827,10 +2839,17 @@ function renderNodeInspector() {
         </div>
       </div>
 
-      <div class="wf-field-group" style="margin-top:8px;">
-        <label>প্যাকেট লস / অফলাইন সতর্কবার্তা টেক্সট</label>
-        <input type="text" class="text-input" value="${wfEsc(c.loss_text || 'IP ping loss')}"
-               onchange="updateNodeCfg('loss_text', this.value)">
+      <div class="wf-field-row" style="margin-top:8px;">
+        <div class="wf-field-group">
+          <label>ওয়্যারলেস (AP) সেকশন শিরোনাম</label>
+          <input type="text" class="text-input" value="${wfEsc(c.section3_title || 'Wireless Network Status-')}"
+                 onchange="updateNodeCfg('section3_title', this.value)">
+        </div>
+        <div class="wf-field-group">
+          <label>প্যাকেট লস / অফলাইন সতর্কবার্তা টেক্সট</label>
+          <input type="text" class="text-input" value="${wfEsc(c.loss_text || 'IP ping loss')}"
+                 onchange="updateNodeCfg('loss_text', this.value)">
+        </div>
       </div>
 
       <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
@@ -4350,7 +4369,7 @@ function syncPingLoopItemsFromFormatter(notify = false) {
   if (!node || node.type !== 'ping_report_formatter') return;
 
   const c = node.config || {};
-  const allLines = `${c.unit_routers_text || ''}\n${c.servers_text || ''}`.split(/\r?\n/);
+  const allLines = `${c.unit_routers_text || ''}\n${c.servers_text || ''}\n${c.access_points_text || ''}`.split(/\r?\n/);
   const ips = [];
   allLines.forEach(l => {
     const m = l.match(/(?:\d{1,3}\.){3}\d{1,3}/);

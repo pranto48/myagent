@@ -1034,30 +1034,34 @@ class WorkflowEngine:
             elif ntype == "ping_report_formatter":
                 sec1_title = str(cfg.get("section1_title") or "Unit router ping status:").strip()
                 sec2_title = str(cfg.get("section2_title") or "Server Ping Status:").strip()
+                sec3_title = str(cfg.get("section3_title") or "Wireless Network Status-").strip()
                 loss_text = str(cfg.get("loss_text") or "IP ping loss").strip()
 
                 raw_routers = str(cfg.get("unit_routers_text") or "")
                 raw_servers = str(cfg.get("servers_text") or "")
+                raw_aps = str(cfg.get("access_points_text") or "")
 
                 def _parse_lines_to_targets(text: str):
                     parsed = []
                     for line in text.splitlines():
-                        line = line.strip()
+                        line = line.strip().rstrip(",")
                         if not line or line.startswith("#"):
                             continue
-                        m = re.match(r"^(.+?)[\s:=|]+((?:\d{1,3}\.){3}\d{1,3})$", line)
-                        if m:
-                            parsed.append((m.group(1).strip(), m.group(2).strip()))
-                        else:
-                            ip_m = re.search(r"((?:\d{1,3}\.){3}\d{1,3})", line)
-                            if ip_m:
-                                ip_val = ip_m.group(1).strip()
-                                lbl = line.replace(ip_val, "").strip(" :=|-") or ip_val
-                                parsed.append((lbl, ip_val))
+                        ip_m = re.search(r"((?:\d{1,3}\.){3}\d{1,3})", line)
+                        if ip_m:
+                            ip_val = ip_m.group(1).strip()
+                            lbl = line[:ip_m.start()].strip()
+                            lbl = re.sub(r"^\d+[\.\-\)]\s*", "", lbl)
+                            lbl = re.sub(r"[\s:=|\-]+IP[\s:=|\-]*$", "", lbl, flags=re.IGNORECASE)
+                            lbl = re.sub(r"[\s:=|\-]+$", "", lbl).strip()
+                            if not lbl:
+                                lbl = ip_val
+                            parsed.append((lbl, ip_val))
                     return parsed
 
                 unit_routers = _parse_lines_to_targets(raw_routers)
                 servers = _parse_lines_to_targets(raw_servers)
+                access_points = _parse_lines_to_targets(raw_aps)
 
                 # Collect ping results from prev node or all prior nodes
                 item_map: Dict[str, Dict[str, Any]] = {}
@@ -1077,7 +1081,7 @@ class WorkflowEngine:
                             item_map[str(it["item"]).strip()] = it
 
                 prev_text = str(ctx.get("prev", {}).get("output", "") or "")
-                all_targets = unit_routers + servers
+                all_targets = unit_routers + servers + access_points
                 for _, ip_target in all_targets:
                     if ip_target not in item_map:
                         for line in prev_text.splitlines():
@@ -1120,13 +1124,37 @@ class WorkflowEngine:
                         else:
                             out_lines.append(f"{idx}.\t{name} {ip} Average Ping Time {res_ms}")
 
+                offline_aps = []
+                if access_points:
+                    if out_lines:
+                        out_lines.append("")
+                    if sec3_title:
+                        out_lines.append(sec3_title)
+                    total_aps = len(access_points)
+                    for name, ip in access_points:
+                        res_ms = _extract_ms(ip)
+                        if res_ms == loss_text:
+                            offline_aps.append((name, ip))
+
+                    out_lines.append(f"1.\tTotal Access Points: {total_aps}")
+                    out_lines.append(f"2.\tOffline Access Points: {len(offline_aps)}")
+
+                    if offline_aps:
+                        out_lines.append("")
+                        out_lines.append("Offline AP List:")
+                        for off_name, off_ip in offline_aps:
+                            out_lines.append(f"•\t{off_name} {off_ip}: Link Down ({loss_text})")
+
                 output = "\n".join(out_lines)
-                summary = f"Ping Report ({len(unit_routers)} routers, {len(servers)} servers)"
+                summary = f"Ping Report ({len(unit_routers)} routers, {len(servers)} servers, {len(access_points)} APs)"
                 data = {
                     "total_routers": len(unit_routers),
                     "total_servers": len(servers),
+                    "total_aps": len(access_points),
+                    "offline_aps_count": len(offline_aps),
                     "routers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in unit_routers],
-                    "servers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in servers]
+                    "servers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in servers],
+                    "access_points": [{"name": n, "ip": ip, "latency": _extract_ms(ip), "status": "OFFLINE" if _extract_ms(ip) == loss_text else "ONLINE"} for n, ip in access_points]
                 }
 
             # 4C. ForEach Batch Loop Iterator Node
@@ -1149,7 +1177,7 @@ class WorkflowEngine:
                         val = ln.strip()
                         if val and not val.startswith("#"):
                             items.append(val)
-                items = items[:25]
+                items = items[:150]
                 if not items:
                     raise ValueError("No items supplied for ForEach Batch Loop.")
 
@@ -1162,49 +1190,64 @@ class WorkflowEngine:
                 batch_results: List[Dict[str, Any]] = []
                 lines_md: List[str] = [f"| # | Item | Status | Summary |", "|---|---|---|---|"]
 
-                for idx_i, item_val in enumerate(items, 1):
-                    item_status = "OK"
-                    item_out = ""
-                    try:
-                        if action_type == "ping":
-                            from agent.subagents.ping_agent import NetworkPingSubAgent
-                            p_res = await asyncio.wait_for(
-                                NetworkPingSubAgent.ping_target(target=item_val),
-                                timeout=15.0
-                            )
-                            ok_p = bool(p_res.get("success", False))
-                            item_status = "ONLINE" if ok_p else "OFFLINE"
-                            lat = p_res.get("latency_ms", "-")
-                            item_out = f"{p_res.get('status', item_status)} ({lat} ms) - {p_res.get('detail', p_res.get('method', 'ICMP'))}"
-                        elif action_type == "http" and http_url_tpl:
-                            url_i = http_url_tpl.replace("{{item}}", item_val)
-                            async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
-                                resp_i = await client.request(http_method, url_i)
-                                item_status = f"HTTP {resp_i.status_code}"
-                                if resp_i.status_code >= 400:
-                                    item_status = f"ERROR HTTP {resp_i.status_code}"
-                                item_out = resp_i.text[:350]
-                        else:
-                            args_str = args_tpl.replace("{{item}}", item_val)
-                            try:
-                                parsed_args = json.loads(args_str)
-                            except Exception:
-                                parsed_args = {"target": item_val}
-                            t_res = await asyncio.wait_for(
-                                AgentTools.dispatch_tool(tool_name, parsed_args),
-                                timeout=25.0
-                            )
-                            item_out = str(t_res).strip()
-                            low_out = item_out.lower()
-                            if any(bad in low_out for bad in ("error", "failed", "100% packet loss", "unreachable", "offline")):
-                                item_status = "ERROR"
-                    except Exception as it_err:
-                        item_status = "ERROR"
-                        item_out = str(it_err)
+                # Run loop items with controlled concurrency (Semaphore = 10) for high throughput
+                sem = asyncio.Semaphore(10)
 
-                    batch_results.append({"item": item_val, "status": item_status, "output": item_out[:600]})
-                    one_line = " ".join(item_out.splitlines())[:120].replace("|", "/")
-                    lines_md.append(f"| {idx_i} | `{item_val}` | **{item_status}** | {one_line} |")
+                async def _exec_loop_item(idx_i: int, item_val: str) -> Dict[str, Any]:
+                    async with sem:
+                        item_status = "OK"
+                        item_out = ""
+                        try:
+                            if action_type == "ping":
+                                from agent.subagents.ping_agent import NetworkPingSubAgent
+                                p_res = await asyncio.wait_for(
+                                    NetworkPingSubAgent.ping_target(target=item_val),
+                                    timeout=15.0
+                                )
+                                ok_p = bool(p_res.get("success", False))
+                                item_status = "ONLINE" if ok_p else "OFFLINE"
+                                lat = p_res.get("latency_ms", "-")
+                                item_out = f"{p_res.get('status', item_status)} ({lat} ms) - {p_res.get('detail', p_res.get('method', 'ICMP'))}"
+                            elif action_type == "http" and http_url_tpl:
+                                url_i = http_url_tpl.replace("{{item}}", item_val)
+                                async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
+                                    resp_i = await client.request(http_method, url_i)
+                                    item_status = f"HTTP {resp_i.status_code}"
+                                    if resp_i.status_code >= 400:
+                                        item_status = f"ERROR HTTP {resp_i.status_code}"
+                                    item_out = resp_i.text[:350]
+                            else:
+                                args_str = args_tpl.replace("{{item}}", item_val)
+                                try:
+                                    parsed_args = json.loads(args_str)
+                                except Exception:
+                                    parsed_args = {"target": item_val}
+                                t_res = await asyncio.wait_for(
+                                    AgentTools.dispatch_tool(tool_name, parsed_args),
+                                    timeout=25.0
+                                )
+                                item_out = str(t_res).strip()
+                                low_out = item_out.lower()
+                                if any(bad in low_out for bad in ("error", "failed", "100% packet loss", "unreachable", "offline")):
+                                    item_status = "ERROR"
+                        except Exception as it_err:
+                            item_status = "ERROR"
+                            item_out = str(it_err)
+
+                        return {
+                            "idx": idx_i,
+                            "item": item_val,
+                            "status": item_status,
+                            "output": item_out[:600]
+                        }
+
+                tasks = [_exec_loop_item(idx_i, item_val) for idx_i, item_val in enumerate(items, 1)]
+                res_list = await asyncio.gather(*tasks)
+
+                for res in res_list:
+                    batch_results.append({"item": res["item"], "status": res["status"], "output": res["output"]})
+                    one_line = " ".join(res["output"].splitlines())[:120].replace("|", "/")
+                    lines_md.append(f"| {res['idx']} | `{res['item']}` | **{res['status']}** | {one_line} |")
 
                 err_items = sum(1 for b in batch_results if b["status"] in ("ERROR", "OFFLINE") or "ERROR" in b["status"])
                 data = {"total_items": len(batch_results), "error_items": err_items, "items": batch_results}

@@ -372,8 +372,27 @@ NODE_CATALOG: List[Dict[str, Any]] = [
                 "Fast React Server: 192.168.9.216\n"
                 "Accpack Server: 192.168.21.5"
             ),
+            "access_points_text": (
+                "IAL-AMZAD-SIR-IT: 192.168.4.7\n"
+                "IAL-BOD-COO-IT: 192.168.4.8\n"
+                "IAL-1ST-FLOOR-PROC-IT: 192.168.4.12\n"
+                "IAL-ACC-AUDIT-IT: 192.168.4.13\n"
+                "IAL-INSPECTIONAREA2-IT: 192.168.4.18\n"
+                "IAL-OB5F-PLANING-IE-IT: 192.168.4.24\n"
+                "IAL-MERCHANDISING-IT: 192.168.4.25\n"
+                "IAL-ITROOM-IT: 192.168.4.26\n"
+                "IAL-MMS: 192.168.4.27\n"
+                "IAL-MMS2: 192.168.4.32\n"
+                "IAL-SAMPLE-ROOM-IT: 192.168.4.28\n"
+                "IAL-1ST-FLOOR-IT: 192.168.4.29\n"
+                "IAL-STORE-SCANNER: 192.168.4.31\n"
+                "IAL-BOARD-ROOM-2NDF-IN: 192.168.4.34\n"
+                "IAL-N9F-BUYER-LUNCH: 192.168.4.35\n"
+                "IAL-INTERSTOFF_BOD2: 192.168.4.37"
+            ),
             "section1_title": "Unit router ping status:",
             "section2_title": "Server Ping Status:",
+            "section3_title": "Wireless Network Status-",
             "loss_text": "IP ping loss"
         }
     },
@@ -1181,7 +1200,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
             {
                 "id": "node_2",
                 "type": "loop_foreach",
-                "title": "🌐 রাউটার ও গেটওয়ে ব্যাচ পিং চেক",
+                "title": "🌐 রাউটার, সার্ভার ও AP ব্যাচ পিং চেক",
                 "x": 370,
                 "y": 160,
                 "config": {
@@ -1197,7 +1216,23 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                         "192.168.6.2\n"
                         "192.168.9.3\n"
                         "192.168.9.216\n"
-                        "192.168.21.5"
+                        "192.168.21.5\n"
+                        "192.168.4.7\n"
+                        "192.168.4.8\n"
+                        "192.168.4.12\n"
+                        "192.168.4.13\n"
+                        "192.168.4.18\n"
+                        "192.168.4.24\n"
+                        "192.168.4.25\n"
+                        "192.168.4.26\n"
+                        "192.168.4.27\n"
+                        "192.168.4.32\n"
+                        "192.168.4.28\n"
+                        "192.168.4.29\n"
+                        "192.168.4.31\n"
+                        "192.168.4.34\n"
+                        "192.168.4.35\n"
+                        "192.168.4.37"
                     ),
                     "action_type": "ping"
                 }
@@ -1225,8 +1260,27 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                         "Fast React Server: 192.168.9.216\n"
                         "Accpack Server: 192.168.21.5"
                     ),
+                    "access_points_text": (
+                        "IAL-AMZAD-SIR-IT: 192.168.4.7\n"
+                        "IAL-BOD-COO-IT: 192.168.4.8\n"
+                        "IAL-1ST-FLOOR-PROC-IT: 192.168.4.12\n"
+                        "IAL-ACC-AUDIT-IT: 192.168.4.13\n"
+                        "IAL-INSPECTIONAREA2-IT: 192.168.4.18\n"
+                        "IAL-OB5F-PLANING-IE-IT: 192.168.4.24\n"
+                        "IAL-MERCHANDISING-IT: 192.168.4.25\n"
+                        "IAL-ITROOM-IT: 192.168.4.26\n"
+                        "IAL-MMS: 192.168.4.27\n"
+                        "IAL-MMS2: 192.168.4.32\n"
+                        "IAL-SAMPLE-ROOM-IT: 192.168.4.28\n"
+                        "IAL-1ST-FLOOR-IT: 192.168.4.29\n"
+                        "IAL-STORE-SCANNER: 192.168.4.31\n"
+                        "IAL-BOARD-ROOM-2NDF-IN: 192.168.4.34\n"
+                        "IAL-N9F-BUYER-LUNCH: 192.168.4.35\n"
+                        "IAL-INTERSTOFF_BOD2: 192.168.4.37"
+                    ),
                     "section1_title": "Unit router ping status:",
                     "section2_title": "Server Ping Status:",
+                    "section3_title": "Wireless Network Status-",
                     "loss_text": "IP ping loss"
                 }
             },
