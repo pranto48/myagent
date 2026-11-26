@@ -319,78 +319,65 @@ class ResendEmailService:
                 "id": None
             }
 
-            latency_ms = int((time.time() - t0) * 1000)
-            status_code = res.status_code
+        latency_ms = int((time.time() - t0) * 1000)
+        status_code = res.status_code
 
-            try:
-                data = res.json()
-            except Exception:
-                data = {"raw_text": res.text}
+        try:
+            data = res.json()
+        except Exception:
+            data = {"raw_text": res.text}
 
-            if status_code in (200, 201):
-                msg_id = data.get("id") or ""
-                logger.info(f"Resend email dispatched successfully! ID={msg_id}, To={recipients}, Sender={sender}")
-                return {
-                    "ok": True,
-                    "id": msg_id,
-                    "from": sender,
-                    "to": recipients,
-                    "subject": clean_subject,
-                    "status_code": status_code,
-                    "latency_ms": latency_ms,
-                    "error": ""
-                }
-
-            # If sender failed because custom domain is not yet active or sandbox rule:
-            # Auto-fallback to onboarding@resend.dev if first attempt failed on custom domain
-            err_msg = data.get("message") or res.text
-            if status_code in (403, 422) and "onboarding@resend.dev" not in sender:
-                logger.warning(f"Resend custom sender failed ({err_msg}). Retrying with sandbox sender 'onboarding@resend.dev'...")
-                payload["from"] = "MyAgent <onboarding@resend.dev>"
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    fallback_res = await client.post(
-                        f"{RESEND_API_BASE}/emails",
-                        json=payload,
-                        headers=headers
-                    )
-                if fallback_res.status_code in (200, 201):
-                    fb_data = fallback_res.json()
-                    msg_id = fb_data.get("id") or ""
-                    return {
-                        "ok": True,
-                        "id": msg_id,
-                        "from": payload["from"],
-                        "to": recipients,
-                        "subject": clean_subject,
-                        "status_code": fallback_res.status_code,
-                        "fallback_used": True,
-                        "error": ""
-                    }
-
-            logger.error(f"Resend email failed: HTTP {status_code} - {err_msg}")
+        if status_code in (200, 201):
+            msg_id = data.get("id") or ""
+            logger.info(f"Resend email dispatched successfully! ID={msg_id}, To={recipients}, Sender={sender}")
             return {
-                "ok": False,
-                "id": None,
+                "ok": True,
+                "id": msg_id,
                 "from": sender,
                 "to": recipients,
                 "subject": clean_subject,
                 "status_code": status_code,
                 "latency_ms": latency_ms,
-                "error": f"Resend API Error (HTTP {status_code}): {err_msg}"
+                "error": ""
             }
 
-        except Exception as ex:
-            logger.error(f"Resend email network error: {ex}")
-            return {
-                "ok": False,
-                "id": None,
-                "from": sender,
-                "to": recipients,
-                "subject": clean_subject,
-                "status_code": 0,
-                "latency_ms": int((time.time() - t0) * 1000),
-                "error": f"Network exception: {str(ex)}"
-            }
+        # If sender failed because custom domain is not yet active or sandbox rule:
+        # Auto-fallback to onboarding@resend.dev if first attempt failed on custom domain
+        err_msg = data.get("message") or res.text
+        if status_code in (403, 422) and "onboarding@resend.dev" not in sender:
+            logger.warning(f"Resend custom sender failed ({err_msg}). Retrying with sandbox sender 'onboarding@resend.dev'...")
+            payload["from"] = "MyAgent <onboarding@resend.dev>"
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                fallback_res = await client.post(
+                    f"{RESEND_API_BASE}/emails",
+                    json=payload,
+                    headers=headers
+                )
+            if fallback_res.status_code in (200, 201):
+                fb_data = fallback_res.json()
+                msg_id = fb_data.get("id") or ""
+                return {
+                    "ok": True,
+                    "id": msg_id,
+                    "from": payload["from"],
+                    "to": recipients,
+                    "subject": clean_subject,
+                    "status_code": fallback_res.status_code,
+                    "fallback_used": True,
+                    "error": ""
+                }
+
+        logger.error(f"Resend email failed: HTTP {status_code} - {err_msg}")
+        return {
+            "ok": False,
+            "id": None,
+            "from": sender,
+            "to": recipients,
+            "subject": clean_subject,
+            "status_code": status_code,
+            "latency_ms": latency_ms,
+            "error": f"Resend API Error (HTTP {status_code}): {err_msg}"
+        }
 
 # Singleton instance
 resend_service = ResendEmailService()
