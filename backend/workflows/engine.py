@@ -1201,14 +1201,35 @@ class WorkflowEngine:
                         try:
                             if action_type == "ping":
                                 from agent.subagents.ping_agent import NetworkPingSubAgent
+                                # Attempt 1: Initial ping check
                                 p_res = await asyncio.wait_for(
-                                    NetworkPingSubAgent.ping_target(target=item_val),
-                                    timeout=15.0
+                                    NetworkPingSubAgent.ping_target(target=item_val, count=2, timeout=1.5),
+                                    timeout=12.0
                                 )
                                 ok_p = bool(p_res.get("success", False))
+                                retry_note = ""
+
+                                # If ping is not okay, ping 2nd time to confirm status before reporting
+                                if not ok_p:
+                                    logger.info(f"Target '{item_val}' ping not okay on 1st check. Retrying 2nd time to confirm...")
+                                    await asyncio.sleep(1.2)
+                                    p_res2 = await asyncio.wait_for(
+                                        NetworkPingSubAgent.ping_target(target=item_val, count=2, timeout=1.5),
+                                        timeout=12.0
+                                    )
+                                    if bool(p_res2.get("success", False)):
+                                        p_res = p_res2
+                                        ok_p = True
+                                        retry_note = " (confirmed OK on 2nd attempt)"
+                                        logger.info(f"Target '{item_val}' confirmed ONLINE on 2nd ping check.")
+                                    else:
+                                        p_res = p_res2
+                                        retry_note = " (confirmed OFFLINE after 2 attempts)"
+                                        logger.info(f"Target '{item_val}' confirmed OFFLINE after 2nd ping check.")
+
                                 item_status = "ONLINE" if ok_p else "OFFLINE"
                                 lat = p_res.get("latency_ms", "-")
-                                item_out = f"{p_res.get('status', item_status)} ({lat} ms) - {p_res.get('detail', p_res.get('method', 'ICMP'))}"
+                                item_out = f"{p_res.get('status', item_status)} ({lat} ms) - {p_res.get('detail', p_res.get('method', 'ICMP'))}{retry_note}"
                             elif action_type == "http" and http_url_tpl:
                                 url_i = http_url_tpl.replace("{{item}}", item_val)
                                 async with httpx.AsyncClient(timeout=12.0, verify=False) as client:
