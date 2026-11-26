@@ -1190,11 +1190,12 @@ class WorkflowEngine:
                 batch_results: List[Dict[str, Any]] = []
                 lines_md: List[str] = [f"| # | Item | Status | Summary |", "|---|---|---|---|"]
 
-                # Run loop items with controlled concurrency (Semaphore = 10) for high throughput
-                sem = asyncio.Semaphore(10)
+                # Run loop items with controlled concurrency (Semaphore = 3) to prevent switch/firewall ICMP rate-limiting
+                sem = asyncio.Semaphore(3)
 
                 async def _exec_loop_item(idx_i: int, item_val: str) -> Dict[str, Any]:
                     async with sem:
+                        await asyncio.sleep(0.05)
                         item_status = "OK"
                         item_out = ""
                         try:

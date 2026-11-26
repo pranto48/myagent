@@ -295,13 +295,29 @@ class ResendEmailService:
         }
 
         t0 = time.time()
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                res = await client.post(
-                    f"{RESEND_API_BASE}/emails",
-                    json=payload,
-                    headers=headers
-                )
+        res = None
+        last_net_err = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=25.0) as client:
+                    res = await client.post(
+                        f"{RESEND_API_BASE}/emails",
+                        json=payload,
+                        headers=headers
+                    )
+                break
+            except Exception as net_ex:
+                last_net_err = net_ex
+                logger.warning(f"Resend API connection attempt {attempt+1} failed: {net_ex}")
+                if attempt < 2:
+                    await asyncio.sleep(1.5)
+
+        if res is None:
+            return {
+                "ok": False,
+                "error": f"Resend API network exception: {last_net_err}",
+                "id": None
+            }
 
             latency_ms = int((time.time() - t0) * 1000)
             status_code = res.status_code
