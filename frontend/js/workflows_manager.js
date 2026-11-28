@@ -1572,7 +1572,8 @@ function getNodeSummaryLine(node) {
       const rCnt = (c.unit_routers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
       const sCnt = (c.servers_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
       const apCnt = (c.access_points_text || '').split(/\r?\n/).filter(x => x.trim() && !x.trim().startsWith('#')).length;
-      return `📊 নো-কোড রিপোর্ট: ${rCnt} রাউটার, ${sCnt} সার্ভার, ${apCnt} AP`;
+      const hasNas = c.enable_nas_report !== false;
+      return `📊 নো-কোড রিপোর্ট: ${rCnt} রাউটার, ${sCnt} সার্ভার, ${apCnt} AP${hasNas ? ' + NAS' : ''}`;
     }
     case 'loop_foreach': {
       const cnt = (c.items_text || '').split(/[\r\n,]+/).filter(x => x.trim()).length;
@@ -2849,6 +2850,45 @@ function renderNodeInspector() {
           <label>প্যাকেট লস / অফলাইন সতর্কবার্তা টেক্সট</label>
           <input type="text" class="text-input" value="${wfEsc(c.loss_text || 'IP ping loss')}"
                  onchange="updateNodeCfg('loss_text', this.value)">
+        </div>
+      </div>
+
+      <div style="margin-top:14px; padding:12px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.25); border-radius:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#34d399; margin-bottom:6px; cursor:pointer;">
+          <input type="checkbox" ${c.enable_nas_report !== false ? 'checked' : ''}
+                 onchange="updateNodeCfg('enable_nas_report', this.checked); syncPingLoopItemsFromFormatter();">
+          <span>💾 NAS সার্ভার ও স্টোরেজ ক্যাপাসিটি রিপোর্ট অন্তর্ভুক্ত করুন</span>
+        </label>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+          পিং চেকের পাশাপাশি NAS সার্ভারের স্টোরেজ ক্যাপাসিটি স্ট্যাটাস (যেমন: <code>NAS Server: Operational (48% Capacity free)</code>) ইমেইল রিপোর্টে যুক্ত হবে।
+        </div>
+        <div class="wf-field-row">
+          <div class="wf-field-group">
+            <label>NAS সার্ভার আইপি (IP)</label>
+            <input type="text" class="text-input" value="${wfEsc(c.nas_ip || '192.168.9.5')}"
+                   placeholder="192.168.9.5"
+                   onchange="updateNodeCfg('nas_ip', this.value); syncPingLoopItemsFromFormatter();">
+          </div>
+          <div class="wf-field-group">
+            <label>NAS সার্ভার নাম / ডিসপ্লে</label>
+            <input type="text" class="text-input" value="${wfEsc(c.nas_name || 'NAS Server')}"
+                   placeholder="NAS Server"
+                   onchange="updateNodeCfg('nas_name', this.value)">
+          </div>
+        </div>
+        <div class="wf-field-row" style="margin-top:8px;">
+          <div class="wf-field-group">
+            <label>স্টোরেজ ক্যাপাসিটি টেক্সট</label>
+            <input type="text" class="text-input" value="${wfEsc(c.nas_capacity_free || '48% Capacity free')}"
+                   placeholder="48% Capacity free"
+                   onchange="updateNodeCfg('nas_capacity_free', this.value)">
+          </div>
+          <div class="wf-field-group">
+            <label>NAS সেকশন শিরোনাম</label>
+            <input type="text" class="text-input" value="${wfEsc(c.section_nas_title || 'NAS Server Storage Status:')}"
+                   placeholder="NAS Server Storage Status:"
+                   onchange="updateNodeCfg('section_nas_title', this.value)">
+          </div>
         </div>
       </div>
 
@@ -4375,6 +4415,11 @@ function syncPingLoopItemsFromFormatter(notify = false) {
     const m = l.match(/(?:\d{1,3}\.){3}\d{1,3}/);
     if (m && !ips.includes(m[0])) ips.push(m[0]);
   });
+
+  if (c.enable_nas_report !== false) {
+    const nasIp = (c.nas_ip || '192.168.9.5').trim();
+    if (nasIp && !ips.includes(nasIp)) ips.push(nasIp);
+  }
 
   if (!ips.length) return;
 

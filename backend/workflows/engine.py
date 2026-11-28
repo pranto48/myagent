@@ -1037,6 +1037,13 @@ class WorkflowEngine:
                 sec3_title = str(cfg.get("section3_title") or "Wireless Network Status-").strip()
                 loss_text = str(cfg.get("loss_text") or "IP ping loss").strip()
 
+                enable_nas = bool(cfg.get("enable_nas_report", True))
+                nas_ip = str(cfg.get("nas_ip") or "192.168.9.5").strip()
+                nas_name = str(cfg.get("nas_name") or "NAS Server").strip()
+                nas_cap_str = str(cfg.get("nas_capacity_free") or "48% Capacity free").strip()
+                sec_nas_title = str(cfg.get("section_nas_title") or "NAS Server Storage Status:").strip()
+                nas_mount_path = str(cfg.get("nas_mount_path") or "").strip()
+
                 raw_routers = str(cfg.get("unit_routers_text") or "")
                 raw_servers = str(cfg.get("servers_text") or "")
                 raw_aps = str(cfg.get("access_points_text") or "")
@@ -1082,6 +1089,8 @@ class WorkflowEngine:
 
                 prev_text = str(ctx.get("prev", {}).get("output", "") or "")
                 all_targets = unit_routers + servers + access_points
+                if enable_nas and nas_ip:
+                    all_targets.append((nas_name, nas_ip))
                 for _, ip_target in all_targets:
                     if ip_target not in item_map:
                         for line in prev_text.splitlines():
@@ -1124,6 +1133,62 @@ class WorkflowEngine:
                         else:
                             out_lines.append(f"{idx}.\t{name} {ip} Average Ping Time {res_ms}")
 
+                # NAS Server Storage Status Section
+                nas_report_line = ""
+                is_nas_online = False
+                cap_display = nas_cap_str
+                if enable_nas and nas_ip:
+                    free_pct_detected = None
+                    check_path = nas_mount_path if (nas_mount_path and os.path.exists(nas_mount_path)) else None
+                    if not check_path and os.path.exists("/mnt/nas"):
+                        check_path = "/mnt/nas"
+                    if not check_path:
+                        try:
+                            cwd = os.getcwd()
+                            if "192.168.9.5" in cwd or "nas" in cwd.lower():
+                                check_path = cwd
+                        except Exception:
+                            pass
+
+                    if check_path:
+                        try:
+                            import shutil as _shutil
+                            du = _shutil.disk_usage(check_path)
+                            free_pct_detected = int(round((du.free / du.total) * 100))
+                        except Exception:
+                            pass
+
+                    if free_pct_detected is not None:
+                        cap_display = f"{free_pct_detected}% Capacity free"
+                    else:
+                        cap_display = nas_cap_str
+
+                    if not cap_display.endswith("free") and "%" in cap_display:
+                        cap_display = f"{cap_display} Capacity free"
+
+                    nas_ping_res = _extract_ms(nas_ip)
+                    if nas_ping_res != loss_text:
+                        is_nas_online = True
+                        nas_report_line = f"{nas_name}: Operational ({cap_display})"
+                    else:
+                        if nas_ip not in item_map:
+                            try:
+                                import socket
+                                with socket.create_connection((nas_ip, 445), timeout=1.5):
+                                    is_nas_online = True
+                            except Exception:
+                                pass
+                        if is_nas_online:
+                            nas_report_line = f"{nas_name}: Operational ({cap_display})"
+                        else:
+                            nas_report_line = f"{nas_name}: Offline ({loss_text})"
+
+                    if out_lines:
+                        out_lines.append("")
+                    if sec_nas_title:
+                        out_lines.append(sec_nas_title)
+                    out_lines.append(nas_report_line)
+
                 offline_aps = []
                 if access_points:
                     if out_lines:
@@ -1146,7 +1211,8 @@ class WorkflowEngine:
                             out_lines.append(f"•\t{off_name} {off_ip}: Link Down ({loss_text})")
 
                 output = "\n".join(out_lines)
-                summary = f"Ping Report ({len(unit_routers)} routers, {len(servers)} servers, {len(access_points)} APs)"
+                nas_summary_tag = f", NAS: {'OK' if is_nas_online else 'Down'}" if enable_nas else ""
+                summary = f"Ping Report ({len(unit_routers)} routers, {len(servers)} servers, {len(access_points)} APs{nas_summary_tag})"
                 data = {
                     "total_routers": len(unit_routers),
                     "total_servers": len(servers),
@@ -1154,7 +1220,15 @@ class WorkflowEngine:
                     "offline_aps_count": len(offline_aps),
                     "routers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in unit_routers],
                     "servers": [{"name": n, "ip": ip, "latency": _extract_ms(ip)} for n, ip in servers],
-                    "access_points": [{"name": n, "ip": ip, "latency": _extract_ms(ip), "status": "OFFLINE" if _extract_ms(ip) == loss_text else "ONLINE"} for n, ip in access_points]
+                    "access_points": [{"name": n, "ip": ip, "latency": _extract_ms(ip), "status": "OFFLINE" if _extract_ms(ip) == loss_text else "ONLINE"} for n, ip in access_points],
+                    "nas_storage": {
+                        "enabled": enable_nas,
+                        "name": nas_name,
+                        "ip": nas_ip,
+                        "status": "Operational" if is_nas_online else "Offline",
+                        "capacity": cap_display if enable_nas else "",
+                        "line": nas_report_line
+                    }
                 }
 
             # 4C. ForEach Batch Loop Iterator Node

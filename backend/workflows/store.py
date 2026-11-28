@@ -394,7 +394,13 @@ NODE_CATALOG: List[Dict[str, Any]] = [
             "section1_title": "Unit router ping status:",
             "section2_title": "Server Ping Status:",
             "section3_title": "Wireless Network Status-",
-            "loss_text": "IP ping loss"
+            "loss_text": "IP ping loss",
+            "enable_nas_report": True,
+            "nas_ip": "192.168.9.5",
+            "nas_name": "NAS Server",
+            "nas_capacity_free": "48% Capacity free",
+            "section_nas_title": "NAS Server Storage Status:",
+            "nas_mount_path": ""
         }
     },
     {
@@ -1218,6 +1224,7 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                         "192.168.9.3\n"
                         "192.168.9.216\n"
                         "192.168.21.5\n"
+                        "192.168.9.5\n"
                         "192.168.4.7\n"
                         "192.168.4.8\n"
                         "192.168.4.12\n"
@@ -1284,7 +1291,13 @@ WORKFLOW_TEMPLATES: List[Dict[str, Any]] = [
                     "section1_title": "Unit router ping status:",
                     "section2_title": "Server Ping Status:",
                     "section3_title": "Wireless Network Status-",
-                    "loss_text": "IP ping loss"
+                    "loss_text": "IP ping loss",
+                    "enable_nas_report": True,
+                    "nas_ip": "192.168.9.5",
+                    "nas_name": "NAS Server",
+                    "nas_capacity_free": "48% Capacity free",
+                    "section_nas_title": "NAS Server Storage Status:",
+                    "nas_mount_path": ""
                 }
             },
             {
